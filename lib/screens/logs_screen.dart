@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/obd_data_provider.dart';
+import '../providers/log_provider.dart';
 import '../theme/app_theme.dart';
 import '../models/obd_data.dart';
 
@@ -25,7 +25,7 @@ class _LogsScreenState extends State<LogsScreen> {
   LogFilterType _currentFilter = LogFilterType.all;
 
   /// 根据过滤类型获取过滤后的日志
-  List<DiagnosticLog> _getFilteredLogs(OBDDataProvider provider) {
+  List<DiagnosticLog> _getFilteredLogs(LogProvider provider) {
     if (_currentFilter == LogFilterType.all) {
       return provider.logs;
     }
@@ -46,14 +46,13 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   /// 获取各类型日志数量
-  Map<LogFilterType, int> _getLogCounts(OBDDataProvider provider) {
-    final logs = provider.logs;
+  Map<LogFilterType, int> _getLogCounts(LogProvider provider) {
     return {
-      LogFilterType.all: logs.length,
-      LogFilterType.success: logs.where((l) => l.type == LogType.success).length,
-      LogFilterType.warning: logs.where((l) => l.type == LogType.warning).length,
-      LogFilterType.error: logs.where((l) => l.type == LogType.error).length,
-      LogFilterType.info: logs.where((l) => l.type == LogType.info).length,
+      LogFilterType.all: provider.totalCount,
+      LogFilterType.success: provider.successCount,
+      LogFilterType.warning: provider.warningCount,
+      LogFilterType.error: provider.errorCount,
+      LogFilterType.info: provider.infoCount,
     };
   }
 
@@ -66,7 +65,7 @@ class _LogsScreenState extends State<LogsScreen> {
       child: Column(
         children: [
           // 合并后的顶部区域
-          Consumer<OBDDataProvider>(
+          Consumer<LogProvider>(
             builder: (context, provider, child) {
               final counts = _getLogCounts(provider);
               return _CompactHeader(
@@ -77,13 +76,14 @@ class _LogsScreenState extends State<LogsScreen> {
                     _currentFilter = filter;
                   });
                 },
+                onExport: () => provider.shareLogs(),
               );
             },
           ),
 
           // 日志列表
           Expanded(
-            child: Consumer<OBDDataProvider>(
+            child: Consumer<LogProvider>(
               builder: (context, provider, child) {
                 final filteredLogs = _getFilteredLogs(provider);
 
@@ -142,11 +142,13 @@ class _CompactHeader extends StatelessWidget {
   final Map<LogFilterType, int> counts;
   final LogFilterType currentFilter;
   final ValueChanged<LogFilterType> onFilterChanged;
+  final VoidCallback onExport;
 
   const _CompactHeader({
     required this.counts,
     required this.currentFilter,
     required this.onFilterChanged,
+    required this.onExport,
   });
 
   @override
@@ -238,30 +240,33 @@ class _CompactHeader extends StatelessWidget {
           const SizedBox(width: 12),
 
           // 右侧：导出按钮
-          Container(
-            height: 24,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.primary,
-              borderRadius: BorderRadius.circular(5),
-              boxShadow: AppTheme.glowShadow(AppTheme.primary),
-            ),
-            child: const Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.download, color: Colors.white, size: 12),
-                  SizedBox(width: 4),
-                  Text(
-                    'EXPORT',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
+          GestureDetector(
+            onTap: onExport,
+            child: Container(
+              height: 24,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.primary,
+                borderRadius: BorderRadius.circular(5),
+                boxShadow: AppTheme.glowShadow(AppTheme.primary),
+              ),
+              child: const Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.download, color: Colors.white, size: 12),
+                    SizedBox(width: 4),
+                    Text(
+                      'EXPORT',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

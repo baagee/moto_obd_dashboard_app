@@ -98,10 +98,12 @@ class DiagnosticLog {
   final LogType type;
   final String message;
   final DateTime timestamp;
+  final String source; // 日志来源
 
   DiagnosticLog({
     required this.type,
     required this.message,
+    required this.source,
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
 

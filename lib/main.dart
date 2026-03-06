@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'providers/obd_data_provider.dart';
 import 'providers/bluetooth_provider.dart';
+import 'providers/log_provider.dart';
 import 'screens/main_container.dart';
 
 void main() {
@@ -32,6 +33,7 @@ class OBDDashboardApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => OBDDataProvider()),
         ChangeNotifierProvider(create: (_) => BluetoothProvider()),
+        ChangeNotifierProvider(create: (_) => LogProvider()),
       ],
       child: MaterialApp(
         title: 'CYBER-CYCLE OBD',

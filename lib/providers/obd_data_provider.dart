@@ -8,7 +8,6 @@ class OBDDataProvider extends ChangeNotifier {
   // 数据更新定时器
   Timer? _updateTimer;
   Timer? _eventTimer;
-  Timer? _logTimer;
 
   // OBD数据
   OBDData _data = OBDData(
@@ -30,9 +29,6 @@ class OBDDataProvider extends ChangeNotifier {
   // 骑行事件列表
   final List<RidingEvent> _events = [];
 
-  // 诊断日志列表
-  final List<DiagnosticLog> _logs = [];
-
   // 随机数生成器
   final Random _random = Random();
 
@@ -46,7 +42,6 @@ class OBDDataProvider extends ChangeNotifier {
   // Getter
   OBDData get data => _data;
   List<RidingEvent> get events => _events;
-  List<DiagnosticLog> get logs => _logs;
   List<int> get pressureHistory => _pressureHistory;
 
   OBDDataProvider() {
@@ -73,11 +68,6 @@ class OBDDataProvider extends ChangeNotifier {
     for (int i = 0; i < 3; i++) {
       _events.insert(0, _generateEvent());
     }
-
-    // 初始化日志
-    for (int i = 0; i < 5; i++) {
-      _logs.insert(0, _generateLog());
-    }
   }
 
   /// 启动定时器
@@ -90,11 +80,6 @@ class OBDDataProvider extends ChangeNotifier {
     // 每8秒添加新事件
     _eventTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       _addEvent();
-    });
-
-    // 每5秒添加新日志
-    _logTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      _addLog();
     });
   }
 
@@ -146,15 +131,6 @@ class OBDDataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 添加诊断日志
-  void _addLog() {
-    _logs.insert(0, _generateLog());
-    if (_logs.length > 15) {
-      _logs.removeLast();
-    }
-    notifyListeners();
-  }
-
   // ========== 数据生成方法 ==========
 
   int _generateRPM() => 6000 + _random.nextInt(6000);
@@ -196,27 +172,10 @@ class OBDDataProvider extends ChangeNotifier {
     return events[_random.nextInt(events.length)];
   }
 
-  DiagnosticLog _generateLog() {
-    final logs = [
-      DiagnosticLog(type: LogType.success, message: 'ECU Handshake Successful'),
-      DiagnosticLog(type: LogType.warning, message: 'O2 Sensor Voltage Fluctuating'),
-      DiagnosticLog(type: LogType.error, message: 'P0118: Engine Coolant Temp Circuit High'),
-      DiagnosticLog(type: LogType.info, message: 'Fuel Trim Readout: Normal'),
-      DiagnosticLog(type: LogType.warning, message: 'Tire Pressure Low: Rear (32 PSI)'),
-      DiagnosticLog(type: LogType.success, message: 'Transmission Temperature: Normal'),
-      DiagnosticLog(type: LogType.info, message: 'Air Intake Flow: Optimal'),
-      DiagnosticLog(type: LogType.warning, message: 'Battery Voltage Slight Drop'),
-      DiagnosticLog(type: LogType.success, message: 'Brake System Check: Passed'),
-      DiagnosticLog(type: LogType.info, message: 'Throttle Position Sensor: Calibrated'),
-    ];
-    return logs[_random.nextInt(logs.length)];
-  }
-
   @override
   void dispose() {
     _updateTimer?.cancel();
     _eventTimer?.cancel();
-    _logTimer?.cancel();
     super.dispose();
   }
 }

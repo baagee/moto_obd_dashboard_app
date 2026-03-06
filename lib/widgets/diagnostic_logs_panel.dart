@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/obd_data_provider.dart';
+import '../providers/log_provider.dart';
 import '../theme/app_theme.dart';
 import '../models/obd_data.dart';
 
@@ -10,7 +10,7 @@ class DiagnosticLogsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<OBDDataProvider>(
+    return Consumer<LogProvider>(
       builder: (context, provider, child) {
         return Container(
           decoration: BoxDecoration(
@@ -71,7 +71,7 @@ class DiagnosticLogsPanel extends StatelessWidget {
                   color: AppTheme.backgroundDark.withOpacity(0.3),
                   child: ListView.separated(
                     padding: const EdgeInsets.all(8),
-                    itemCount: provider.logs.length,
+                    itemCount: provider.logs.length > 5 ? 5 : provider.logs.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
                       return _LogItem(log: provider.logs[index]);

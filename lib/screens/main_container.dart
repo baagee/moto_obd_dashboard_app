@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/bluetooth_provider.dart';
+import '../providers/log_provider.dart';
 import '../widgets/bluetooth_status_icon.dart';
 import '../widgets/bluetooth_alert_dialog.dart';
 import 'dashboard_screen.dart';
@@ -32,6 +33,13 @@ class _MainContainerState extends State<MainContainer> {
 
   Future<void> _initializeBluetooth() async {
     final bluetoothProvider = context.read<BluetoothProvider>();
+    final logProvider = context.read<LogProvider>();
+
+    // 初始化日志系统
+    await logProvider.initialize();
+
+    // 设置日志 Provider 并初始化蓝牙
+    bluetoothProvider.setLogProvider(logProvider);
     await bluetoothProvider.initialize();
     _hasCheckedBluetooth = true;
     _checkAndShowBluetoothDialog();
