@@ -141,7 +141,7 @@ class CombinedGaugePainter extends CustomPainter {
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
-      ..strokeCap = StrokeCap.round;
+      ..strokeCap = StrokeCap.butt;  // 平头样式，避免与对向弧冲突
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
@@ -156,7 +156,7 @@ class CombinedGaugePainter extends CustomPainter {
       ..color = color.withValues(alpha: 0.4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 36  // 加粗0.5倍 (24 * 1.5)
-      ..strokeCap = StrokeCap.round
+      ..strokeCap = StrokeCap.butt  // 平头样式
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
 
     canvas.drawArc(
@@ -186,7 +186,7 @@ class CombinedGaugePainter extends CustomPainter {
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
-      ..strokeCap = StrokeCap.round;
+      ..strokeCap = StrokeCap.butt;  // 平头样式，避免与对向弧冲突
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
@@ -201,7 +201,7 @@ class CombinedGaugePainter extends CustomPainter {
       ..color = color.withValues(alpha: 0.4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 36  // 加粗0.5倍 (24 * 1.5)
-      ..strokeCap = StrokeCap.round
+      ..strokeCap = StrokeCap.butt  // 平头样式
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
 
     canvas.drawArc(
@@ -421,6 +421,73 @@ class CombinedGaugePainter extends CustomPainter {
     speedUnitPainter.paint(
       canvas,
       Offset(center.dx - speedUnitPainter.width / 2, center.dy + radius * 0.45),
+    );
+
+    // 档位显示在左下角 - 靠近车辆状态模块和屏幕底部
+    // 绘制卡片背景
+    final cardWidth = radius * 0.45;
+    final cardHeight = radius * 0.4;
+    // 往左往下移，靠近左边缘和底部，但留边距
+    final cardLeft = center.dx - radius - radius * 0.35;
+    final cardTop = center.dy + radius - radius * 0.15;
+    final cardRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(cardLeft, cardTop, cardWidth, cardHeight),
+      const Radius.circular(8),
+    );
+
+    // 卡片背景
+    final cardBgPaint = Paint()
+      ..color = const Color(0xFF1E293B)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(cardRect, cardBgPaint);
+
+    // 卡片边框
+    final cardBorderPaint = Paint()
+      ..color = AppTheme.primary.withValues(alpha: 0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawRRect(cardRect, cardBorderPaint);
+
+    // 档位标签
+    final gearLabelSpan = TextSpan(
+      text: 'N',
+      style: TextStyle(
+        color: AppTheme.primary60,
+        fontSize: radius * 0.07,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+    final gearLabelPainter = TextPainter(
+      text: gearLabelSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    gearLabelPainter.paint(
+      canvas,
+      Offset(
+        cardLeft + (cardWidth - gearLabelPainter.width) / 2,
+        cardTop + cardHeight * 0.1,
+      ),
+    );
+
+    // 档位数值
+    final gearValueSpan = TextSpan(
+      text: gear > 0 ? gear.toString() : 'N',
+      style: TextStyle(
+        color: AppTheme.primary,
+        fontSize: radius * 0.2,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+    final gearValuePainter = TextPainter(
+      text: gearValueSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    gearValuePainter.paint(
+      canvas,
+      Offset(
+        cardLeft + (cardWidth - gearValuePainter.width) / 2,
+        cardTop + cardHeight * 0.35,
+      ),
     );
   }
 
