@@ -101,7 +101,7 @@ class CombinedGaugePainter extends CustomPainter {
     final paint = Paint()
       ..color = const Color(0xFF1E293B)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 18
+      ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
       ..strokeCap = StrokeCap.round;
 
     // 上半圆背景
@@ -140,7 +140,7 @@ class CombinedGaugePainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 18
+      ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
       ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(
@@ -155,7 +155,7 @@ class CombinedGaugePainter extends CustomPainter {
     final glowPaint = Paint()
       ..color = color.withValues(alpha: 0.4)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 24
+      ..strokeWidth = 36  // 加粗0.5倍 (24 * 1.5)
       ..strokeCap = StrokeCap.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
 
@@ -185,7 +185,7 @@ class CombinedGaugePainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 18
+      ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
       ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(
@@ -200,7 +200,7 @@ class CombinedGaugePainter extends CustomPainter {
     final glowPaint = Paint()
       ..color = color.withValues(alpha: 0.4)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 24
+      ..strokeWidth = 36  // 加粗0.5倍 (24 * 1.5)
       ..strokeCap = StrokeCap.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
 
@@ -217,7 +217,7 @@ class CombinedGaugePainter extends CustomPainter {
     final tickPaint = Paint()
       ..color = AppTheme.primary60
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 3;  // 加粗0.5倍 (2 * 1.5)
 
     final textStyle = TextStyle(
       color: AppTheme.textMuted,
@@ -258,6 +258,28 @@ class CombinedGaugePainter extends CustomPainter {
       textPainter.paint(canvas, Offset(textX, textY));
     }
 
+    // 细粒度刻度 (RPM) - 每500一个，显示在进度弧内部
+    final fineTickPaint = Paint()
+      ..color = const Color(0xFF1E2530)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5;
+
+    for (int i = 0; i <= maxRpm; i += 500) {
+      if (i == 0 || i % 2000 == 0) continue; // 跳过0和大刻度位置
+
+      final angle = pi - (i / maxRpm) * pi;
+      // 显示在进度弧内部（更靠近圆心）
+      final innerRadius = radius - 38;
+      final outerRadius = radius - 32;
+
+      final x1 = center.dx + innerRadius * cos(angle);
+      final y1 = center.dy + innerRadius * sin(angle);
+      final x2 = center.dx + outerRadius * cos(angle);
+      final y2 = center.dy + outerRadius * sin(angle);
+
+      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), fineTickPaint);
+    }
+
     // 下半圆刻度 (Speed) - 顺时针从π到0，经过下方
     for (int i = 0; i <= maxSpeed; i += 50) {
       if (i == maxSpeed) continue; // 跳过250
@@ -290,6 +312,23 @@ class CombinedGaugePainter extends CustomPainter {
 
       textPainter.paint(canvas, Offset(textX, textY));
     }
+
+    // 细粒度刻度 (Speed) - 每10一个，显示在进度弧内部
+    for (int i = 0; i <= maxSpeed; i += 10) {
+      if (i == 0 || i % 50 == 0) continue; // 跳过0和大刻度位置
+
+      final angle = pi + (i / maxSpeed) * pi;
+      // 显示在进度弧内部（更靠近圆心）
+      final innerRadius = radius - 38;
+      final outerRadius = radius - 32;
+
+      final x1 = center.dx + innerRadius * cos(angle);
+      final y1 = center.dy + innerRadius * sin(angle);
+      final x2 = center.dx + outerRadius * cos(angle);
+      final y2 = center.dy + outerRadius * sin(angle);
+
+      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), fineTickPaint);
+    }
   }
 
   void _drawCenterValues(Canvas canvas, Offset center, double radius) {
@@ -298,7 +337,8 @@ class CombinedGaugePainter extends CustomPainter {
     // RPM 在上半圆视觉中心：数值在 center 上方， 单位在数值更上方
     // RPM 值
     final rpmTextSpan = TextSpan(
-      text: rpm >= 1000 ? '${(rpm / 1000).toStringAsFixed(1)}k' : rpm.toString(),
+      // text: rpm >= 1000 ? '${(rpm / 1000).toStringAsFixed(1)}k' : rpm.toString(),
+      text: rpm.toString(),
       style: TextStyle(
         color: AppTheme.primary,
         fontSize: fontSize,

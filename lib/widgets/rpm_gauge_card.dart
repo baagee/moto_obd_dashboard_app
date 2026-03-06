@@ -175,6 +175,7 @@ class SemiCircleGaugePainter extends CustomPainter {
         canvas.drawLine(Offset(x1, y1), Offset(x2, y2), smallTickPaint);
       }
     }
+
   }
 
   void _drawProgressArc(Canvas canvas, Offset center, double radius) {
