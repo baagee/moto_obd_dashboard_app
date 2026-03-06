@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../providers/bluetooth_provider.dart';
+import '../widgets/bluetooth_status_icon.dart';
+import '../widgets/bluetooth_alert_dialog.dart';
 import 'dashboard_screen.dart';
 import 'logs_screen.dart';
 
@@ -13,11 +17,51 @@ class MainContainer extends StatefulWidget {
 
 class _MainContainerState extends State<MainContainer> {
   int _currentIndex = 0;
+  bool _hasCheckedBluetooth = false;
 
   final List<Widget> _pages = const [
     DashboardScreen(),
     LogsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeBluetooth();
+  }
+
+  Future<void> _initializeBluetooth() async {
+    final bluetoothProvider = context.read<BluetoothProvider>();
+    await bluetoothProvider.initialize();
+    _hasCheckedBluetooth = true;
+    _checkAndShowBluetoothDialog();
+  }
+
+  void _checkAndShowBluetoothDialog() {
+    if (!_hasCheckedBluetooth) return;
+
+    final bluetoothProvider = context.read<BluetoothProvider>();
+
+    // 检查是否需要显示弹窗
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!bluetoothProvider.hasPermission) {
+        // 权限未授权，先请求权限
+        final granted = await bluetoothProvider.requestPermission();
+        if (!granted && mounted) {
+          BluetoothAlertDialog.showPermissionDeniedDialog(
+            context,
+            onOpenSettings: () => bluetoothProvider.openSettings(),
+          );
+        }
+      } else if (!bluetoothProvider.isBluetoothOn && mounted) {
+        // 权限已授权但蓝牙未开启
+        BluetoothAlertDialog.showBluetoothOffDialog(
+          context,
+          onOpenSettings: () => bluetoothProvider.openSettings(),
+        );
+      }
+    });
+  }
 
   void _navigateTo(int index) {
     setState(() {
@@ -178,32 +222,8 @@ class _TopNavigationBar extends StatelessWidget {
 
           const SizedBox(width: 6),
 
-          // 状态图标
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(5),
-              border: Border.all(
-                color: AppTheme.primary.withOpacity(0.1),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.bluetooth_connected,
-                  color: AppTheme.accentGreen,
-                  size: 12,
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.signal_cellular_alt,
-                  color: AppTheme.primary,
-                  size: 12,
-                ),
-              ],
-            ),
-          ),
+          // 蓝牙和信号状态图标
+          const BluetoothStatusIcon(),
         ],
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'providers/obd_data_provider.dart';
+import 'providers/bluetooth_provider.dart';
 import 'screens/main_container.dart';
 
 void main() {
@@ -27,8 +28,11 @@ class OBDDashboardApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => OBDDataProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => OBDDataProvider()),
+        ChangeNotifierProvider(create: (_) => BluetoothProvider()),
+      ],
       child: MaterialApp(
         title: 'CYBER-CYCLE OBD',
         debugShowCheckedModeBanner: false,
@@ -39,7 +43,6 @@ class OBDDashboardApp extends StatelessWidget {
           colorScheme: const ColorScheme.dark(
             primary: Color(0xFF0DA6F2),
             surface: Color(0xFF162229),
-            background: Color(0xFF0A1114),
             error: Color(0xFFFF4D4D),
           ),
           scaffoldBackgroundColor: const Color(0xFF0A1114),
