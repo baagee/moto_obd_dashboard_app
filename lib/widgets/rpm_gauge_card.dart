@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/obd_data_provider.dart';
 import '../theme/app_theme.dart';
 
-/// RPM圆形表盘卡片
+/// RPM半圆表盘卡片
 class RPMGaugeCard extends StatelessWidget {
   const RPMGaugeCard({super.key});
 
@@ -15,49 +15,52 @@ class RPMGaugeCard extends StatelessWidget {
         final data = provider.data;
 
         return Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(16),
           decoration: AppTheme.surfaceBorder(),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // 根据可用空间计算表盘大小
-              final gaugeSize = min(constraints.maxWidth, constraints.maxHeight) * 0.6;
+              // 占满整个区域
+              final width = constraints.maxWidth;
+              final height = constraints.maxHeight;
 
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // RPM圆形表盘
-                  SizedBox(
-                    width: gaugeSize,
-                    height: gaugeSize,
-                    child: CustomPaint(
-                      painter: RPMGaugePainter(
-                        rpm: data.rpm,
-                        maxRpm: 12000,
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'RPM',
-                              style: AppTheme.labelTinyPrimary.copyWith(
-                                fontSize: gaugeSize * 0.06,
-                              ),
+              return SizedBox(
+                width: width,
+                height: height,
+                child: CustomPaint(
+                  painter: SemiCircleGaugePainter(
+                    value: data.rpm,
+                    maxValue: 12000,
+                    warnThreshold: 6000,
+                    dangerThreshold: 9000,
+                    tickInterval: 1000,
+                    unit: 'RPM',
+                    gaugeWidth: width,
+                    gaugeHeight: height,
+                  ),
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: height * 0.18),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formatRPM(data.rpm),
+                            style: AppTheme.valueMedium.copyWith(
+                              fontSize: height * 0.28,
+                              letterSpacing: -1,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatRPM(data.rpm),
-                              style: AppTheme.valueMedium.copyWith(
-                                fontSize: gaugeSize * 0.28,
-                                letterSpacing: -1,
-                              ),
+                          ),
+                          Text(
+                            'RPM',
+                            style: AppTheme.labelTinyPrimary.copyWith(
+                              fontSize: height * 0.09,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ],
+                ),
               );
             },
           ),
@@ -74,85 +77,203 @@ class RPMGaugeCard extends StatelessWidget {
   }
 }
 
-/// RPM表盘绘制器
-class RPMGaugePainter extends CustomPainter {
-  final int rpm;
-  final int maxRpm;
+/// 半圆仪表盘绘制器
+class SemiCircleGaugePainter extends CustomPainter {
+  final int value;
+  final int maxValue;
+  final int warnThreshold;
+  final int dangerThreshold;
+  final int tickInterval;
+  final String unit;
+  final double gaugeWidth;
+  final double gaugeHeight;
 
-  RPMGaugePainter({
-    required this.rpm,
-    required this.maxRpm,
+  SemiCircleGaugePainter({
+    required this.value,
+    required this.maxValue,
+    required this.warnThreshold,
+    required this.dangerThreshold,
+    required this.tickInterval,
+    required this.unit,
+    required this.gaugeWidth,
+    required this.gaugeHeight,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 8;
+    // 使用传入的尺寸
+    final width = gaugeWidth;
+    final height = gaugeHeight;
 
-    // 背景圆环 - 加粗到10
+    final center = Offset(width / 2, height);
+    final radius = width / 2 - 24;
+
+    // 绘制背景半圆弧
     final bgPaint = Paint()
       ..color = const Color(0xFF1E293B)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(center, radius, bgPaint);
-
-    // 进度圆环
-    final progress = rpm / maxRpm;
-    final sweepAngle = 2 * pi * progress * 0.75; // 最大270度
-
-    final gradient = SweepGradient(
-      startAngle: -pi / 2,
-      endAngle: -pi / 2 + sweepAngle,
-      colors: const [
-        AppTheme.primary,
-        AppTheme.accentCyan,
-      ],
-    );
-
-    final progressPaint = Paint()
-      ..shader = gradient.createShader(
-        Rect.fromCircle(center: center, radius: radius),
-      )
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
+      ..strokeWidth = 18
       ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      -pi / 2,
-      sweepAngle,
+      pi, // 从左侧开始
+      pi, // 180度
       false,
-      progressPaint,
+      bgPaint,
     );
 
-    // 刻度点
-    final tickPaint = Paint()
-      ..color = AppTheme.primary20
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
+    // 绘制刻度背景弧(更细的刻度条)
+    _drawTickBackground(canvas, center, radius);
 
-    for (int i = 0; i < 60; i++) {
-      final angle = (2 * pi * i / 60) - pi / 2;
-      final innerRadius = radius - 14;
-      final outerRadius = radius - 10;
+    // 绘制进度弧(带颜色分区)
+    _drawProgressArc(canvas, center, radius);
+
+    // 绘制刻度线和数值
+    _drawTicks(canvas, center, radius);
+  }
+
+  void _drawTickBackground(Canvas canvas, Offset center, double radius) {
+    final tickBgPaint = Paint()
+      ..color = const Color(0xFF334155)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    // 大刻度
+    for (int i = 0; i <= maxValue; i += tickInterval) {
+      final angle = pi + (i / maxValue) * pi;
+      final innerRadius = radius - 24;
+      final outerRadius = radius - 16;
 
       final x1 = center.dx + innerRadius * cos(angle);
       final y1 = center.dy + innerRadius * sin(angle);
       final x2 = center.dx + outerRadius * cos(angle);
       final y2 = center.dy + outerRadius * sin(angle);
 
-      canvas.drawLine(
-        Offset(x1, y1),
-        Offset(x2, y2),
-        tickPaint,
+      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), tickBgPaint);
+    }
+
+    // 小刻度 (每1000区间5个小刻度，每200一个)
+    final smallTickPaint = Paint()
+      ..color = const Color(0xFF2D3A4D)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    for (int i = 0; i <= maxValue; i += 1000) {
+      for (int j = 1; j < 5; j++) {
+        final tickValue = i + j * 200;
+        if (tickValue > maxValue) break;
+
+        final angle = pi + (tickValue / maxValue) * pi;
+        final innerRadius = radius - 22;
+        final outerRadius = radius - 18;
+
+        final x1 = center.dx + innerRadius * cos(angle);
+        final y1 = center.dy + innerRadius * sin(angle);
+        final x2 = center.dx + outerRadius * cos(angle);
+        final y2 = center.dy + outerRadius * sin(angle);
+
+        canvas.drawLine(Offset(x1, y1), Offset(x2, y2), smallTickPaint);
+      }
+    }
+  }
+
+  void _drawProgressArc(Canvas canvas, Offset center, double radius) {
+    final progress = value / maxValue;
+    final sweepAngle = pi * progress;
+
+    // 根据阈值计算颜色
+    Color progressColor;
+    if (value >= dangerThreshold) {
+      progressColor = const Color(0xFFF44336); // 红色
+    } else if (value >= warnThreshold) {
+      progressColor = const Color(0xFFFFC107); // 黄色
+    } else {
+      progressColor = AppTheme.accentCyan; // 青色(正常)
+    }
+
+    // 绘制进度弧
+    final progressPaint = Paint()
+      ..color = progressColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 18
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      pi,
+      sweepAngle,
+      false,
+      progressPaint,
+    );
+
+    // 添加发光效果
+    final glowPaint = Paint()
+      ..color = progressColor.withValues(alpha: 0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 24
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      pi,
+      sweepAngle,
+      false,
+      glowPaint,
+    );
+  }
+
+  void _drawTicks(Canvas canvas, Offset center, double radius) {
+    final tickPaint = Paint()
+      ..color = AppTheme.primary60
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    final textStyle = TextStyle(
+      color: AppTheme.textMuted,
+      fontSize: gaugeWidth * 0.025,
+      fontWeight: FontWeight.w500,
+    );
+
+    for (int i = 0; i <= maxValue; i += tickInterval) {
+      // 长刻度线
+      final angle = pi + (i / maxValue) * pi;
+      final innerRadius = radius - 32;
+      final outerRadius = radius - 24;
+
+      final x1 = center.dx + innerRadius * cos(angle);
+      final y1 = center.dy + innerRadius * sin(angle);
+      final x2 = center.dx + outerRadius * cos(angle);
+      final y2 = center.dy + outerRadius * sin(angle);
+
+      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), tickPaint);
+
+      // 绘制刻度值
+      final textSpan = TextSpan(
+        text: i >= 1000 ? '${i ~/ 1000}k' : i.toString(),
+        style: textStyle,
       );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      final textRadius = radius - 46;
+      final textX = center.dx + textRadius * cos(angle) - textPainter.width / 2;
+      final textY = center.dy + textRadius * sin(angle) - textPainter.height / 2;
+
+      textPainter.paint(canvas, Offset(textX, textY));
     }
   }
 
   @override
-  bool shouldRepaint(covariant RPMGaugePainter oldDelegate) {
-    return oldDelegate.rpm != rpm || oldDelegate.maxRpm != maxRpm;
+  bool shouldRepaint(covariant SemiCircleGaugePainter oldDelegate) {
+    return oldDelegate.value != value ||
+        oldDelegate.maxValue != maxValue ||
+        oldDelegate.warnThreshold != warnThreshold ||
+        oldDelegate.dangerThreshold != dangerThreshold ||
+        oldDelegate.gaugeWidth != gaugeWidth ||
+        oldDelegate.gaugeHeight != gaugeHeight;
   }
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/obd_data_provider.dart';
 import '../widgets/rpm_gauge_card.dart';
-import '../widgets/speed_gear_card.dart';
+import '../widgets/speed_gauge_card.dart';
 import '../widgets/side_stats_panel.dart';
 import '../widgets/telemetry_chart_card.dart';
 import '../widgets/riding_events_panel.dart';
@@ -43,9 +43,9 @@ class DashboardScreen extends StatelessWidget {
 
                       SizedBox(height: 8),
 
-                      // 下半部分：时速半圆仪表盘
+                      // 下半部分：时速半圆仪表盘（带档位）
                       Expanded(
-                        child: SpeedGearCard(),
+                        child: SpeedGaugeCard(),
                       ),
                     ],
                   ),
