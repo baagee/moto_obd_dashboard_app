@@ -61,7 +61,7 @@ class CombinedGaugePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     // 使用宽度和高度中较小的值作为基准
-    final radius = (size.width < size.height ? size.width : size.height) / 2 - 30;
+    final radius = (size.width < size.height ? size.width : size.height) / 2 - 10;
 
     // 绘制背景
     _drawBackground(canvas, center, radius);
@@ -127,12 +127,12 @@ class CombinedGaugePainter extends CustomPainter {
     final progress = rpm / maxRpm;
     final sweepAngle = pi * progress;
 
-    // 阶段颜色（去掉渐变）
+    // 阶段颜色 - 使用 AppTheme 颜色
     Color color;
     if (rpm <= warnRpm) {
-      color = const Color(0xFF2196F3); // 蓝色
+      color = AppTheme.primary; // 蓝色
     } else if (rpm <= dangerRpm) {
-      color = const Color(0xFF00BCD4); // 青色
+      color = AppTheme.accentCyan; // 青色
     } else {
       color = const Color(0xFFF44336); // 红色
     }
@@ -172,12 +172,12 @@ class CombinedGaugePainter extends CustomPainter {
     final progress = speed / maxSpeed;
     final sweepAngle = pi * progress;
 
-    // 阶段颜色（去掉渐变）
+    // 阶段颜色 - 使用 AppTheme 颜色
     Color color;
     if (speed <= warnSpeed) {
-      color = const Color(0xFF2196F3); // 蓝色
+      color = AppTheme.accentCyan; // 青色
     } else if (speed <= dangerSpeed) {
-      color = const Color(0xFF00BCD4); // 青色
+      color = AppTheme.primary; // 蓝色
     } else {
       color = const Color(0xFFF44336); // 红色
     }
@@ -421,73 +421,6 @@ class CombinedGaugePainter extends CustomPainter {
     speedUnitPainter.paint(
       canvas,
       Offset(center.dx - speedUnitPainter.width / 2, center.dy + radius * 0.45),
-    );
-
-    // 档位显示在左下角 - 靠近车辆状态模块和屏幕底部
-    // 绘制卡片背景
-    final cardWidth = radius * 0.45;
-    final cardHeight = radius * 0.4;
-    // 往左往下移，靠近左边缘和底部，但留边距
-    final cardLeft = center.dx - radius - radius * 0.35;
-    final cardTop = center.dy + radius - radius * 0.15;
-    final cardRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(cardLeft, cardTop, cardWidth, cardHeight),
-      const Radius.circular(8),
-    );
-
-    // 卡片背景
-    final cardBgPaint = Paint()
-      ..color = const Color(0xFF1E293B)
-      ..style = PaintingStyle.fill;
-    canvas.drawRRect(cardRect, cardBgPaint);
-
-    // 卡片边框
-    final cardBorderPaint = Paint()
-      ..color = AppTheme.primary.withValues(alpha: 0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    canvas.drawRRect(cardRect, cardBorderPaint);
-
-    // 档位标签
-    final gearLabelSpan = TextSpan(
-      text: 'N',
-      style: TextStyle(
-        color: AppTheme.primary60,
-        fontSize: radius * 0.07,
-        fontWeight: FontWeight.w500,
-      ),
-    );
-    final gearLabelPainter = TextPainter(
-      text: gearLabelSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    gearLabelPainter.paint(
-      canvas,
-      Offset(
-        cardLeft + (cardWidth - gearLabelPainter.width) / 2,
-        cardTop + cardHeight * 0.1,
-      ),
-    );
-
-    // 档位数值
-    final gearValueSpan = TextSpan(
-      text: gear > 0 ? gear.toString() : 'N',
-      style: TextStyle(
-        color: AppTheme.primary,
-        fontSize: radius * 0.2,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-    final gearValuePainter = TextPainter(
-      text: gearValueSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    gearValuePainter.paint(
-      canvas,
-      Offset(
-        cardLeft + (cardWidth - gearValuePainter.width) / 2,
-        cardTop + cardHeight * 0.35,
-      ),
     );
   }
 

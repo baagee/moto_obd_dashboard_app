@@ -4,9 +4,58 @@ import '../providers/obd_data_provider.dart';
 import '../theme/app_theme.dart';
 import '../models/obd_data.dart';
 
+/// 日志过滤类型
+enum LogFilterType {
+  all,
+  success,
+  warning,
+  error,
+  info,
+}
+
 /// 日志页面
-class LogsScreen extends StatelessWidget {
+class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
+
+  @override
+  State<LogsScreen> createState() => _LogsScreenState();
+}
+
+class _LogsScreenState extends State<LogsScreen> {
+  LogFilterType _currentFilter = LogFilterType.all;
+
+  /// 根据过滤类型获取过滤后的日志
+  List<DiagnosticLog> _getFilteredLogs(OBDDataProvider provider) {
+    if (_currentFilter == LogFilterType.all) {
+      return provider.logs;
+    }
+    return provider.logs.where((log) {
+      switch (_currentFilter) {
+        case LogFilterType.success:
+          return log.type == LogType.success;
+        case LogFilterType.warning:
+          return log.type == LogType.warning;
+        case LogFilterType.error:
+          return log.type == LogType.error;
+        case LogFilterType.info:
+          return log.type == LogType.info;
+        case LogFilterType.all:
+          return true;
+      }
+    }).toList();
+  }
+
+  /// 获取各类型日志数量
+  Map<LogFilterType, int> _getLogCounts(OBDDataProvider provider) {
+    final logs = provider.logs;
+    return {
+      LogFilterType.all: logs.length,
+      LogFilterType.success: logs.where((l) => l.type == LogType.success).length,
+      LogFilterType.warning: logs.where((l) => l.type == LogType.warning).length,
+      LogFilterType.error: logs.where((l) => l.type == LogType.error).length,
+      LogFilterType.info: logs.where((l) => l.type == LogType.info).length,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,87 +65,51 @@ class LogsScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // 顶部区域
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.surface.withOpacity(0.5),
-              border: Border(
-                bottom: BorderSide(
-                  color: AppTheme.primary.withOpacity(0.2),
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'DIAGNOSTIC LOGS',
-                        style: TextStyle(
-                          color: AppTheme.primary.withOpacity(0.6),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Consumer<OBDDataProvider>(
-                        builder: (context, provider, child) {
-                          return Text(
-                            'Total: ${provider.logs.length} entries',
-                            style: const TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 9,
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 筛选按钮
-                _FilterButton(),
-                const SizedBox(width: 8),
-
-                // 导出按钮
-                Container(
-                  height: 28,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary,
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: AppTheme.glowShadow(AppTheme.primary),
-                  ),
-                  child: const Center(
-                    child: Row(
-                      children: [
-                        Icon(Icons.download, color: Colors.white, size: 14),
-                        SizedBox(width: 6),
-                        Text(
-                          'EXPORT',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          // 合并后的顶部区域
+          Consumer<OBDDataProvider>(
+            builder: (context, provider, child) {
+              final counts = _getLogCounts(provider);
+              return _CompactHeader(
+                counts: counts,
+                currentFilter: _currentFilter,
+                onFilterChanged: (filter) {
+                  setState(() {
+                    _currentFilter = filter;
+                  });
+                },
+              );
+            },
           ),
 
           // 日志列表
           Expanded(
             child: Consumer<OBDDataProvider>(
               builder: (context, provider, child) {
+                final filteredLogs = _getFilteredLogs(provider);
+
+                if (filteredLogs.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inbox_outlined,
+                          color: AppTheme.textMuted,
+                          size: 48,
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          'No logs match the current filter',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
                 return Container(
                   margin: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -108,10 +121,10 @@ class LogsScreen extends StatelessWidget {
                   ),
                   child: ListView.separated(
                     padding: const EdgeInsets.all(8),
-                    itemCount: provider.logs.length,
+                    itemCount: filteredLogs.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
-                      return _LogItem(log: provider.logs[index]);
+                      return _LogItem(log: filteredLogs[index]);
                     },
                   ),
                 );
@@ -124,31 +137,238 @@ class LogsScreen extends StatelessWidget {
   }
 }
 
-class _FilterButton extends StatelessWidget {
+/// 合并后的紧凑顶部区域
+class _CompactHeader extends StatelessWidget {
+  final Map<LogFilterType, int> counts;
+  final LogFilterType currentFilter;
+  final ValueChanged<LogFilterType> onFilterChanged;
+
+  const _CompactHeader({
+    required this.counts,
+    required this.currentFilter,
+    required this.onFilterChanged,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 28,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: AppTheme.primary.withOpacity(0.2),
+        color: AppTheme.surface.withOpacity(0.5),
+        border: Border(
+          bottom: BorderSide(
+            color: AppTheme.primary.withOpacity(0.2),
+          ),
         ),
       ),
-      child: const Center(
+      child: Row(
+        children: [
+          // 左侧：标题
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'DIAGNOSTIC LOGS',
+                style: TextStyle(
+                  color: AppTheme.primary.withOpacity(0.6),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Total: ${counts[LogFilterType.all]} entries',
+                style: const TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 9,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(width: 16),
+
+          // 中间：筛选标签
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _CompactFilterChip(
+                    filterType: LogFilterType.all,
+                    count: counts[LogFilterType.all] ?? 0,
+                    isActive: currentFilter == LogFilterType.all,
+                    onTap: () => onFilterChanged(LogFilterType.all),
+                  ),
+                  const SizedBox(width: 8),
+                  _CompactFilterChip(
+                    filterType: LogFilterType.success,
+                    count: counts[LogFilterType.success] ?? 0,
+                    isActive: currentFilter == LogFilterType.success,
+                    onTap: () => onFilterChanged(LogFilterType.success),
+                  ),
+                  const SizedBox(width: 8),
+                  _CompactFilterChip(
+                    filterType: LogFilterType.warning,
+                    count: counts[LogFilterType.warning] ?? 0,
+                    isActive: currentFilter == LogFilterType.warning,
+                    onTap: () => onFilterChanged(LogFilterType.warning),
+                  ),
+                  const SizedBox(width: 8),
+                  _CompactFilterChip(
+                    filterType: LogFilterType.error,
+                    count: counts[LogFilterType.error] ?? 0,
+                    isActive: currentFilter == LogFilterType.error,
+                    onTap: () => onFilterChanged(LogFilterType.error),
+                  ),
+                  const SizedBox(width: 8),
+                  _CompactFilterChip(
+                    filterType: LogFilterType.info,
+                    count: counts[LogFilterType.info] ?? 0,
+                    isActive: currentFilter == LogFilterType.info,
+                    onTap: () => onFilterChanged(LogFilterType.info),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // 右侧：导出按钮
+          Container(
+            height: 24,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.primary,
+              borderRadius: BorderRadius.circular(5),
+              boxShadow: AppTheme.glowShadow(AppTheme.primary),
+            ),
+            child: const Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.download, color: Colors.white, size: 12),
+                  SizedBox(width: 4),
+                  Text(
+                    'EXPORT',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 紧凑型筛选标签
+class _CompactFilterChip extends StatelessWidget {
+  final LogFilterType filterType;
+  final int count;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _CompactFilterChip({
+    required this.filterType,
+    required this.count,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  Color get _color {
+    switch (filterType) {
+      case LogFilterType.all:
+        return AppTheme.textPrimary;
+      case LogFilterType.success:
+        return AppTheme.accentGreen;
+      case LogFilterType.warning:
+        return AppTheme.accentOrange;
+      case LogFilterType.error:
+        return AppTheme.accentRed;
+      case LogFilterType.info:
+        return AppTheme.primary;
+    }
+  }
+
+  IconData get _icon {
+    switch (filterType) {
+      case LogFilterType.all:
+        return Icons.list_alt;
+      case LogFilterType.success:
+        return Icons.check_circle;
+      case LogFilterType.warning:
+        return Icons.warning;
+      case LogFilterType.error:
+        return Icons.error;
+      case LogFilterType.info:
+        return Icons.info;
+    }
+  }
+
+  String get _label {
+    switch (filterType) {
+      case LogFilterType.all:
+        return 'ALL';
+      case LogFilterType.success:
+        return 'SUCCESS';
+      case LogFilterType.warning:
+        return 'WARNING';
+      case LogFilterType.error:
+        return 'ERROR';
+      case LogFilterType.info:
+        return 'INFO';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive ? _color.withOpacity(0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isActive ? _color : AppTheme.textMuted.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.filter_list, color: AppTheme.primary, size: 14),
-            SizedBox(width: 6),
+            Icon(
+              _icon,
+              color: isActive ? _color : AppTheme.textMuted,
+              size: 12,
+            ),
+            const SizedBox(width: 4),
             Text(
-              'FILTER',
+              '$count',
               style: TextStyle(
-                color: AppTheme.primary,
-                fontSize: 9,
+                color: isActive ? _color : AppTheme.textMuted,
+                fontSize: 10,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              _label,
+              style: TextStyle(
+                color: isActive ? _color : AppTheme.textMuted,
+                fontSize: 8,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.5,
               ),
             ),
           ],
@@ -194,10 +414,10 @@ class _LogItem extends StatelessWidget {
     final isWarning = log.type == LogType.warning || log.type == LogType.error;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: _color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         border: Border(
           left: BorderSide(color: _color, width: 3),
         ),
@@ -207,28 +427,28 @@ class _LogItem extends StatelessWidget {
         children: [
           // 图标
           Container(
-            margin: const EdgeInsets.only(right: 12),
+            margin: const EdgeInsets.only(right: 10),
             child: Icon(
               _icon,
               color: _color,
-              size: 18,
+              size: 16,
             ),
           ),
 
           // 时间
           SizedBox(
-            width: 70,
+            width: 60,
             child: Text(
               log.formattedTime,
               style: const TextStyle(
                 color: AppTheme.textMuted,
-                fontSize: 10,
+                fontSize: 9,
                 fontFamily: 'monospace',
               ),
             ),
           ),
 
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
 
           // 消息
           Expanded(
@@ -239,17 +459,17 @@ class _LogItem extends StatelessWidget {
                   log.type.name.toUpperCase(),
                   style: TextStyle(
                     color: _color,
-                    fontSize: 9,
+                    fontSize: 8,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
                   log.message,
                   style: TextStyle(
                     color: isWarning ? _color : AppTheme.textSecondary,
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: log.type == LogType.error ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),

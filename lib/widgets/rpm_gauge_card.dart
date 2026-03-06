@@ -187,14 +187,14 @@ class SemiCircleGaugePainter extends CustomPainter {
     if (value <= warnThreshold) {
       // 蓝色 -> 青色
       gradientColors = [
-        const Color(0xFF2196F3),
-        Color.lerp(const Color(0xFF2196F3), const Color(0xFF00BCD4), value / warnThreshold)!,
+        AppTheme.primary,
+        Color.lerp(AppTheme.primary, AppTheme.accentCyan, value / warnThreshold)!,
       ];
     } else if (value <= dangerThreshold) {
       // 青色 -> 黄色
       gradientColors = [
-        const Color(0xFF00BCD4),
-        Color.lerp(const Color(0xFF00BCD4), const Color(0xFFFFC107), (value - warnThreshold) / (dangerThreshold - warnThreshold))!,
+        AppTheme.accentCyan,
+        Color.lerp(AppTheme.accentCyan, const Color(0xFFFFC107), (value - warnThreshold) / (dangerThreshold - warnThreshold))!,
       ];
     } else {
       // 黄色 -> 红色
