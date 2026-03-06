@@ -16,7 +16,6 @@ class RPMGaugeCard extends StatelessWidget {
 
         return Container(
           padding: const EdgeInsets.all(16),
-          decoration: AppTheme.surfaceBorder(),
           child: LayoutBuilder(
             builder: (context, constraints) {
               // 占满整个区域
@@ -182,19 +181,37 @@ class SemiCircleGaugePainter extends CustomPainter {
     final progress = value / maxValue;
     final sweepAngle = pi * progress;
 
-    // 根据阈值计算颜色
-    Color progressColor;
-    if (value >= dangerThreshold) {
-      progressColor = const Color(0xFFF44336); // 红色
-    } else if (value >= warnThreshold) {
-      progressColor = const Color(0xFFFFC107); // 黄色
+    // 根据当前值计算渐变颜色
+    List<Color> gradientColors;
+    if (value <= warnThreshold) {
+      // 蓝色 -> 青色
+      gradientColors = [
+        const Color(0xFF2196F3),
+        Color.lerp(const Color(0xFF2196F3), const Color(0xFF00BCD4), value / warnThreshold)!,
+      ];
+    } else if (value <= dangerThreshold) {
+      // 青色 -> 黄色
+      gradientColors = [
+        const Color(0xFF00BCD4),
+        Color.lerp(const Color(0xFF00BCD4), const Color(0xFFFFC107), (value - warnThreshold) / (dangerThreshold - warnThreshold))!,
+      ];
     } else {
-      progressColor = AppTheme.accentCyan; // 青色(正常)
+      // 黄色 -> 红色
+      gradientColors = [
+        const Color(0xFFFFC107),
+        Color.lerp(const Color(0xFFFFC107), const Color(0xFFF44336), (value - dangerThreshold) / (maxValue - dangerThreshold))!,
+      ];
     }
 
-    // 绘制进度弧
+    // 绘制渐变进度弧
+    final gradient = SweepGradient(
+      startAngle: pi,
+      endAngle: pi + sweepAngle,
+      colors: gradientColors,
+    );
+
     final progressPaint = Paint()
-      ..color = progressColor
+      ..shader = gradient.createShader(Rect.fromCircle(center: center, radius: radius))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 18
       ..strokeCap = StrokeCap.round;
@@ -207,9 +224,10 @@ class SemiCircleGaugePainter extends CustomPainter {
       progressPaint,
     );
 
-    // 添加发光效果
+    // 发光效果使用渐变的结束颜色
+    final glowColor = gradientColors.last;
     final glowPaint = Paint()
-      ..color = progressColor.withValues(alpha: 0.4)
+      ..color = glowColor.withValues(alpha: 0.4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 24
       ..strokeCap = StrokeCap.round

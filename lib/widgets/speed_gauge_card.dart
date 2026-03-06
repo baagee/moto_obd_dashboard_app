@@ -16,10 +16,6 @@ class SpeedGaugeCard extends StatelessWidget {
 
         return Container(
           padding: const EdgeInsets.all(16),
-          decoration: AppTheme.surfaceBorder(
-            borderColor: AppTheme.primary,
-            opacity: 0.3,
-          ),
           child: LayoutBuilder(
             builder: (context, constraints) {
               // 占满整个区域
