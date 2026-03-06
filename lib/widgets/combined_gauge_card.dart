@@ -75,6 +75,10 @@ class CombinedGaugePainter extends CustomPainter {
     // 绘制下半圆 Speed 进度
     _drawSpeedProgress(canvas, center, radius);
 
+    // 绘制指针
+    _drawRPMPointer(canvas, center, radius);
+    _drawSpeedPointer(canvas, center, radius);
+
     // 绘制刻度线
     _drawTicks(canvas, center, radius);
 
@@ -211,6 +215,134 @@ class CombinedGaugePainter extends CustomPainter {
       false,
       glowPaint,
     );
+  }
+
+  void _drawRPMPointer(Canvas canvas, Offset center, double radius) {
+    final progress = rpm / maxRpm;
+    if (progress <= 0) return;
+
+    // 固定颜色 - 橙色，与数字蓝色区分
+    const color = Color(0xFFFF9800);
+
+    // 顺时针角度：从 π 到 0，经过上方
+    final angle = pi - progress * pi;
+    final pointerLength = radius - 35;
+    final headRadius = radius * 0.06; // 水滴头部半径
+
+    // 指针尖端坐标
+    final tipX = center.dx + pointerLength * cos(angle);
+    final tipY = center.dy + pointerLength * sin(angle);
+
+    // 绘制指针发光效果
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.5)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+
+    // 绘制水滴形状指针
+    final pointerPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    // 水滴形状：从尖端到圆心处的圆润头部
+    final pointerPath = Path()
+      // 从尖端开始
+      ..moveTo(tipX, tipY)
+      // 左侧曲线延伸到头部
+      ..quadraticBezierTo(
+        center.dx + headRadius * cos(angle - pi / 2) * 0.5,
+        center.dy + headRadius * sin(angle - pi / 2) * 0.5,
+        center.dx + headRadius * cos(angle - pi / 2),
+        center.dy + headRadius * sin(angle - pi / 2),
+      )
+      // 头部半圆
+      ..arcToPoint(
+        Offset(
+          center.dx + headRadius * cos(angle + pi / 2),
+          center.dy + headRadius * sin(angle + pi / 2),
+        ),
+        radius: Radius.circular(headRadius),
+        clockwise: true,
+      )
+      // 右侧曲线延伸到尖端
+      ..quadraticBezierTo(
+        center.dx + headRadius * cos(angle + pi / 2) * 0.5,
+        center.dy + headRadius * sin(angle + pi / 2) * 0.5,
+        tipX,
+        tipY,
+      )
+      ..close();
+
+    canvas.drawPath(pointerPath, glowPaint);
+    canvas.drawPath(pointerPath, pointerPaint);
+
+    // 绘制指针中心亮点
+    final dotPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.8);
+    canvas.drawCircle(center, headRadius * 0.5, dotPaint);
+  }
+
+  void _drawSpeedPointer(Canvas canvas, Offset center, double radius) {
+    final progress = speed / maxSpeed;
+    if (progress <= 0) return;
+
+    // 固定颜色 - 品红色，与数字青色区分
+    const color = Color(0xFFE91E63);
+
+    // 顺时针角度：从 π 到 2π，经过下方
+    final angle = pi + progress * pi;
+    final pointerLength = radius - 35;
+    final headRadius = radius * 0.06; // 水滴头部半径
+
+    // 指针尖端坐标
+    final tipX = center.dx + pointerLength * cos(angle);
+    final tipY = center.dy + pointerLength * sin(angle);
+
+    // 绘制指针发光效果
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.5)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+
+    // 绘制水滴形状指针
+    final pointerPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    // 水滴形状：从尖端到圆心处的圆润头部
+    final pointerPath = Path()
+      // 从尖端开始
+      ..moveTo(tipX, tipY)
+      // 左侧曲线延伸到头部
+      ..quadraticBezierTo(
+        center.dx + headRadius * cos(angle - pi / 2) * 0.5,
+        center.dy + headRadius * sin(angle - pi / 2) * 0.5,
+        center.dx + headRadius * cos(angle - pi / 2),
+        center.dy + headRadius * sin(angle - pi / 2),
+      )
+      // 头部半圆
+      ..arcToPoint(
+        Offset(
+          center.dx + headRadius * cos(angle + pi / 2),
+          center.dy + headRadius * sin(angle + pi / 2),
+        ),
+        radius: Radius.circular(headRadius),
+        clockwise: true,
+      )
+      // 右侧曲线延伸到尖端
+      ..quadraticBezierTo(
+        center.dx + headRadius * cos(angle + pi / 2) * 0.5,
+        center.dy + headRadius * sin(angle + pi / 2) * 0.5,
+        tipX,
+        tipY,
+      )
+      ..close();
+
+    canvas.drawPath(pointerPath, glowPaint);
+    canvas.drawPath(pointerPath, pointerPaint);
+
+    // 绘制指针中心亮点
+    final dotPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.8);
+    canvas.drawCircle(center, headRadius * 0.5, dotPaint);
   }
 
   void _drawTicks(Canvas canvas, Offset center, double radius) {
@@ -375,14 +507,14 @@ class CombinedGaugePainter extends CustomPainter {
     );
 
     // 分隔线
-    final dividerPaint = Paint()
-      ..color = AppTheme.primary30
-      ..strokeWidth = 1;
-    canvas.drawLine(
-      Offset(center.dx - radius * 0.08, center.dy),
-      Offset(center.dx + radius * 0.08, center.dy),
-      dividerPaint,
-    );
+    // final dividerPaint = Paint()
+    //   ..color = AppTheme.primary30
+    //   ..strokeWidth = 1;
+    // canvas.drawLine(
+    //   Offset(center.dx - radius * 0.08, center.dy),
+    //   Offset(center.dx + radius * 0.08, center.dy),
+    //   dividerPaint,
+    // );
 
     // Speed 在下半圆视觉中心：数值在 center 下方， 单位在数值更下方
     // Speed 值

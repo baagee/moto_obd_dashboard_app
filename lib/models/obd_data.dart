@@ -88,8 +88,8 @@ class RidingEvent {
 /// 诊断日志类型
 enum LogType {
   success,
-  warning,
   error,
+  warning,
   info,
 }
 

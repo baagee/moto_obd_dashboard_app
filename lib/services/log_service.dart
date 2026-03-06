@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/obd_data.dart';
@@ -38,7 +39,7 @@ class LogService {
         buffer.writeln('File Created: ${DateTime.now().toIso8601String()}');
         buffer.writeln('=' * 50);
         buffer.writeln();
-        await file.writeAsString(buffer.toString());
+        await file.writeAsString(buffer.toString(), encoding: utf8);
       }
     } catch (e) {
       // 初始化失败静默处理
@@ -54,7 +55,7 @@ class LogService {
       final typeStr = log.type.name.toUpperCase();
       final logLine = '[${log.formattedTime}] [$typeStr] [${log.source}] ${log.message}\n';
 
-      await file.writeAsString(logLine, mode: FileMode.append);
+      await file.writeAsString(logLine, encoding: utf8, mode: FileMode.append);
     } catch (e) {
       // 写入失败静默处理
     }
@@ -73,7 +74,7 @@ class LogService {
       buffer.writeln('File Cleared: ${DateTime.now().toIso8601String()}');
       buffer.writeln('=' * 50);
       buffer.writeln();
-      await file.writeAsString(buffer.toString());
+      await file.writeAsString(buffer.toString(), encoding: utf8);
     } catch (e) {
       // 清空失败静默处理
     }
@@ -87,7 +88,7 @@ class LogService {
 
       if (await file.exists()) {
         await Share.shareXFiles(
-          [XFile(filePath)],
+          [XFile(filePath, mimeType: 'text/plain; charset=utf-8')],
           subject: 'OBD Dashboard Logs',
         );
       }

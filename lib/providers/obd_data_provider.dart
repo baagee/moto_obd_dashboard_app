@@ -72,8 +72,8 @@ class OBDDataProvider extends ChangeNotifier {
 
   /// 启动定时器
   void _startTimers() {
-    // 每2秒更新OBD数据
-    _updateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    // 每X秒更新OBD数据
+    _updateTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       _updateOBDData();
     });
 
