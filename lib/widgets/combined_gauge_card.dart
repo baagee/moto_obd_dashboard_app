@@ -215,9 +215,9 @@ class CombinedGaugePainter extends CustomPainter {
 
   void _drawTicks(Canvas canvas, Offset center, double radius) {
     final tickPaint = Paint()
-      ..color = AppTheme.primary60
+      ..color = AppTheme.accentCyan
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;  // 加粗0.5倍 (2 * 1.5)
+      ..strokeWidth = 4;  // 加粗 (原3)
 
     final textStyle = TextStyle(
       color: AppTheme.textMuted,
@@ -231,7 +231,7 @@ class CombinedGaugePainter extends CustomPainter {
 
       // 逆时针：π → 3π/2 → 0
       final angle = pi - (i / maxRpm) * pi;
-      final innerRadius = radius - 28;
+      final innerRadius = radius - 32;
       final outerRadius = radius - 22;
 
       final x1 = center.dx + innerRadius * cos(angle);
@@ -260,17 +260,17 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 细粒度刻度 (RPM) - 每500一个，显示在进度弧内部
     final fineTickPaint = Paint()
-      ..color = const Color(0xFF1E2530)
+      ..color = AppTheme.primary60
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.5;
+      ..strokeWidth = 1.5;
 
     for (int i = 0; i <= maxRpm; i += 500) {
       if (i == 0 || i % 2000 == 0) continue; // 跳过0和大刻度位置
 
       final angle = pi - (i / maxRpm) * pi;
       // 显示在进度弧内部（更靠近圆心）
-      final innerRadius = radius - 38;
-      final outerRadius = radius - 32;
+      final innerRadius = radius - 40;
+      final outerRadius = radius - 30;
 
       final x1 = center.dx + innerRadius * cos(angle);
       final y1 = center.dy + innerRadius * sin(angle);
@@ -286,7 +286,7 @@ class CombinedGaugePainter extends CustomPainter {
 
       // 顺时针：π → π/2 → 0
       final angle = pi + (i / maxSpeed) * pi;
-      final innerRadius = radius - 28;
+      final innerRadius = radius - 32;
       final outerRadius = radius - 22;
 
       final x1 = center.dx + innerRadius * cos(angle);
@@ -319,8 +319,8 @@ class CombinedGaugePainter extends CustomPainter {
 
       final angle = pi + (i / maxSpeed) * pi;
       // 显示在进度弧内部（更靠近圆心）
-      final innerRadius = radius - 38;
-      final outerRadius = radius - 32;
+      final innerRadius = radius - 40;
+      final outerRadius = radius - 30;
 
       final x1 = center.dx + innerRadius * cos(angle);
       final y1 = center.dy + innerRadius * sin(angle);
