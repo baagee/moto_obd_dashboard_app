@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
+import '../constants/bluetooth_constants.dart';
 import '../models/obd_data.dart';
 import '../providers/obd_data_provider.dart';
 
@@ -39,8 +40,8 @@ class OBDService {
   fb.BluetoothCharacteristic? _writeCharacteristic;
   Timer? _pollingTimer;
 
-  // 分级轮询常量
-  static const int pollingBaseInterval = 50;
+  // 分级轮询常量 - 从 BluetoothConstants 引用
+  static final int pollingBaseInterval = BluetoothConstants.pollingBaseIntervalMs;
   static const List<String> highFreqPids = ['010D', '010C'];
   static const List<String> mediumFreqPids = ['0111', '010F', '010B'];
   static const List<String> lowFreqPids = ['0105', '0104', '0145', '0142'];
@@ -144,7 +145,6 @@ class OBDService {
 
     try {
       final response = utf8.decode(value, allowMalformed: true).trim();
-      logCallback?.call('OBD', LogType.info, '收到原始数据: $response');
       final result = parseResponse(response);
       if (result == null) {
         return;
@@ -175,7 +175,7 @@ class OBDService {
     try {
       final bytes = utf8.encode("$command\r");
       await _writeCharacteristic!.write(bytes, withoutResponse: false);
-      logCallback?.call('OBD', LogType.info, '发送命令: $command');
+      // logCallback?.call('OBD', LogType.info, '发送命令: $command');
     } catch (e) {
       logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $e');
     }

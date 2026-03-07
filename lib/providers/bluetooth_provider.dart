@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
+import '../constants/bluetooth_constants.dart';
 import '../models/bluetooth_device.dart';
 import '../models/obd_data.dart';
 import '../services/bluetooth_service.dart' as app_bluetooth;
@@ -25,7 +26,8 @@ class BluetoothProvider extends ChangeNotifier {
 
   // 重连相关
   int _reconnectAttempts = 0;
-  static const int maxReconnectAttempts = 2;
+  // 从 BluetoothConstants 引用
+  static final int maxReconnectAttempts = BluetoothConstants.maxReconnectAttempts;
   bool _isAutoReconnecting = false;
 
   // OBD 相关
@@ -35,7 +37,6 @@ class BluetoothProvider extends ChangeNotifier {
   fb.BluetoothCharacteristic? _notifyCharacteristic;
   StreamSubscription<List<int>>? _obdNotificationSubscription;
   Timer? _obdPollingTimer;
-  static const int obdCommandInterval = 200;
   // 中频 PID - 节气门、进气温度、压力 (5Hz, 200ms)
   static const List<String> mediumFreqPids = ['0111', '010F', '010B'];
   // 低频 PID - 水温、负载、电压等 (2Hz, 500ms)
@@ -144,7 +145,7 @@ class BluetoothProvider extends ChangeNotifier {
     await startScan();
 
     // 等待扫描结果
-    await Future.delayed(const Duration(seconds: 5));
+    await Future.delayed(BluetoothConstants.autoReconnectWait);
 
     // 检查是否在扫描结果中找到设备（优先 ID 匹配）
     var foundDevice = _scannedDevices.where((d) => d.id == _lastConnectedDevice!.id).toList();
@@ -190,16 +191,16 @@ class BluetoothProvider extends ChangeNotifier {
       }
 
       if (_reconnectAttempts < maxReconnectAttempts && !_isDeviceConnected) {
-        await Future.delayed(const Duration(seconds: 2));
+        await Future.delayed(BluetoothConstants.reconnectRetryInterval);
       }
     }
 
     if (!_isDeviceConnected && _reconnectAttempts >= maxReconnectAttempts) {
       _logCallback?.call('Bluetooth', LogType.error, '自动重连失败，已达到最大重试次数');
       // 连接失败，清除保存的设备信息，让用户重新选择
-      await DeviceStorageService.clearLastDevice();
+      // await DeviceStorageService.clearLastDevice();
       _lastConnectedDevice = null;
-      _logCallback?.call('Bluetooth', LogType.info, '已清除上次设备信息');
+      // _logCallback?.call('Bluetooth', LogType.info, '已清除上次设备信息');
     }
   }
 
@@ -277,7 +278,7 @@ class BluetoothProvider extends ChangeNotifier {
     _logCallback?.call('Bluetooth', LogType.info, '开始扫描蓝牙设备...');
 
     // 设置6秒超时
-    _scanTimer = Timer(const Duration(seconds: 6), () {
+    _scanTimer = Timer(BluetoothConstants.scanTimeout, () {
       stopScan();
     });
 
@@ -324,7 +325,7 @@ class BluetoothProvider extends ChangeNotifier {
     // 开始扫描
     try {
       await fb.FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 6),
+        timeout: BluetoothConstants.connectionTimeout,
       );
     } catch (e) {
       _logCallback?.call('Bluetooth', LogType.error, '扫描失败: $e');
@@ -436,7 +437,7 @@ class BluetoothProvider extends ChangeNotifier {
   /// 连接蓝牙设备
   Future<void> _connectBluetoothDevice(BluetoothDeviceModel device) async {
     await device.flutterDevice!.connect(
-      timeout: const Duration(seconds: 6),
+      timeout: BluetoothConstants.connectionTimeout,
       autoConnect: true,
     );
 
@@ -501,23 +502,23 @@ class BluetoothProvider extends ChangeNotifier {
     try {
       _logCallback?.call('ELM327', LogType.info, '发送 ATZ (复位)...');
       await _obdService?.sendCommand("ATZ");
-      await Future.delayed(const Duration(milliseconds: 1000));
+      await Future.delayed(BluetoothConstants.elm327InitWait);
 
       _logCallback?.call('ELM327', LogType.info, '发送 ATE0 (关闭回显)...');
       await _obdService?.sendCommand("ATE0");
-      await Future.delayed(const Duration(milliseconds: obdCommandInterval));
+      await Future.delayed(BluetoothConstants.obdCommandInterval);
 
       _logCallback?.call('ELM327', LogType.info, '发送 ATL0 (关闭行尾)...');
       await _obdService?.sendCommand("ATL0");
-      await Future.delayed(const Duration(milliseconds: obdCommandInterval));
+      await Future.delayed(BluetoothConstants.obdCommandInterval);
 
       _logCallback?.call('ELM327', LogType.info, '发送 ATH0 (关闭头信息)...');
       await _obdService?.sendCommand("ATH0");
-      await Future.delayed(const Duration(milliseconds: obdCommandInterval));
+      await Future.delayed(BluetoothConstants.obdCommandInterval);
 
       _logCallback?.call('ELM327', LogType.info, '发送 ATSP0 (自动协议)...');
       await _obdService?.sendCommand("ATSP0");
-      await Future.delayed(const Duration(milliseconds: obdCommandInterval));
+      await Future.delayed(BluetoothConstants.obdCommandInterval);
 
       _logCallback?.call('ELM327', LogType.success, 'ELM327 初始化完成');
     } catch (e) {
@@ -665,6 +666,14 @@ class BluetoothProvider extends ChangeNotifier {
     _connectedDevice = null;
     _isDeviceConnected = false;
     _reconnectAttempts = 0;
+    notifyListeners();
+  }
+
+  /// 清除上次保存的设备信息
+  Future<void> clearLastDevice() async {
+    await DeviceStorageService.clearLastDevice();
+    _lastConnectedDevice = null;
+    _logCallback?.call('Bluetooth', LogType.info, '已清除上次设备信息');
     notifyListeners();
   }
 

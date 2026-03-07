@@ -36,6 +36,10 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> {
     context.read<BluetoothProvider>().startScan();
   }
 
+  void _handleClearLastDevice() {
+    context.read<BluetoothProvider>().clearLastDevice();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -164,6 +168,7 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> {
           connectedDevice: provider.connectedDevice,
           lastConnectedDevice: provider.lastConnectedDevice,
           onDisconnect: _handleDisconnect,
+          onClear: _handleClearLastDevice,
         );
       },
     );

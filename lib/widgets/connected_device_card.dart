@@ -9,12 +9,14 @@ class ConnectedDeviceCard extends StatelessWidget {
   final BluetoothDeviceModel? connectedDevice;
   final BluetoothDeviceModel? lastConnectedDevice;
   final VoidCallback? onDisconnect;
+  final VoidCallback? onClear;
 
   const ConnectedDeviceCard({
     super.key,
     this.connectedDevice,
     this.lastConnectedDevice,
     this.onDisconnect,
+    this.onClear,
   });
 
   @override
@@ -25,7 +27,10 @@ class ConnectedDeviceCard extends StatelessWidget {
         onDisconnect: onDisconnect,
       );
     } else if (lastConnectedDevice != null) {
-      return _LastConnectedState(device: lastConnectedDevice!);
+      return _LastConnectedState(
+        device: lastConnectedDevice!,
+        onClear: onClear,
+      );
     } else {
       return const _EmptyState();
     }
@@ -212,8 +217,12 @@ class _ConnectedState extends StatelessWidget {
 /// 上次连接状态
 class _LastConnectedState extends StatelessWidget {
   final BluetoothDeviceModel device;
+  final VoidCallback? onClear;
 
-  const _LastConnectedState({required this.device});
+  const _LastConnectedState({
+    required this.device,
+    this.onClear,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -254,9 +263,26 @@ class _LastConnectedState extends StatelessWidget {
                   ),
                 ],
               ),
-              const Icon(
-                Icons.history,
-                color: AppTheme.textMuted,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onClear != null)
+                    GestureDetector(
+                      onTap: onClear,
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.delete_outline,
+                          color: AppTheme.textMuted,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  const Icon(
+                    Icons.history,
+                    color: AppTheme.textMuted,
+                  ),
+                ],
               ),
             ],
           ),

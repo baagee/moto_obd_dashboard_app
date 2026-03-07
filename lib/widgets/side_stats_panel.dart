@@ -333,8 +333,8 @@ class _PressureChart extends StatelessWidget {
               size: const Size(double.infinity, 24),
               painter: PressureChartPainter(
                 pressureHistory: pressureHistory,
-                minPressure: 90,
-                maxPressure: 110,
+                minPressure: 0,
+                maxPressure: 150,
               ),
             ),
           ),
