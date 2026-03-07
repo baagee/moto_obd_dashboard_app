@@ -20,9 +20,9 @@ class SideStatsPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 标题
-              const Text('VEHICLE STATUS', style: AppTheme.labelTinyPrimary),
+              const Text('车辆状态', style: AppTheme.labelTinyPrimary),
 
-              const SizedBox(height: 6),
+              const SizedBox(height: 2),
 
               // 内容区域 - 不滚动
               Expanded(
@@ -35,7 +35,7 @@ class SideStatsPanel extends StatelessWidget {
                           child: _TempCard(
                             icon: Icons.device_thermostat,
                             iconColor: AppTheme.accentOrange,
-                            label: 'Coolant',
+                            label: '冷却水温',
                             value: '${data.coolantTemp}°C',
                           ),
                         ),
@@ -44,32 +44,32 @@ class SideStatsPanel extends StatelessWidget {
                           child: _TempCard(
                             icon: Icons.ac_unit,
                             iconColor: AppTheme.accentCyan,
-                            label: 'Intake',
+                            label: '进气温度',
                             value: '${data.intakeTemp}°C',
                           ),
                         ),
                       ],
                     ),
 
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 3),
 
                     // 油门进度条
                     _ProgressBar(
-                      label: 'Throttle',
+                      label: '油门开度',
                       value: data.throttle,
                       color: AppTheme.accentCyan,
                     ),
 
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 3),
 
                     // 负载进度条
                     _ProgressBar(
-                      label: 'Engine Load',
+                      label: '发动机负载',
                       value: data.load,
                       color: AppTheme.accentOrange,
                     ),
 
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 3),
 
                     // 倾斜角度指示器
                     _LeanAngleIndicator(
@@ -77,7 +77,7 @@ class SideStatsPanel extends StatelessWidget {
                       direction: data.leanDirection,
                     ),
 
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 3),
 
                     // 气压趋势图
                     _PressureChart(
@@ -85,7 +85,7 @@ class SideStatsPanel extends StatelessWidget {
                       pressureHistory: provider.pressureHistory,
                     ),
 
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 3),
 
                     // 电压显示
                     _VoltageDisplay(voltage: data.voltage),
@@ -132,7 +132,7 @@ class _TempCard extends StatelessWidget {
               Text(label, style: AppTheme.labelMedium),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(value, style: AppTheme.valueMedium),
         ],
       ),
@@ -170,7 +170,7 @@ class _ProgressBar extends StatelessWidget {
               Text('$value%', style: AppTheme.valueSmall.copyWith(color: color)),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           Stack(
             children: [
               Container(
@@ -214,7 +214,7 @@ class _LeanAngleIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(4),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
         borderRadius: BorderRadius.all(Radius.circular(6)),
@@ -225,7 +225,7 @@ class _LeanAngleIndicator extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Lean Angle', style: AppTheme.labelMedium),
+              const Text('车辆倾角', style: AppTheme.labelMedium),
               Row(
                 children: [
                   Text('$angle°', style: AppTheme.valueSmall),
@@ -238,7 +238,7 @@ class _LeanAngleIndicator extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           LayoutBuilder(
             builder: (context, constraints) {
               // 计算指示器位置：50%为中间
@@ -247,7 +247,7 @@ class _LeanAngleIndicator extends StatelessWidget {
                 children: [
                   // 背景条
                   Container(
-                    height: 12,
+                    height: 7,
                     decoration: const BoxDecoration(
                       color: Color(0xFF1E293B),
                       borderRadius: BorderRadius.all(Radius.circular(6)),
@@ -283,7 +283,7 @@ class _LeanAngleIndicator extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -311,7 +311,7 @@ class _PressureChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(5),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
         borderRadius: BorderRadius.all(Radius.circular(6)),
@@ -322,11 +322,11 @@ class _PressureChart extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Pressure', style: AppTheme.labelMedium),
+              const Text('进气歧管压力', style: AppTheme.labelMedium),
               Text('$pressure kPa', style: AppTheme.valueSmall),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           SizedBox(
             height: 24,
             child: CustomPaint(
@@ -429,7 +429,7 @@ class _VoltageDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
         borderRadius: BorderRadius.all(Radius.circular(6)),
@@ -441,7 +441,7 @@ class _VoltageDisplay extends StatelessWidget {
             children: [
               Icon(Icons.battery_charging_full, color: AppTheme.accentGreen, size: 14),
               SizedBox(width: 4),
-              Text('Voltage', style: AppTheme.labelMedium),
+              Text('控制模块电压', style: AppTheme.labelMedium),
             ],
           ),
           Text(

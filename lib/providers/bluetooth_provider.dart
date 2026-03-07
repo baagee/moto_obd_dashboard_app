@@ -29,7 +29,7 @@ class BluetoothProvider extends ChangeNotifier {
   bool _isAutoReconnecting = false;
 
   // OBD 相关
-  OBDDataProvider? _obdDataProvider;
+  final OBDDataProvider _obdDataProvider;
   OBDService? _obdService;
   fb.BluetoothCharacteristic? _writeCharacteristic;
   fb.BluetoothCharacteristic? _notifyCharacteristic;
@@ -64,18 +64,17 @@ class BluetoothProvider extends ChangeNotifier {
   BluetoothDeviceModel? get connectedDevice => _connectedDevice;
   BluetoothDeviceModel? get lastConnectedDevice => _lastConnectedDevice;
 
-  /// 设置日志 Provider
-  void setLogProvider(LogProvider logProvider) {
-    // 创建日志回调 - 降低与 LogProvider 的耦合度
+  /// 构造函数 - 通过依赖注入接收 OBDDataProvider 和 LogProvider
+  BluetoothProvider({
+    required OBDDataProvider obdDataProvider,
+    required LogProvider logProvider,
+  })  : _obdDataProvider = obdDataProvider {
+    // 初始化日志回调
     _logCallback = (source, type, message) => logProvider.addLog(source, type, message);
-  }
 
-  /// 设置 OBDDataProvider 引用
-  void setOBDDataProvider(OBDDataProvider provider) {
-    _obdDataProvider = provider;
-    // 初始化 OBDService，使用回调代替直接引用
+    // 初始化 OBDService
     _obdService = OBDService(
-      obdDataProvider: provider,
+      obdDataProvider: obdDataProvider,
       logCallback: _logCallback,
     );
     _logCallback?.call('OBD', LogType.info, 'OBDDataProvider 已关联');
@@ -608,7 +607,7 @@ class BluetoothProvider extends ChangeNotifier {
     _obdService?.stopPolling();
 
     // 重置数据
-    _obdDataProvider?.resetData();
+    _obdDataProvider.resetData();
 
     // 如果非手动断开，尝试自动重连
     if (wasConnected && previousDevice != null && !_isAutoReconnecting) {
@@ -639,7 +638,7 @@ class BluetoothProvider extends ChangeNotifier {
     }
 
     // 通知 OBDDataProvider 重置数据为默认值
-    _obdDataProvider?.resetData();
+    _obdDataProvider.resetData();
 
     _connectionSubscription?.cancel();
     _connectionSubscription = null;

@@ -40,8 +40,7 @@ class _MainContainerState extends State<MainContainer> {
     // 初始化日志系统
     await logProvider.initialize();
 
-    // 设置日志 Provider 并初始化蓝牙
-    bluetoothProvider.setLogProvider(logProvider);
+    // 初始化蓝牙（依赖已通过 ProxyProvider 注入）
     await bluetoothProvider.initialize();
     _hasCheckedBluetooth = true;
     await _checkAndShowBluetoothDialog();

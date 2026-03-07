@@ -51,14 +51,14 @@ class _LogsScreenState extends State<LogsScreen> {
         ),
         actions: [
           CyberButton.secondary(
-            text: 'CANCEL',
+            text: '取消',
             onPressed: () => Navigator.pop(context),
             height: 32,
             fontSize: 10,
           ),
           const SizedBox(width: 8),
           CyberButton.danger(
-            text: 'CLEAR',
+            text: '确认',
             onPressed: () {
               provider.clearLogs();
               Navigator.pop(context);
@@ -314,7 +314,7 @@ class _CompactHeader extends StatelessWidget {
                         Icon(Icons.delete_outline, color: AppTheme.accentRed.withOpacity(0.7), size: 12),
                         const SizedBox(width: 4),
                         Text(
-                          'CLEAR',
+                          '清空',
                           style: TextStyle(
                             color: AppTheme.accentRed.withOpacity(0.7),
                             fontSize: 8,
@@ -345,7 +345,7 @@ class _CompactHeader extends StatelessWidget {
                         Icon(Icons.download, color: Colors.white, size: 12),
                         SizedBox(width: 4),
                         Text(
-                          'EXPORT',
+                          '导出分享',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 8,
@@ -537,7 +537,7 @@ class _LogItem extends StatelessWidget {
               log.formattedTime,
               style: const TextStyle(
                 color: AppTheme.textMuted,
-                fontSize: 9,
+                fontSize: 10,
                 fontFamily: 'monospace',
               ),
             ),

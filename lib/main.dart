@@ -10,16 +10,6 @@ import 'screens/main_container.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 创建 Provider 实例（在 main() 中创建，避免每次 build 重建）
-  final obdProvider = OBDDataProvider();
-  final logProvider = LogProvider();
-  final bluetoothProvider = BluetoothProvider();
-
-  // 建立 BluetoothProvider 和 OBDDataProvider 的关联
-  bluetoothProvider.setOBDDataProvider(obdProvider);
-  // 建立 BluetoothProvider 和 LogProvider 的关联
-  bluetoothProvider.setLogProvider(logProvider);
-
   // 强制横屏
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,
@@ -34,9 +24,28 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider<OBDDataProvider>.value(value: obdProvider),
-        ChangeNotifierProvider<BluetoothProvider>.value(value: bluetoothProvider),
-        ChangeNotifierProvider<LogProvider>.value(value: logProvider),
+        // 基础 Providers（无依赖）
+        ChangeNotifierProvider<OBDDataProvider>(
+          create: (_) => OBDDataProvider(),
+        ),
+        ChangeNotifierProvider<LogProvider>(
+          create: (_) => LogProvider(),
+        ),
+
+        // ProxyProvider - 通过依赖注入创建 BluetoothProvider
+        // OBDDataProvider 和 LogProvider 会在创建时自动注入
+        ChangeNotifierProxyProvider2<OBDDataProvider, LogProvider, BluetoothProvider>(
+          create: (context) => BluetoothProvider(
+            obdDataProvider: context.read<OBDDataProvider>(),
+            logProvider: context.read<LogProvider>(),
+          ),
+          update: (context, obdDataProvider, logProvider, previous) =>
+              previous ??
+              BluetoothProvider(
+                obdDataProvider: obdDataProvider,
+                logProvider: logProvider,
+              ),
+        ),
       ],
       child: const OBDDashboardApp(),
     ),

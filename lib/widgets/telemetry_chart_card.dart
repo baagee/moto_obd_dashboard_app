@@ -15,7 +15,7 @@ class TelemetryChartCard extends StatelessWidget {
         final data = provider.data;
 
         return Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(9),
           decoration: BoxDecoration(
             color: AppTheme.surface40,
             border: Border.all(color: AppTheme.primary10),
@@ -39,7 +39,7 @@ class TelemetryChartCard extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
               // 图表区域（带左右Y轴）
               Expanded(
@@ -64,18 +64,6 @@ class TelemetryChartCard extends StatelessWidget {
                                 velocityHistory: data.velocityHistory,
                               ),
                             ),
-                          ),
-                          // 时间标签
-                          const SizedBox(height: 4),
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _TimeLabel('-60s'),
-                              _TimeLabel('-45s'),
-                              _TimeLabel('-30s'),
-                              _TimeLabel('-15s'),
-                              _TimeLabel('实时'),
-                            ],
                           ),
                         ],
                       ),
@@ -120,17 +108,6 @@ class _LegendDot extends StatelessWidget {
         Text(label.toUpperCase(), style: AppTheme.labelTiny),
       ],
     );
-  }
-}
-
-class _TimeLabel extends StatelessWidget {
-  final String text;
-
-  const _TimeLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(text, style: AppTheme.labelTiny);
   }
 }
 

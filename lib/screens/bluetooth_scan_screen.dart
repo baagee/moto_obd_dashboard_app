@@ -124,7 +124,7 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> {
                       color: provider.isScanning
                           ? AppTheme.textMuted
                           : AppTheme.primary,
-                      size: 14,
+                      size: 28,
                     ),
                   ),
                 ),

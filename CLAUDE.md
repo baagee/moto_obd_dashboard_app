@@ -33,8 +33,8 @@ flutter clean && flutter pub get && flutter build apk --debug
 ### 状态管理
 - 使用 **Provider**（非 Riverpod 或 Bloc）
 - 主要 Provider:
-  - `OBDDataProvider` - OBD 数据和骑行事件
-  - `BluetoothProvider` - 蓝牙状态管理
+  - `OBDDataProvider` - OBD 数据状态管理
+  - `BluetoothProvider` - 蓝牙权限、扫描、连接状态管理（含 OBD 会话管理）
   - `LogProvider` - 业务日志管理
 
 ### 项目结构
@@ -43,41 +43,46 @@ flutter clean && flutter pub get && flutter build apk --debug
 lib/
 ├── main.dart                     # 应用入口，强制横屏模式，Provider 配置
 ├── models/
-│   └── obd_data.dart            # OBDData、RidingEvent、DiagnosticLog 模型
+│   ├── obd_data.dart            # OBDData、RidingEvent、DiagnosticLog 模型
+│   └── bluetooth_device.dart     # BluetoothDeviceModel、DeviceConnectionStatus 模型
 ├── providers/
-│   ├── obd_data_provider.dart   # OBD 数据和骑行事件状态管理
-│   ├── bluetooth_provider.dart    # 蓝牙权限和连接状态管理
-│   └── log_provider.dart         # 业务日志管理
+│   ├── obd_data_provider.dart   # OBD 数据状态管理（实时数据更新、历史数据）
+│   ├── bluetooth_provider.dart  # 蓝牙权限、扫描、连接、ELM327初始化、OBD轮询
+│   └── log_provider.dart        # 业务日志管理（内存+文件双写）
 ├── services/
-│   ├── bluetooth_service.dart     # 蓝牙权限检测和设置跳转
-│   └── log_service.dart          # 日志文件实时写入和分享
+│   ├── bluetooth_service.dart   # 蓝牙权限检测、状态检测、设置跳转
+│   ├── obd_service.dart         # OBD 协议解析、分级轮询、通知处理
+│   ├── log_service.dart        # 日志文件实时写入和分享
+│   └── device_storage_service.dart # 设备信息持久化存储
 ├── screens/
-│   ├── main_container.dart        # 带顶部导航栏的导航容器
-│   ├── dashboard_screen.dart      # 主仪表盘视图
-│   └── logs_screen.dart          # 诊断日志视图
+│   ├── main_container.dart     # 主容器（含顶部导航栏 + IndexedStack 页面管理）
+│   ├── dashboard_screen.dart    # 主仪表盘视图
+│   ├── logs_screen.dart        # 诊断日志视图
+│   └── bluetooth_scan_screen.dart # 蓝牙设备扫描页面
 ├── theme/
-│   └── app_theme.dart            # 颜色、TextStyles、BoxDecorations
+│   └── app_theme.dart          # 颜色常量、TextStyles、BoxDecorations
 └── widgets/
     ├── speed_gauge_card.dart          # 圆形速度表
     ├── rpm_gauge_card.dart           # 带渐变的转速表
     ├── combined_gauge_card.dart      # 多仪表组合显示
-    ├── speed_gear_card.dart         # 速度+档位显示
-    ├── telemetry_chart_card.dart     # fl_chart 折线图
+    ├── speed_gear_card.dart          # 速度+档位显示
+    ├── telemetry_chart_card.dart    # fl_chart 折线图
     ├── side_stats_panel.dart        # 侧边统计面板
-    ├── diagnostic_logs_panel.dart   # 日志条目
-    ├── riding_events_panel.dart     # 事件列表
+    ├── diagnostic_logs_panel.dart   # 日志条目列表
+    ├── riding_events_panel.dart     # 骑行事件列表
     ├── status_footer.dart           # 底部状态栏
-    ├── top_navigation_bar.dart      # 导航（在 main_container 中）
     ├── bluetooth_status_icon.dart   # 蓝牙状态图标
-    ├── bluetooth_alert_dialog.dart  # 蓝牙提示弹窗
-    └── cyber_button.dart            # 赛博朋克风格通用按钮
+    ├── bluetooth_alert_dialog.dart # 蓝牙提示弹窗（权限/关闭）
+    ├── cyber_button.dart           # 赛博朋克风格通用按钮
+    ├── bluetooth_device_list.dart  # 蓝牙设备扫描列表
+    └── connected_device_card.dart   # 已连接设备详情卡片
 ```
 
 ### 设计系统
-- 详见 `DESIGN_STYLE_GUIDE.md`
 - 赛博朋克主题：深色背景 (#0A1114)，霓虹强调色 (#0DA6F2, #00F2FF)
 - 使用 Space Grotesk 字体（Google Fonts）
 - 所有卡片样式通过 `AppTheme.surfaceBorder()`，发光效果通过 `AppTheme.glowShadow()`
+- 预定义透明度颜色（如 `primary20`, `primary30`）和 TextStyles（`labelSmall`, `valueMedium` 等）
 
 ### 关键模式
 - 通过模型的 `copyWith()` 方法实现不可变性
@@ -86,15 +91,21 @@ lib/
 - 更新历史数据时始终创建新的列表实例（避免修改现有列表）
 
 ### 外部依赖
-- `provider: ^6.1.1` - 状态管理
-- `google_fonts: ^6.1.0` - Space Grotesk 字体
-- `fl_chart: ^0.66.0` - 遥测数据折线图
-- `cupertino_icons: ^1.0.6` - Material 图标
-- `permission_handler: ^11.0.0` - 权限管理
-- `flutter_blue_plus: ^1.32.0` - 蓝牙连接
-- `android_intent_plus: ^4.0.2` - Android Intent
-- `share_plus: ^7.0.0` - 文件分享
-- `path_provider: ^2.1.0` - 文件路径
+
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.1.0
+  fl_chart: ^0.66.0
+  provider: ^6.1.1
+  permission_handler: ^11.0.0
+  flutter_blue_plus: ^1.32.0
+  android_intent_plus: ^4.0.2
+  share_plus: ^7.0.0
+  path_provider: ^2.1.0
+```
 
 ## Flutter Expert 技能
 
@@ -109,21 +120,36 @@ lib/
 ### 日志系统
 - 使用 `LogProvider` 统一管理业务日志
 - 每次 `addLog()` 会同时写入内存和实时写入文件
-- 日志文件路径：`/data/data/{package}/files/obd_logs.txt`
+- 日志文件路径：`{app_documents}/obd_logs.txt`
 - 分享日志直接分享已存在的文件
 
 ### 按钮组件
 - 所有按钮使用 `CyberButton` 组件（赛博朋克风格）
 - 支持 4 种类型：primary、secondary、danger、success
-- 位置：`lib/widgets/cyber_button.dart`
 
 ### 蓝牙模块
 - 权限检测在应用启动时执行
 - 蓝牙状态通过 `BluetoothProvider` 管理
 - 关键方法：
-  - `initialize()` - 初始化并检测蓝牙状态
+  - `initialize()` - 初始化并检测蓝牙状态，自动重连上次设备
+  - `startScan()` - 扫描蓝牙设备（6秒超时）
+  - `connectToDevice()` - 连接设备并启动 OBD 会话
   - `requestPermission()` - 请求蓝牙权限
   - `openSettings()` - 打开系统设置
+- 设备优先级：OBD > ELM > 诊断工具 > 其他
+
+### OBD 数据流
+
+1. **BluetoothProvider** 管理蓝牙连接和 ELM327 初始化
+2. **OBDService** 负责：
+   - OBD 协议解析（PID 0C=转速, 0D=车速, 05=水温, 11=节气门, 0F=进气温度, 0B=MAP, 04=负载, 42=电压）
+   - 分级轮询（高速 PID 5Hz，中速 PID 2Hz，低速 PID 1Hz）
+3. **OBDDataProvider** 接收实时数据并维护历史数据
+
+### 自动重连机制
+- 应用启动时自动尝试连接上次设备
+- 连接断开后自动重连（最多 2 次）
+- 支持 ID 匹配和名称匹配两种方式
 
 ## Android 配置
 
@@ -131,8 +157,8 @@ lib/
 蓝牙相关权限在 `android/app/src/main/AndroidManifest.xml` 中配置：
 - BLUETOOTH
 - BLUETOOTH_ADMIN
-- BLUETOOTH_SCAN
-- BLUETOOTH_CONNECT
+- BLUETOOTH_SCAN (Android 12+)
+- BLUETOOTH_CONNECT (Android 12+)
 - ACCESS_FINE_LOCATION
 
 ### 已知警告
