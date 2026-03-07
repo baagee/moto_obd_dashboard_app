@@ -150,7 +150,7 @@ class CombinedGaugePainter extends CustomPainter {
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       pi,
-      -sweepAngle,  // 逆时针，经过上方
+      sweepAngle,  // 顺时针，经过上方
       false,
       paint,
     );
@@ -166,7 +166,7 @@ class CombinedGaugePainter extends CustomPainter {
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       pi,
-      -sweepAngle,  // 逆时针，经过上方
+      sweepAngle,  // 顺时针，经过上方
       false,
       glowPaint,
     );
@@ -195,7 +195,7 @@ class CombinedGaugePainter extends CustomPainter {
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       pi,
-      sweepAngle,  // 顺时针
+      -sweepAngle,  // 逆时针
       false,
       paint,
     );
@@ -211,7 +211,7 @@ class CombinedGaugePainter extends CustomPainter {
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       pi,
-      sweepAngle,  // 顺时针
+      -sweepAngle,  // 逆时针
       false,
       glowPaint,
     );
@@ -224,8 +224,8 @@ class CombinedGaugePainter extends CustomPainter {
     // 固定颜色 - 橙色，与数字蓝色区分
     const color = Color(0xFFFF9800);
 
-    // 顺时针角度：从 π 到 0，经过上方
-    final angle = pi - progress * pi;
+    // 顺时针角度：从 π 到 2π，经过上方
+    final angle = pi + progress * pi;
     final pointerLength = radius - 35;
     final headRadius = radius * 0.06; // 水滴头部半径
 
@@ -288,8 +288,8 @@ class CombinedGaugePainter extends CustomPainter {
     // 固定颜色 - 品红色，与数字青色区分
     const color = Color(0xFFE91E63);
 
-    // 顺时针角度：从 π 到 2π，经过下方
-    final angle = pi + progress * pi;
+    // 逆时针角度：从 π 到 0，经过下方
+    final angle = pi - progress * pi;
     final pointerLength = radius - 35;
     final headRadius = radius * 0.06; // 水滴头部半径
 
@@ -357,12 +357,12 @@ class CombinedGaugePainter extends CustomPainter {
       fontWeight: FontWeight.w500,
     );
 
-    // 上半圆刻度 (RPM) - 逆时针从π到0，经过上方
+    // 上半圆刻度 (RPM) - 顺时针从π到2π，经过上方
     for (int i = 0; i <= maxRpm; i += 2000) {
       if (i == 0) continue; // 跳过0
 
-      // 逆时针：π → 3π/2 → 0
-      final angle = pi - (i / maxRpm) * pi;
+      // 顺时针：π → 3π/2 → 2π
+      final angle = pi + (i / maxRpm) * pi;
       final innerRadius = radius - 32;
       final outerRadius = radius - 22;
 
@@ -399,7 +399,7 @@ class CombinedGaugePainter extends CustomPainter {
     for (int i = 0; i <= maxRpm; i += 500) {
       if (i == 0 || i % 2000 == 0) continue; // 跳过0和大刻度位置
 
-      final angle = pi - (i / maxRpm) * pi;
+      final angle = pi + (i / maxRpm) * pi;
       // 显示在进度弧内部（更靠近圆心）
       final innerRadius = radius - 40;
       final outerRadius = radius - 30;
@@ -412,12 +412,12 @@ class CombinedGaugePainter extends CustomPainter {
       canvas.drawLine(Offset(x1, y1), Offset(x2, y2), fineTickPaint);
     }
 
-    // 下半圆刻度 (Speed) - 顺时针从π到0，经过下方
+    // 下半圆刻度 (Speed) - 逆时针从π到0，经过下方
     for (int i = 0; i <= maxSpeed; i += 50) {
       if (i == maxSpeed) continue; // 跳过250
 
-      // 顺时针：π → π/2 → 0
-      final angle = pi + (i / maxSpeed) * pi;
+      // 逆时针：π → π/2 → 0
+      final angle = pi - (i / maxSpeed) * pi;
       final innerRadius = radius - 32;
       final outerRadius = radius - 22;
 
@@ -449,7 +449,7 @@ class CombinedGaugePainter extends CustomPainter {
     for (int i = 0; i <= maxSpeed; i += 10) {
       if (i == 0 || i % 50 == 0) continue; // 跳过0和大刻度位置
 
-      final angle = pi + (i / maxSpeed) * pi;
+      final angle = pi - (i / maxSpeed) * pi;
       // 显示在进度弧内部（更靠近圆心）
       final innerRadius = radius - 40;
       final outerRadius = radius - 30;
