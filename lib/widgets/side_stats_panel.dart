@@ -241,8 +241,8 @@ class _LeanAngleIndicator extends StatelessWidget {
           const SizedBox(height: 4),
           LayoutBuilder(
             builder: (context, constraints) {
-              // 计算指示器位置：50%为中间
-              final leanPercent = 50 + (direction == 'LEFT' ? -angle : angle) * (50 / 45);
+              // 计算指示器位置：50%为中间，最大60度
+              final leanPercent = 50 + (direction == 'LEFT' ? -angle : angle) * (50 / 60);
               return Stack(
                 children: [
                   // 背景条
@@ -287,9 +287,9 @@ class _LeanAngleIndicator extends StatelessWidget {
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('左45°', style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
+              Text('左60°', style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
               Text('0°', style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
-              Text('右45°', style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
+              Text('右60°', style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
             ],
           ),
         ],
