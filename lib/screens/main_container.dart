@@ -7,6 +7,7 @@ import '../widgets/bluetooth_status_icon.dart';
 import '../widgets/bluetooth_alert_dialog.dart';
 import 'dashboard_screen.dart';
 import 'logs_screen.dart';
+import 'bluetooth_scan_screen.dart';
 
 /// 主容器 - 管理页面导航
 class MainContainer extends StatefulWidget {
@@ -23,6 +24,7 @@ class _MainContainerState extends State<MainContainer> {
   final List<Widget> _pages = const [
     DashboardScreen(),
     LogsScreen(),
+    BluetoothScanScreen(),
   ];
 
   @override
@@ -77,6 +79,11 @@ class _MainContainerState extends State<MainContainer> {
     });
   }
 
+  void _navigateToBluetoothScan() {
+    // 始终切换到 DEVICES 页面（使用 IndexedStack，共享顶部导航栏）
+    _navigateTo(2);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -86,6 +93,7 @@ class _MainContainerState extends State<MainContainer> {
           _TopNavigationBar(
             currentIndex: _currentIndex,
             onNavigate: _navigateTo,
+            onLinkVehiclePressed: _navigateToBluetoothScan,
           ),
 
           // 页面内容
@@ -104,10 +112,12 @@ class _MainContainerState extends State<MainContainer> {
 class _TopNavigationBar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onNavigate;
+  final VoidCallback? onLinkVehiclePressed;
 
   const _TopNavigationBar({
     required this.currentIndex,
     required this.onNavigate,
+    this.onLinkVehiclePressed,
   });
 
   @override
@@ -191,7 +201,11 @@ class _TopNavigationBar extends StatelessWidget {
                 onTap: () => onNavigate(1),
               ),
               const SizedBox(width: 12),
-              _NavItem('SETTINGS', onTap: () {}),
+              _NavItem(
+                'DEVICES',
+                isActive: currentIndex == 2,
+                onTap: () => onNavigate(2),
+              ),
             ],
           ),
 
@@ -207,22 +221,25 @@ class _TopNavigationBar extends StatelessWidget {
           const SizedBox(width: 10),
 
           // Link Vehicle按钮
-          Container(
-            height: 21,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.primary,
-              borderRadius: BorderRadius.circular(5),
-              boxShadow: AppTheme.glowShadow(AppTheme.primary),
-            ),
-            child: const Center(
-              child: Text(
-                'LINK VEHICLE',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 7,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
+          GestureDetector(
+            onTap: onLinkVehiclePressed,
+            child: Container(
+              height: 21,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.primary,
+                borderRadius: BorderRadius.circular(5),
+                boxShadow: AppTheme.glowShadow(AppTheme.primary),
+              ),
+              child: const Center(
+                child: Text(
+                  'LINK VEHICLE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 7,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
                 ),
               ),
             ),

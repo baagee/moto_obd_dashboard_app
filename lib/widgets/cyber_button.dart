@@ -68,6 +68,18 @@ class CyberButton extends StatelessWidget {
     this.icon,
   }) : type = CyberButtonType.danger;
 
+  /// 成功按钮（绿色）
+  const CyberButton.success({
+    super.key,
+    required this.text,
+    this.onPressed,
+    this.width,
+    this.height = 40,
+    this.fontSize = 12,
+    this.isLoading = false,
+    this.icon,
+  }) : type = CyberButtonType.success;
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
