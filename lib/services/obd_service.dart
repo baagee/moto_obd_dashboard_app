@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
 import '../models/obd_data.dart';
 import '../providers/obd_data_provider.dart';
-import '../providers/log_provider.dart';
 
 /// OBD 数据解析结果
 class ObdParseResult {
@@ -33,7 +32,9 @@ class ObdParseResult {
 /// OBD 服务 - 负责 OBD 协议解析和数据轮询
 class OBDService {
   final OBDDataProvider _obdDataProvider;
-  final LogProvider? _logProvider;
+
+  // 日志回调 - 替代直接引用 LogProvider
+  void Function(String source, LogType type, String message)? logCallback;
 
   fb.BluetoothCharacteristic? _writeCharacteristic;
   Timer? _pollingTimer;
@@ -46,9 +47,9 @@ class OBDService {
 
   OBDService({
     required OBDDataProvider obdDataProvider,
-    LogProvider? logProvider,
+    void Function(String source, LogType type, String message)? logCallback,
   })  : _obdDataProvider = obdDataProvider,
-        _logProvider = logProvider;
+        logCallback = logCallback;
 
   /// 设置写入特征
   void setWriteCharacteristic(fb.BluetoothCharacteristic? characteristic) {
@@ -64,7 +65,7 @@ class OBDService {
 
     // 非标准 OBD 响应
     if (!response.startsWith("41")) {
-      _logProvider?.addLog('OBD', LogType.warning, '非标准 OBD 响应: $response');
+      logCallback?.call('OBD', LogType.warning, '非标准 OBD 响应: $response');
       return null;
     }
 
@@ -143,7 +144,7 @@ class OBDService {
 
     try {
       final response = utf8.decode(value, allowMalformed: true).trim();
-      _logProvider?.addLog('OBD', LogType.info, '收到原始数据: $response');
+      logCallback?.call('OBD', LogType.info, '收到原始数据: $response');
       final result = parseResponse(response);
       if (result == null) {
         return;
@@ -161,28 +162,28 @@ class OBDService {
         timestamp: timestamp,
       );
     } catch (e) {
-      _logProvider?.addLog('OBD', LogType.error, '解析数据失败: $e');
+      logCallback?.call('OBD', LogType.error, '解析数据失败: $e');
     }
   }
 
   /// 发送 OBD 命令
   Future<void> sendCommand(String command) async {
     if (_writeCharacteristic == null) {
-      _logProvider?.addLog('OBD', LogType.warning, '写入特征为空，跳过命令: $command');
+      logCallback?.call('OBD', LogType.warning, '写入特征为空，跳过命令: $command');
       return;
     }
     try {
       final bytes = utf8.encode("$command\r");
       await _writeCharacteristic!.write(bytes, withoutResponse: false);
-      _logProvider?.addLog('OBD', LogType.info, '发送命令: $command');
+      logCallback?.call('OBD', LogType.info, '发送命令: $command');
     } catch (e) {
-      _logProvider?.addLog('OBD', LogType.error, '发送命令失败: $command, 错误: $e');
+      logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $e');
     }
   }
 
   /// 启动分级轮询
   void startPolling() {
-    _logProvider?.addLog('OBD', LogType.info, '启动 OBD 轮询（分级模式）...');
+    logCallback?.call('OBD', LogType.info, '启动 OBD 轮询（分级模式）...');
 
     _pollingTimer?.cancel();
     int highFreqIndex = 0;
@@ -194,7 +195,7 @@ class OBDService {
       Duration(milliseconds: pollingBaseInterval),
       (_) async {
         if (_writeCharacteristic == null) {
-          _logProvider?.addLog('OBD', LogType.warning, '写入特征为空');
+          logCallback?.call('OBD', LogType.warning, '写入特征为空');
           return;
         }
 
@@ -215,14 +216,14 @@ class OBDService {
       },
     );
 
-    _logProvider?.addLog('OBD', LogType.success, 'OBD 分级轮询已启动');
+    logCallback?.call('OBD', LogType.success, 'OBD 分级轮询已启动');
   }
 
   /// 停止轮询
   void stopPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = null;
-    _logProvider?.addLog('OBD', LogType.info, 'OBD 轮询已停止');
+    logCallback?.call('OBD', LogType.info, 'OBD 轮询已停止');
   }
 
   /// 释放资源

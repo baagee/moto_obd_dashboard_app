@@ -45,8 +45,9 @@ class BluetoothProvider extends ChangeNotifier {
   StreamSubscription<List<fb.ScanResult>>? _scanSubscription;
   StreamSubscription<fb.BluetoothConnectionState>? _connectionSubscription;
   Timer? _scanTimer;
-  Timer? _connectionSimulationTimer;
-  LogProvider? _logProvider;
+
+  // 日志回调 - 降低耦合度
+  void Function(String source, LogType type, String message)? _logCallback;
 
   // 过滤阈值
   static const int minRssi = -90; // 过滤弱信号设备
@@ -65,18 +66,19 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 设置日志 Provider
   void setLogProvider(LogProvider logProvider) {
-    _logProvider = logProvider;
+    // 创建日志回调 - 降低与 LogProvider 的耦合度
+    _logCallback = (source, type, message) => logProvider.addLog(source, type, message);
   }
 
   /// 设置 OBDDataProvider 引用
   void setOBDDataProvider(OBDDataProvider provider) {
     _obdDataProvider = provider;
-    // 初始化 OBDService
+    // 初始化 OBDService，使用回调代替直接引用
     _obdService = OBDService(
       obdDataProvider: provider,
-      logProvider: _logProvider,
+      logCallback: _logCallback,
     );
-    _logProvider?.addLog('OBD', LogType.info, 'OBDDataProvider 已关联');
+    _logCallback?.call('OBD', LogType.info, 'OBDDataProvider 已关联');
   }
 
   /// 初始化蓝牙状态检测
@@ -84,7 +86,7 @@ class BluetoothProvider extends ChangeNotifier {
     if (_isInitialized) return;
 
     // 输出初始化日志
-    _logProvider?.addLog('Bluetooth', LogType.info, '蓝牙服务初始化中...');
+    _logCallback?.call('Bluetooth', LogType.info, '蓝牙服务初始化中...');
 
     // 初始检测
     await _checkPermission();
@@ -97,13 +99,13 @@ class BluetoothProvider extends ChangeNotifier {
 
       // 蓝牙状态变化时输出日志
       if (_isBluetoothOn && !wasOn) {
-        _logProvider?.addLog('Bluetooth', LogType.success, '蓝牙已开启');
+        _logCallback?.call('Bluetooth', LogType.success, '蓝牙已开启');
         // 蓝牙开启后自动扫描
         if (!_hasScanned && !_isScanning) {
           startScan();
         }
       } else if (!_isBluetoothOn && wasOn) {
-        _logProvider?.addLog('Bluetooth', LogType.warning, '蓝牙已关闭');
+        _logCallback?.call('Bluetooth', LogType.warning, '蓝牙已关闭');
       }
 
       notifyListeners();
@@ -114,7 +116,7 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 如果上次有连接的设备且当前未连接，尝试自动重连
     if (_lastConnectedDevice != null && !_isDeviceConnected && _isBluetoothOn) {
-      _logProvider?.addLog('Bluetooth', LogType.info, '尝试自动连接上次设备: ${_lastConnectedDevice!.name}');
+      _logCallback?.call('Bluetooth', LogType.info, '尝试自动连接上次设备: ${_lastConnectedDevice!.name}');
       await _autoReconnectLastDevice();
     }
 
@@ -127,7 +129,7 @@ class BluetoothProvider extends ChangeNotifier {
     final device = await DeviceStorageService.loadLastDevice();
     if (device != null) {
       _lastConnectedDevice = device;
-      _logProvider?.addLog('Bluetooth', LogType.info, '已加载上次设备: ${device.name}');
+      _logCallback?.call('Bluetooth', LogType.info, '已加载上次设备: ${device.name}');
       notifyListeners();
     }
   }
@@ -152,12 +154,12 @@ class BluetoothProvider extends ChangeNotifier {
     if (foundDevice.isEmpty && _lastConnectedDevice!.name.isNotEmpty) {
       foundDevice = _scannedDevices.where((d) => d.name == _lastConnectedDevice!.name).toList();
       if (foundDevice.isNotEmpty) {
-        _logProvider?.addLog('Bluetooth', LogType.info, '通过名称匹配到设备: ${foundDevice.first.name}');
+        _logCallback?.call('Bluetooth', LogType.info, '通过名称匹配到设备: ${foundDevice.first.name}');
       }
     }
 
     if (foundDevice.isEmpty) {
-      _logProvider?.addLog('Bluetooth', LogType.warning, '未找到上次设备: ${_lastConnectedDevice!.name}，请手动重试');
+      _logCallback?.call('Bluetooth', LogType.warning, '未找到上次设备: ${_lastConnectedDevice!.name}，请手动重试');
       // 保留设备信息，让用户可以手动点击重连
       _isAutoReconnecting = false;
       notifyListeners();
@@ -176,16 +178,16 @@ class BluetoothProvider extends ChangeNotifier {
   Future<void> _attemptReconnect(BluetoothDeviceModel device) async {
     while (_reconnectAttempts < maxReconnectAttempts && !_isDeviceConnected) {
       _reconnectAttempts++;
-      _logProvider?.addLog('Bluetooth', LogType.info, '自动重连尝试 $_reconnectAttempts/$maxReconnectAttempts');
+      _logCallback?.call('Bluetooth', LogType.info, '自动重连尝试 $_reconnectAttempts/$maxReconnectAttempts');
 
       try {
         await connectToDevice(device);
         if (_isDeviceConnected) {
-          _logProvider?.addLog('Bluetooth', LogType.success, '自动重连成功');
+          _logCallback?.call('Bluetooth', LogType.success, '自动重连成功');
           break;
         }
       } catch (e) {
-        _logProvider?.addLog('Bluetooth', LogType.error, '重连失败: $e');
+        _logCallback?.call('Bluetooth', LogType.error, '重连失败: $e');
       }
 
       if (_reconnectAttempts < maxReconnectAttempts && !_isDeviceConnected) {
@@ -194,11 +196,11 @@ class BluetoothProvider extends ChangeNotifier {
     }
 
     if (!_isDeviceConnected && _reconnectAttempts >= maxReconnectAttempts) {
-      _logProvider?.addLog('Bluetooth', LogType.error, '自动重连失败，已达到最大重试次数');
+      _logCallback?.call('Bluetooth', LogType.error, '自动重连失败，已达到最大重试次数');
       // 连接失败，清除保存的设备信息，让用户重新选择
       await DeviceStorageService.clearLastDevice();
       _lastConnectedDevice = null;
-      _logProvider?.addLog('Bluetooth', LogType.info, '已清除上次设备信息');
+      _logCallback?.call('Bluetooth', LogType.info, '已清除上次设备信息');
     }
   }
 
@@ -208,16 +210,16 @@ class BluetoothProvider extends ChangeNotifier {
 
     switch (_permissionStatus) {
       case app_bluetooth.BluetoothPermissionStatus.granted:
-        _logProvider?.addLog('Bluetooth', LogType.success, '蓝牙权限已获取');
+        _logCallback?.call('Bluetooth', LogType.success, '蓝牙权限已获取');
         break;
       case app_bluetooth.BluetoothPermissionStatus.denied:
-        _logProvider?.addLog('Bluetooth', LogType.warning, '蓝牙权限被拒绝');
+        _logCallback?.call('Bluetooth', LogType.warning, '蓝牙权限被拒绝');
         break;
       case app_bluetooth.BluetoothPermissionStatus.permanentlyDenied:
-        _logProvider?.addLog('Bluetooth', LogType.error, '蓝牙权限已永久拒绝，请前往设置授权');
+        _logCallback?.call('Bluetooth', LogType.error, '蓝牙权限已永久拒绝，请前往设置授权');
         break;
       case app_bluetooth.BluetoothPermissionStatus.unknown:
-        _logProvider?.addLog('Bluetooth', LogType.info, '正在检测蓝牙权限...');
+        _logCallback?.call('Bluetooth', LogType.info, '正在检测蓝牙权限...');
         break;
     }
 
@@ -229,9 +231,9 @@ class BluetoothProvider extends ChangeNotifier {
     _isBluetoothOn = await app_bluetooth.BluetoothService.isBluetoothEnabled();
 
     if (_isBluetoothOn) {
-      _logProvider?.addLog('Bluetooth', LogType.success, '蓝牙已开启');
+      _logCallback?.call('Bluetooth', LogType.success, '蓝牙已开启');
     } else {
-      _logProvider?.addLog('Bluetooth', LogType.warning, '蓝牙未开启，请开启蓝牙');
+      _logCallback?.call('Bluetooth', LogType.warning, '蓝牙未开启，请开启蓝牙');
     }
 
     notifyListeners();
@@ -239,13 +241,13 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 请求蓝牙权限
   Future<bool> requestPermission() async {
-    _logProvider?.addLog('Bluetooth', LogType.info, '正在请求蓝牙权限...');
+    _logCallback?.call('Bluetooth', LogType.info, '正在请求蓝牙权限...');
     _permissionStatus = await app_bluetooth.BluetoothService.requestBluetoothPermission();
 
     if (_permissionStatus == app_bluetooth.BluetoothPermissionStatus.granted) {
-      _logProvider?.addLog('Bluetooth', LogType.success, '蓝牙权限已获取');
+      _logCallback?.call('Bluetooth', LogType.success, '蓝牙权限已获取');
     } else {
-      _logProvider?.addLog('Bluetooth', LogType.warning, '蓝牙权限授权失败');
+      _logCallback?.call('Bluetooth', LogType.warning, '蓝牙权限授权失败');
     }
 
     notifyListeners();
@@ -254,14 +256,14 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 刷新蓝牙状态
   Future<void> refreshBluetoothStatus() async {
-    _logProvider?.addLog('Bluetooth', LogType.info, '正在刷新蓝牙状态...');
+    _logCallback?.call('Bluetooth', LogType.info, '正在刷新蓝牙状态...');
     await _checkPermission();
     await _checkBluetoothStatus();
   }
 
   /// 打开系统设置
   Future<void> openSettings() async {
-    _logProvider?.addLog('Bluetooth', LogType.info, '正在打开系统设置...');
+    _logCallback?.call('Bluetooth', LogType.info, '正在打开系统设置...');
     await app_bluetooth.BluetoothService.openBluetoothSettings();
   }
 
@@ -273,7 +275,7 @@ class BluetoothProvider extends ChangeNotifier {
     _scannedDevices = [];
     notifyListeners();
 
-    _logProvider?.addLog('Bluetooth', LogType.info, '开始扫描蓝牙设备...');
+    _logCallback?.call('Bluetooth', LogType.info, '开始扫描蓝牙设备...');
 
     // 设置6秒超时
     _scanTimer = Timer(const Duration(seconds: 6), () {
@@ -297,10 +299,10 @@ class BluetoothProvider extends ChangeNotifier {
         return a.name.compareTo(b.name);
       });
 
-      // 输出扫描到的设备详情
-      for (final device in filteredDevices) {
-        _logProvider?.addLog('Bluetooth', LogType.info, '扫描到设备: ${device.name} (${device.id}) RSSI: ${device.rssi}');
-      }
+      // // 输出扫描到的设备详情
+      // for (final device in filteredDevices) {
+      //   _logCallback?.call('Bluetooth', LogType.info, '扫描到设备: ${device.name} (${device.id}) RSSI: ${device.rssi}');
+      // }
 
       _scannedDevices = filteredDevices;
 
@@ -326,7 +328,7 @@ class BluetoothProvider extends ChangeNotifier {
         timeout: const Duration(seconds: 6),
       );
     } catch (e) {
-      _logProvider?.addLog('Bluetooth', LogType.error, '扫描失败: $e');
+      _logCallback?.call('Bluetooth', LogType.error, '扫描失败: $e');
       await stopScan();
     }
   }
@@ -341,7 +343,7 @@ class BluetoothProvider extends ChangeNotifier {
     _scanSubscription = null;
 
     _isScanning = false;
-    _logProvider?.addLog('Bluetooth', LogType.info, '扫描完成，找到 ${_scannedDevices.length} 个设备');
+    _logCallback?.call('Bluetooth', LogType.info, '扫描完成，找到 ${_scannedDevices.length} 个设备');
     notifyListeners();
   }
 
@@ -367,11 +369,11 @@ class BluetoothProvider extends ChangeNotifier {
   Future<void> connectToDevice(BluetoothDeviceModel device) async {
     // 前置检查
     if (device.flutterDevice == null) {
-      _logProvider?.addLog('Bluetooth', LogType.error, '设备对象无效');
+      _logCallback?.call('Bluetooth', LogType.error, '设备对象无效');
       return;
     }
 
-    _logProvider?.addLog('Bluetooth', LogType.info, '正在连接 ${device.name}...');
+    _logCallback?.call('Bluetooth', LogType.info, '正在连接 ${device.name}...');
 
     // 断开旧设备
     if (_connectedDevice != null) {
@@ -398,7 +400,7 @@ class BluetoothProvider extends ChangeNotifier {
   /// 由 _handleConnectionStateChanged 在连接成功时调用
   Future<void> _startObdSession(BluetoothDeviceModel device, int deviceIndex) async {
     if (device.flutterDevice == null) {
-      _logProvider?.addLog('Bluetooth', LogType.error, '设备对象无效，无法启动 OBD 会话');
+      _logCallback?.call('Bluetooth', LogType.error, '设备对象无效，无法启动 OBD 会话');
       return;
     }
 
@@ -417,7 +419,7 @@ class BluetoothProvider extends ChangeNotifier {
       _updateDeviceConnectedStatus(device, deviceIndex);
 
     } catch (e) {
-      _logProvider?.addLog('Bluetooth', LogType.error, '启动 OBD 会话失败: $e');
+      _logCallback?.call('Bluetooth', LogType.error, '启动 OBD 会话失败: $e');
       _handleConnectionError(device, deviceIndex, e);
     }
   }
@@ -451,8 +453,8 @@ class BluetoothProvider extends ChangeNotifier {
     BluetoothDeviceModel device,
     List<fb.BluetoothService> services,
   ) async {
-    _logProvider?.addLog('Bluetooth', LogType.info, '开始发现服务...');
-    _logProvider?.addLog('Bluetooth', LogType.info, '发现 ${services.length} 个服务');
+    _logCallback?.call('Bluetooth', LogType.info, '开始发现服务...');
+    _logCallback?.call('Bluetooth', LogType.info, '发现 ${services.length} 个服务');
 
 
     final characteristics = services.expand((s) => s.characteristics).toList();
@@ -476,13 +478,13 @@ class BluetoothProvider extends ChangeNotifier {
       await DeviceStorageService.saveLastDevice(_connectedDevice!);
     }
 
-    _logProvider?.addLog('Bluetooth', LogType.success, '已连接到 ${device.name}');
+    _logCallback?.call('Bluetooth', LogType.success, '已连接到 ${device.name}');
     notifyListeners();
   }
 
   /// 处理连接失败
   void _handleConnectionError(BluetoothDeviceModel device, int index, Object error) {
-    _logProvider?.addLog('Bluetooth', LogType.error, '连接失败: $error');
+    _logCallback?.call('Bluetooth', LogType.error, '连接失败: $error');
 
     // 更新状态为断开
     if (index != -1) {
@@ -495,32 +497,32 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// ========== ELM327 初始化（增加详细日志） ==========
   Future<void> _initializeElm327() async {
-    _logProvider?.addLog('ELM327', LogType.info, '开始初始化 ELM327...');
+    _logCallback?.call('ELM327', LogType.info, '开始初始化 ELM327...');
 
     try {
-      _logProvider?.addLog('ELM327', LogType.info, '发送 ATZ (复位)...');
+      _logCallback?.call('ELM327', LogType.info, '发送 ATZ (复位)...');
       await _obdService?.sendCommand("ATZ");
       await Future.delayed(const Duration(milliseconds: 1000));
 
-      _logProvider?.addLog('ELM327', LogType.info, '发送 ATE0 (关闭回显)...');
+      _logCallback?.call('ELM327', LogType.info, '发送 ATE0 (关闭回显)...');
       await _obdService?.sendCommand("ATE0");
       await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
-      _logProvider?.addLog('ELM327', LogType.info, '发送 ATL0 (关闭行尾)...');
+      _logCallback?.call('ELM327', LogType.info, '发送 ATL0 (关闭行尾)...');
       await _obdService?.sendCommand("ATL0");
       await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
-      _logProvider?.addLog('ELM327', LogType.info, '发送 ATH0 (关闭头信息)...');
+      _logCallback?.call('ELM327', LogType.info, '发送 ATH0 (关闭头信息)...');
       await _obdService?.sendCommand("ATH0");
       await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
-      _logProvider?.addLog('ELM327', LogType.info, '发送 ATSP0 (自动协议)...');
+      _logCallback?.call('ELM327', LogType.info, '发送 ATSP0 (自动协议)...');
       await _obdService?.sendCommand("ATSP0");
       await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
-      _logProvider?.addLog('ELM327', LogType.success, 'ELM327 初始化完成');
+      _logCallback?.call('ELM327', LogType.success, 'ELM327 初始化完成');
     } catch (e) {
-      _logProvider?.addLog('ELM327', LogType.error, '初始化失败: $e');
+      _logCallback?.call('ELM327', LogType.error, '初始化失败: $e');
       rethrow;
     }
   }
@@ -539,34 +541,33 @@ class BluetoothProvider extends ChangeNotifier {
 
     if (notifyChar != null && writeChar != null) {
       _writeCharacteristic = writeChar;
+      _notifyCharacteristic = notifyChar;
       // 设置 OBDService 的写入特征
       _obdService?.setWriteCharacteristic(writeChar);
-      _logProvider?.addLog('Bluetooth', LogType.success, '匹配写入特征: ${_writeCharacteristic?.uuid.str}');
-
-      _logProvider?.addLog('Bluetooth', LogType.success, '智能匹配通知特征: ${notifyChar.uuid.str}');
+      _logCallback?.call('Bluetooth', LogType.success, '匹配写入特征: ${_writeCharacteristic?.uuid.str}');
 
       // 订阅通知
       try {
         await notifyChar.setNotifyValue(true);
-        _logProvider?.addLog('Bluetooth', LogType.info, '已订阅通知特征');
+        _logCallback?.call('Bluetooth', LogType.info, '已订阅通知特征');
         _obdNotificationSubscription?.cancel();
         _obdNotificationSubscription = notifyChar.lastValueStream.listen(
           (value) => _obdService?.handleNotification(value),
-          onError: (e) => _logProvider?.addLog('Bluetooth', LogType.error, '通知监听数据错误: $e'),
+          onError: (e) => _logCallback?.call('Bluetooth', LogType.error, '通知监听数据错误: $e'),
         );
       } catch (e) {
-        _logProvider?.addLog('Bluetooth', LogType.error, '订阅通知失败: $e');
+        _logCallback?.call('Bluetooth', LogType.error, '订阅通知失败: $e');
       }
       return;
     }
-    _logProvider?.addLog('Bluetooth', LogType.error, '未匹配到写入&通知service');
+    _logCallback?.call('Bluetooth', LogType.error, '未匹配到写入&通知service');
   }
 
   /// 处理连接状态变化
   Future<void> _handleConnectionStateChanged(fb.BluetoothConnectionState state, BluetoothDeviceModel device) async {
     switch (state) {
       case fb.BluetoothConnectionState.connected:
-        _logProvider?.addLog('Bluetooth', LogType.success, '设备已连接: ${device.name}，正在启动 OBD 会话...');
+        _logCallback?.call('Bluetooth', LogType.success, '设备已连接: ${device.name}，正在启动 OBD 会话...');
 
         // 查找设备在列表中的索引
         final index = _scannedDevices.indexWhere((d) => d.id == device.id || d.name == device.name);
@@ -575,7 +576,7 @@ class BluetoothProvider extends ChangeNotifier {
         await _startObdSession(device, index);
         break;
       case fb.BluetoothConnectionState.disconnected:
-        _logProvider?.addLog('Bluetooth', LogType.warning, '设备已断开: ${device.name}');
+        _logCallback?.call('Bluetooth', LogType.warning, '设备已断开: ${device.name}');
         _handleDisconnection();
         break;
       default:
@@ -611,14 +612,14 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 如果非手动断开，尝试自动重连
     if (wasConnected && previousDevice != null && !_isAutoReconnecting) {
-      _logProvider?.addLog('Bluetooth', LogType.warning, '检测到异常断开，尝试自动重连...');
+      _logCallback?.call('Bluetooth', LogType.warning, '检测到异常断开，尝试自动重连...');
       _attemptReconnect(previousDevice);
     }
   }
 
   /// 断开连接
   Future<void> disconnectDevice() async {
-    _logProvider?.addLog('Bluetooth', LogType.info, '开始断开连接...');
+    _logCallback?.call('Bluetooth', LogType.info, '开始断开连接...');
 
     // 停止 OBD 轮询
     _obdService?.stopPolling();
@@ -631,9 +632,9 @@ class BluetoothProvider extends ChangeNotifier {
     if (_notifyCharacteristic != null) {
       try {
         await _notifyCharacteristic!.setNotifyValue(false);
-        _logProvider?.addLog('Bluetooth', LogType.info, '已取消通知订阅');
+        _logCallback?.call('Bluetooth', LogType.info, '已取消通知订阅');
       } catch (e) {
-        _logProvider?.addLog('Bluetooth', LogType.warning, '取消通知订阅失败: $e');
+        _logCallback?.call('Bluetooth', LogType.warning, '取消通知订阅失败: $e');
       }
     }
 
@@ -646,9 +647,9 @@ class BluetoothProvider extends ChangeNotifier {
     if (_connectedDevice?.flutterDevice != null) {
       try {
         await _connectedDevice!.flutterDevice!.disconnect();
-        _logProvider?.addLog('Bluetooth', LogType.warning, '已断开与 ${_connectedDevice!.name} 的连接');
+        _logCallback?.call('Bluetooth', LogType.warning, '已断开与 ${_connectedDevice!.name} 的连接');
       } catch (e) {
-        _logProvider?.addLog('Bluetooth', LogType.error, '断开连接失败: $e');
+        _logCallback?.call('Bluetooth', LogType.error, '断开连接失败: $e');
       }
     }
 
@@ -680,7 +681,6 @@ class BluetoothProvider extends ChangeNotifier {
     _connectionSubscription?.cancel();
     _obdNotificationSubscription?.cancel();
     _scanTimer?.cancel();
-    _connectionSimulationTimer?.cancel();
     _obdPollingTimer?.cancel();
     _obdService?.dispose();
     super.dispose();

@@ -10,6 +10,16 @@ import 'screens/main_container.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 创建 Provider 实例（在 main() 中创建，避免每次 build 重建）
+  final obdProvider = OBDDataProvider();
+  final logProvider = LogProvider();
+  final bluetoothProvider = BluetoothProvider();
+
+  // 建立 BluetoothProvider 和 OBDDataProvider 的关联
+  bluetoothProvider.setOBDDataProvider(obdProvider);
+  // 建立 BluetoothProvider 和 LogProvider 的关联
+  bluetoothProvider.setLogProvider(logProvider);
+
   // 强制横屏
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,
@@ -21,7 +31,16 @@ void main() {
     SystemUiMode.immersiveSticky,
   );
 
-  runApp(const OBDDashboardApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<OBDDataProvider>.value(value: obdProvider),
+        ChangeNotifierProvider<BluetoothProvider>.value(value: bluetoothProvider),
+        ChangeNotifierProvider<LogProvider>.value(value: logProvider),
+      ],
+      child: const OBDDashboardApp(),
+    ),
+  );
 }
 
 class OBDDashboardApp extends StatelessWidget {
@@ -29,38 +48,21 @@ class OBDDashboardApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 创建 Provider 实例
-    final obdProvider = OBDDataProvider();
-    final bluetoothProvider = BluetoothProvider();
-    final logProvider = LogProvider();
-
-    // 建立 BluetoothProvider 和 OBDDataProvider 的关联
-    bluetoothProvider.setOBDDataProvider(obdProvider);
-    // 建立 BluetoothProvider 和 LogProvider 的关联
-    bluetoothProvider.setLogProvider(logProvider);
-
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider<OBDDataProvider>.value(value: obdProvider),
-        ChangeNotifierProvider<BluetoothProvider>.value(value: bluetoothProvider),
-        ChangeNotifierProvider<LogProvider>.value(value: logProvider),
-      ],
-      child: MaterialApp(
-        title: 'CYBER-CYCLE OBD',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          brightness: Brightness.dark,
-          fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF0DA6F2),
-            surface: Color(0xFF162229),
-            error: Color(0xFFFF4D4D),
-          ),
-          scaffoldBackgroundColor: const Color(0xFF0A1114),
+    return MaterialApp(
+      title: 'CYBER-CYCLE OBD',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF0DA6F2),
+          surface: Color(0xFF162229),
+          error: Color(0xFFFF4D4D),
         ),
-        home: const MainContainer(),
+        scaffoldBackgroundColor: const Color(0xFF0A1114),
       ),
+      home: const MainContainer(),
     );
   }
 }
