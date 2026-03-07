@@ -27,8 +27,6 @@ class DeviceStorageService {
         'name': device.name,
         'macAddress': device.macAddress,
         'rssi': device.rssi,
-        'notifyUuid': device.notifyUuid,
-        'writeUuid': device.writeUuid,
         'savedAt': DateTime.now().toIso8601String(),
       };
 
@@ -61,8 +59,6 @@ class DeviceStorageService {
         macAddress: data['macAddress'] as String,
         rssi: data['rssi'] as int? ?? -100,
         status: DeviceConnectionStatus.disconnected,
-        notifyUuid: data['notifyUuid'] as String?,
-        writeUuid: data['writeUuid'] as String?,
       );
     } catch (e) {
       // 读取失败返回 null

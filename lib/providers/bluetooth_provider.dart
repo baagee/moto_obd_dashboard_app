@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
 import '../models/bluetooth_device.dart';
 import '../models/obd_data.dart';
 import '../services/bluetooth_service.dart' as app_bluetooth;
 import '../services/device_storage_service.dart';
+import '../services/obd_service.dart';
 import 'log_provider.dart';
 import 'obd_data_provider.dart';
 
@@ -31,28 +30,20 @@ class BluetoothProvider extends ChangeNotifier {
 
   // OBD 相关
   OBDDataProvider? _obdDataProvider;
-  BluetoothCharacteristic? _writeCharacteristic;
-  BluetoothCharacteristic? _notifyCharacteristic;
+  OBDService? _obdService;
+  fb.BluetoothCharacteristic? _writeCharacteristic;
+  fb.BluetoothCharacteristic? _notifyCharacteristic;
   StreamSubscription<List<int>>? _obdNotificationSubscription;
   Timer? _obdPollingTimer;
   static const int obdCommandInterval = 200;
+  // 中频 PID - 节气门、进气温度、压力 (5Hz, 200ms)
+  static const List<String> mediumFreqPids = ['0111', '010F', '010B'];
+  // 低频 PID - 水温、负载、电压等 (2Hz, 500ms)
+  static const List<String> lowFreqPids = ['0105', '0104', '0145', '0142'];
 
-  // OBD PID 列表（查询模式 01）
-  static const List<String> obdPids = [
-    '010C', // 发动机转速 RPM
-    '010D', // 车速 VSS
-    '0105', // 冷却液温度
-    '0111', // 节气门位置 TP
-    '010F', // 进气温度 IAT
-    '010B', // 进气歧管压力 MAP
-    '0104', // 引擎负荷
-    '0145', // 绝对节气门位置
-    '0142', // 控制模块电压
-  ];
-
-  StreamSubscription<BluetoothAdapterState>? _adapterSubscription;
-  StreamSubscription<List<ScanResult>>? _scanSubscription;
-  StreamSubscription<BluetoothConnectionState>? _connectionSubscription;
+  StreamSubscription<fb.BluetoothAdapterState>? _adapterSubscription;
+  StreamSubscription<List<fb.ScanResult>>? _scanSubscription;
+  StreamSubscription<fb.BluetoothConnectionState>? _connectionSubscription;
   Timer? _scanTimer;
   Timer? _connectionSimulationTimer;
   LogProvider? _logProvider;
@@ -80,6 +71,11 @@ class BluetoothProvider extends ChangeNotifier {
   /// 设置 OBDDataProvider 引用
   void setOBDDataProvider(OBDDataProvider provider) {
     _obdDataProvider = provider;
+    // 初始化 OBDService
+    _obdService = OBDService(
+      obdDataProvider: provider,
+      logProvider: _logProvider,
+    );
     _logProvider?.addLog('OBD', LogType.info, 'OBDDataProvider 已关联');
   }
 
@@ -95,9 +91,9 @@ class BluetoothProvider extends ChangeNotifier {
     await _checkBluetoothStatus();
 
     // 监听蓝牙状态变化
-    _adapterSubscription = FlutterBluePlus.adapterState.listen((state) {
+    _adapterSubscription = fb.FlutterBluePlus.adapterState.listen((state) {
       final wasOn = _isBluetoothOn;
-      _isBluetoothOn = state == BluetoothAdapterState.on;
+      _isBluetoothOn = state == fb.BluetoothAdapterState.on;
 
       // 蓝牙状态变化时输出日志
       if (_isBluetoothOn && !wasOn) {
@@ -285,15 +281,21 @@ class BluetoothProvider extends ChangeNotifier {
     });
 
     // 监听扫描结果
-    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
+    _scanSubscription = fb.FlutterBluePlus.scanResults.listen((results) {
       // 过滤弱信号设备并按信号强度排序
       final filteredDevices = results
           .where((r) => r.rssi >= minRssi)
           .map((r) => BluetoothDeviceModel.fromScanResult(r))
           .toList();
 
-      // 按信号强度排序（从高到低）
-      filteredDevices.sort((a, b) => b.rssi.compareTo(a.rssi));
+      // 按设备优先级排序，再按信号强度，最后按名称
+      filteredDevices.sort((a, b) {
+        int aPriority = _getDevicePriority(a.name);
+        int bPriority = _getDevicePriority(b.name);
+        if (aPriority != bPriority) return aPriority.compareTo(bPriority);
+        if (a.rssi != b.rssi) return b.rssi.compareTo(a.rssi);
+        return a.name.compareTo(b.name);
+      });
 
       // 输出扫描到的设备详情
       for (final device in filteredDevices) {
@@ -320,7 +322,7 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 开始扫描
     try {
-      await FlutterBluePlus.startScan(
+      await fb.FlutterBluePlus.startScan(
         timeout: const Duration(seconds: 6),
       );
     } catch (e) {
@@ -334,13 +336,31 @@ class BluetoothProvider extends ChangeNotifier {
     _scanTimer?.cancel();
     _scanTimer = null;
 
-    await FlutterBluePlus.stopScan();
+    await fb.FlutterBluePlus.stopScan();
     _scanSubscription?.cancel();
     _scanSubscription = null;
 
     _isScanning = false;
     _logProvider?.addLog('Bluetooth', LogType.info, '扫描完成，找到 ${_scannedDevices.length} 个设备');
     notifyListeners();
+  }
+
+  /// 获取设备优先级（数字越小越优先）
+  /// 优先级: 1=OBD设备, 2=ELM适配器, 3=诊断工具, 4=其他
+  int _getDevicePriority(String deviceName) {
+    String name = deviceName.toUpperCase();
+    if (name.contains('OBD') || name.contains('OBDII') || name.contains('OBD2')) {
+      return 1;
+    }
+    if (name.contains('ELM') || name.contains('ELM327') || name.contains('VAG') ||
+        name.contains('VCDS') || name.contains('SCAN') || name.contains('CAR')) {
+      return 2;
+    }
+    if (name.contains('DIAG') || name.contains('DIAGNOSTIC') || name.contains('TOOL') ||
+        name.contains('PROTOCOL') || name.contains('ADAPTER')) {
+      return 3;
+    }
+    return 4;
   }
 
   /// 连接设备（真实连接）
@@ -391,7 +411,7 @@ class BluetoothProvider extends ChangeNotifier {
       await _initializeElm327();
 
       // 启动 OBD 轮询
-      _startObdPolling();
+      _obdService?.startPolling();
 
       // 更新为已连接状态
       _updateDeviceConnectedStatus(device, deviceIndex);
@@ -429,7 +449,7 @@ class BluetoothProvider extends ChangeNotifier {
   /// 发现服务并匹配特征
   Future<void> _discoverAndMatchCharacteristics(
     BluetoothDeviceModel device,
-    List<BluetoothService> services,
+    List<fb.BluetoothService> services,
   ) async {
     _logProvider?.addLog('Bluetooth', LogType.info, '开始发现服务...');
     _logProvider?.addLog('Bluetooth', LogType.info, '发现 ${services.length} 个服务');
@@ -480,23 +500,23 @@ class BluetoothProvider extends ChangeNotifier {
 
     try {
       _logProvider?.addLog('ELM327', LogType.info, '发送 ATZ (复位)...');
-      await _sendObdCommand("ATZ");
+      await _obdService?.sendCommand("ATZ");
       await Future.delayed(const Duration(milliseconds: 1000));
 
       _logProvider?.addLog('ELM327', LogType.info, '发送 ATE0 (关闭回显)...');
-      await _sendObdCommand("ATE0");
+      await _obdService?.sendCommand("ATE0");
       await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
       _logProvider?.addLog('ELM327', LogType.info, '发送 ATL0 (关闭行尾)...');
-      await _sendObdCommand("ATL0");
+      await _obdService?.sendCommand("ATL0");
       await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
       _logProvider?.addLog('ELM327', LogType.info, '发送 ATH0 (关闭头信息)...');
-      await _sendObdCommand("ATH0");
+      await _obdService?.sendCommand("ATH0");
       await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
       _logProvider?.addLog('ELM327', LogType.info, '发送 ATSP0 (自动协议)...');
-      await _sendObdCommand("ATSP0");
+      await _obdService?.sendCommand("ATSP0");
       await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
       _logProvider?.addLog('ELM327', LogType.success, 'ELM327 初始化完成');
@@ -505,181 +525,6 @@ class BluetoothProvider extends ChangeNotifier {
       rethrow;
     }
   }
-
-  /// ========== 发送 OBD 命令（增加日志） ==========
-  Future<void> _sendObdCommand(String command) async {
-    if (_writeCharacteristic == null) {
-      _logProvider?.addLog('OBD', LogType.warning, '写入特征为空，跳过命令: $command');
-      return;
-    }
-
-    try {
-      final bytes = utf8.encode("$command\r");
-      await _writeCharacteristic!.write(bytes, withoutResponse: false);
-      _logProvider?.addLog('OBD', LogType.info, '发送命令: $command');
-    } catch (e) {
-      _logProvider?.addLog('OBD', LogType.error, '发送命令失败: $command, 错误: $e');
-    }
-  }
-
-  /// ========== 处理 OBD 通知（增加详细日志） ==========
-  void _handleObdNotification(List<int> value) {
-    if (value.isEmpty) {
-      _logProvider?.addLog('OBD', LogType.warning, '收到空数据');
-      return;
-    }
-
-    try {
-      final response = utf8.decode(value, allowMalformed: true).trim();
-      _logProvider?.addLog('OBD', LogType.info, '收到原始数据: $response');
-      _processObdResponse(response);
-    } catch (e) {
-      _logProvider?.addLog('OBD', LogType.error, '解析数据失败: $e, 原始数据: $value');
-    }
-  }
-
-  /// ========== 解析 OBD 响应（增加详细日志） ==========
-  void _processObdResponse(String response) {
-    // 过滤 ELM327 提示符
-    if (response.startsWith(">")) {
-      _logProvider?.addLog('OBD', LogType.info, '跳过 ELM327 提示符');
-      return;
-    }
-
-    if (response.isEmpty) {
-      _logProvider?.addLog('OBD', LogType.info, '跳过空响应');
-      return;
-    }
-
-    // 非标准 OBD 响应（非 41 xx yy 格式）
-    if (!response.startsWith("41")) {
-      _logProvider?.addLog('OBD', LogType.warning, '非标准 OBD 响应: $response');
-      return;
-    }
-
-    final parts = response.split(" ").where((s) => s.isNotEmpty).toList();
-    if (parts.length < 3) {
-      _logProvider?.addLog('OBD', LogType.warning, 'OBD 数据长度不足: $response');
-      return;
-    }
-
-    final pid = parts[1];
-    _logProvider?.addLog('OBD', LogType.info, '解析 PID: $pid, 原始数据: $response');
-
-    switch (pid) {
-      case "0C": // RPM = ((A*256)+B)/4
-        if (parts.length >= 4) {
-          final a = int.tryParse(parts[2], radix: 16) ?? 0;
-          final b = int.tryParse(parts[3], radix: 16) ?? 0;
-          final rpm = ((a * 256) + b) ~/ 4;
-          _logProvider?.addLog('OBD', LogType.info, 'RPM: $rpm');
-          _obdDataProvider?.updateRealTimeData(rpm: rpm);
-        }
-        break;
-      case "0D": // 车速
-        if (parts.length >= 3) {
-          final speed = int.tryParse(parts[2], radix: 16) ?? 0;
-          _logProvider?.addLog('OBD', LogType.info, '车速: $speed km/h');
-          _obdDataProvider?.updateRealTimeData(speed: speed);
-        }
-        break;
-      case "05": // 冷却液温度 = A-40
-        if (parts.length >= 3) {
-          final temp = int.tryParse(parts[2], radix: 16) ?? 0;
-          final celsius = temp - 40;
-          _logProvider?.addLog('OBD', LogType.info, '冷却液温度: $celsius°C');
-          _obdDataProvider?.updateRealTimeData(coolantTemp: celsius);
-        }
-        break;
-      case "11": // 节气门位置 = A*100/255
-        if (parts.length >= 3) {
-          final position = int.tryParse(parts[2], radix: 16) ?? 0;
-          final percent = (position * 100) ~/ 255;
-          _logProvider?.addLog('OBD', LogType.info, '节气门位置: $percent%');
-          _obdDataProvider?.updateRealTimeData(throttle: percent);
-        }
-        break;
-      case "0F": // 进气温度 = A-40
-        if (parts.length >= 3) {
-          final temp = int.tryParse(parts[2], radix: 16) ?? 0;
-          final celsius = temp - 40;
-          _logProvider?.addLog('OBD', LogType.info, '进气温度: $celsius°C');
-          _obdDataProvider?.updateRealTimeData(intakeTemp: celsius);
-        }
-        break;
-      case "0B": // 进气歧管压力
-        if (parts.length >= 3) {
-          final pressure = int.tryParse(parts[2], radix: 16) ?? 0;
-          _logProvider?.addLog('OBD', LogType.info, '进气歧管压力: $pressure kPa');
-          _obdDataProvider?.updateRealTimeData(pressure: pressure);
-        }
-        break;
-      case "04": // 引擎负荷 = A*100/255
-        if (parts.length >= 3) {
-          final load = int.tryParse(parts[2], radix: 16) ?? 0;
-          final percent = (load * 100) ~/ 255;
-          _logProvider?.addLog('OBD', LogType.info, '引擎负荷: $percent%');
-          _obdDataProvider?.updateRealTimeData(load: percent);
-        }
-        break;
-      case "45": // 绝对节气门位置 = A*100/255
-        if (parts.length >= 3) {
-          final position = int.tryParse(parts[2], radix: 16) ?? 0;
-          final percent = (position * 100) ~/ 255;
-          _logProvider?.addLog('OBD', LogType.info, '绝对节气门位置: $percent%');
-          _obdDataProvider?.updateRealTimeData(throttle: percent);
-        }
-        break;
-      case "42": // 控制模块电压 = ((A*256)+B)/1000
-        if (parts.length >= 4) {
-          final a = int.tryParse(parts[2], radix: 16) ?? 0;
-          final b = int.tryParse(parts[3], radix: 16) ?? 0;
-          final voltage = ((a * 256) + b) / 1000.0;
-          _logProvider?.addLog('OBD', LogType.info, '电压: ${voltage.toStringAsFixed(2)}V');
-          _obdDataProvider?.updateRealTimeData(voltage: voltage);
-        }
-        break;
-      default:
-        _logProvider?.addLog('OBD', LogType.info, '未知的 PID: $pid');
-    }
-  }
-
-  /// ========== OBD 轮询（增加日志） ==========
-  void _startObdPolling() {
-    _logProvider?.addLog('OBD', LogType.info, '启动 OBD 轮询...');
-
-    _obdPollingTimer?.cancel();
-    int currentPidIndex = 0;
-
-    _obdPollingTimer = Timer.periodic(
-      Duration(milliseconds: obdCommandInterval),
-      (_) async {
-        if (!_isDeviceConnected) {
-          _logProvider?.addLog('OBD', LogType.warning, '设备已断开，停止轮询');
-          _stopObdPolling();
-          return;
-        }
-
-        if (_writeCharacteristic == null) {
-          _logProvider?.addLog('OBD', LogType.warning, '写入特征为空');
-          return;
-        }
-
-        final command = obdPids[currentPidIndex];
-        await _sendObdCommand(command);
-        currentPidIndex = (currentPidIndex + 1) % obdPids.length;
-      },
-    );
-
-    _logProvider?.addLog('OBD', LogType.success, 'OBD 轮询已启动');
-  }
-
-  void _stopObdPolling() {
-    _obdPollingTimer?.cancel();
-    _obdPollingTimer = null;
-    _logProvider?.addLog('OBD', LogType.info, 'OBD 轮询已停止');
-  }
-
 
   Future<void> _trySmartMatching(List<fb.BluetoothCharacteristic> characteristics) async {
     fb.BluetoothCharacteristic? notifyChar;
@@ -695,6 +540,8 @@ class BluetoothProvider extends ChangeNotifier {
 
     if (notifyChar != null && writeChar != null) {
       _writeCharacteristic = writeChar;
+      // 设置 OBDService 的写入特征
+      _obdService?.setWriteCharacteristic(writeChar);
       _logProvider?.addLog('Bluetooth', LogType.success, '匹配写入特征: ${_writeCharacteristic?.uuid.str}');
 
       _logProvider?.addLog('Bluetooth', LogType.success, '智能匹配通知特征: ${notifyChar.uuid.str}');
@@ -705,7 +552,7 @@ class BluetoothProvider extends ChangeNotifier {
         _logProvider?.addLog('Bluetooth', LogType.info, '已订阅通知特征');
         _obdNotificationSubscription?.cancel();
         _obdNotificationSubscription = notifyChar.lastValueStream.listen(
-          _handleObdNotification,
+          (value) => _obdService?.handleNotification(value),
           onError: (e) => _logProvider?.addLog('Bluetooth', LogType.error, '通知监听数据错误: $e'),
         );
       } catch (e) {
@@ -717,9 +564,9 @@ class BluetoothProvider extends ChangeNotifier {
   }
 
   /// 处理连接状态变化
-  Future<void> _handleConnectionStateChanged(BluetoothConnectionState state, BluetoothDeviceModel device) async {
+  Future<void> _handleConnectionStateChanged(fb.BluetoothConnectionState state, BluetoothDeviceModel device) async {
     switch (state) {
-      case BluetoothConnectionState.connected:
+      case fb.BluetoothConnectionState.connected:
         _logProvider?.addLog('Bluetooth', LogType.success, '设备已连接: ${device.name}，正在启动 OBD 会话...');
 
         // 查找设备在列表中的索引
@@ -728,7 +575,7 @@ class BluetoothProvider extends ChangeNotifier {
         // 启动完整的 OBD 会话初始化流程
         await _startObdSession(device, index);
         break;
-      case BluetoothConnectionState.disconnected:
+      case fb.BluetoothConnectionState.disconnected:
         _logProvider?.addLog('Bluetooth', LogType.warning, '设备已断开: ${device.name}');
         _handleDisconnection();
         break;
@@ -758,7 +605,7 @@ class BluetoothProvider extends ChangeNotifier {
     notifyListeners();
 
     // 停止 OBD 轮询
-    _stopObdPolling();
+    _obdService?.stopPolling();
     _logProvider?.addLog('OBD', LogType.warning, 'OBD 轮询已停止（异常断开）');
 
     // 重置数据
@@ -777,7 +624,7 @@ class BluetoothProvider extends ChangeNotifier {
     _logProvider?.addLog('Bluetooth', LogType.info, '开始断开连接...');
 
     // 停止 OBD 轮询
-    _stopObdPolling();
+    _obdService?.stopPolling();
     _logProvider?.addLog('OBD', LogType.info, 'OBD 轮询已停止');
 
     // 取消通知监听
@@ -840,6 +687,7 @@ class BluetoothProvider extends ChangeNotifier {
     _scanTimer?.cancel();
     _connectionSimulationTimer?.cancel();
     _obdPollingTimer?.cancel();
+    _obdService?.dispose();
     super.dispose();
   }
 }

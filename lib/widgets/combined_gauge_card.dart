@@ -24,7 +24,7 @@ class CombinedGaugeCard extends StatelessWidget {
                 painter: CombinedGaugePainter(
                   rpm: data.rpm,
                   speed: data.speed,
-                  gear: data.gear,
+                  gear: 0,// 获取不到档位，设置为0
                 ),
               );
             },

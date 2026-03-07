@@ -44,33 +44,31 @@ class _MainContainerState extends State<MainContainer> {
     bluetoothProvider.setLogProvider(logProvider);
     await bluetoothProvider.initialize();
     _hasCheckedBluetooth = true;
-    _checkAndShowBluetoothDialog();
+    await _checkAndShowBluetoothDialog();
   }
 
-  void _checkAndShowBluetoothDialog() {
+  Future<void> _checkAndShowBluetoothDialog() async {
     if (!_hasCheckedBluetooth) return;
 
     final bluetoothProvider = context.read<BluetoothProvider>();
 
     // 检查是否需要显示弹窗
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!bluetoothProvider.hasPermission) {
-        // 权限未授权，先请求权限
-        final granted = await bluetoothProvider.requestPermission();
-        if (!granted && mounted) {
-          BluetoothAlertDialog.showPermissionDeniedDialog(
-            context,
-            onOpenSettings: () => bluetoothProvider.openSettings(),
-          );
-        }
-      } else if (!bluetoothProvider.isBluetoothOn && mounted) {
-        // 权限已授权但蓝牙未开启
-        BluetoothAlertDialog.showBluetoothOffDialog(
+    if (!bluetoothProvider.hasPermission) {
+      // 权限未授权，先请求权限
+      final granted = await bluetoothProvider.requestPermission();
+      if (!granted && mounted) {
+        BluetoothAlertDialog.showPermissionDeniedDialog(
           context,
           onOpenSettings: () => bluetoothProvider.openSettings(),
         );
       }
-    });
+    } else if (!bluetoothProvider.isBluetoothOn && mounted) {
+      // 权限已授权但蓝牙未开启
+      BluetoothAlertDialog.showBluetoothOffDialog(
+        context,
+        onOpenSettings: () => bluetoothProvider.openSettings(),
+      );
+    }
   }
 
   void _navigateTo(int index) {
@@ -220,29 +218,41 @@ class _TopNavigationBar extends StatelessWidget {
 
           const SizedBox(width: 10),
 
-          // Link Vehicle按钮
-          GestureDetector(
-            onTap: onLinkVehiclePressed,
-            child: Container(
-              height: 21,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.circular(5),
-                boxShadow: AppTheme.glowShadow(AppTheme.primary),
-              ),
-              child: const Center(
-                child: Text(
-                  'LINK VEHICLE',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 7,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
+          // Link Vehicle按钮 - 根据连接状态显示不同文案
+          Consumer<BluetoothProvider>(
+            builder: (context, bluetoothProvider, child) {
+              final isConnected = bluetoothProvider.isDeviceConnected;
+              final deviceName = bluetoothProvider.connectedDevice?.name;
+
+              final buttonText = isConnected && deviceName != null
+                  ? deviceName
+                  : '设备未连接';
+
+              return GestureDetector(
+                onTap: onLinkVehiclePressed,
+                child: Container(
+                  height: 21,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: isConnected ? AppTheme.accentGreen : AppTheme.primary,
+                    borderRadius: BorderRadius.circular(5),
+                    boxShadow: AppTheme.glowShadow(isConnected ? AppTheme.accentGreen : AppTheme.primary),
+                  ),
+                  child: Center(
+                    child: Text(
+                      buttonText,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 7,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
 
           const SizedBox(width: 6),

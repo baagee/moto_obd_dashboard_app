@@ -1,0 +1,225 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
+import '../models/obd_data.dart';
+import '../providers/obd_data_provider.dart';
+import '../providers/log_provider.dart';
+
+/// OBD 数据解析结果
+class ObdParseResult {
+  final int? rpm;
+  final int? speed;
+  final int? throttle;
+  final int? load;
+  final int? coolantTemp;
+  final int? intakeTemp;
+  final int? pressure;
+  final double? voltage;
+
+  const ObdParseResult({
+    this.rpm,
+    this.speed,
+    this.throttle,
+    this.load,
+    this.coolantTemp,
+    this.intakeTemp,
+    this.pressure,
+    this.voltage,
+  });
+}
+
+/// OBD 服务 - 负责 OBD 协议解析和数据轮询
+class OBDService {
+  final OBDDataProvider _obdDataProvider;
+  final LogProvider? _logProvider;
+
+  fb.BluetoothCharacteristic? _writeCharacteristic;
+  Timer? _pollingTimer;
+
+  // 分级轮询常量
+  static const int pollingBaseInterval = 50;
+  static const List<String> highFreqPids = ['010D', '010C'];
+  static const List<String> mediumFreqPids = ['0111', '010F', '010B'];
+  static const List<String> lowFreqPids = ['0105', '0104', '0145', '0142'];
+
+  OBDService({
+    required OBDDataProvider obdDataProvider,
+    LogProvider? logProvider,
+  })  : _obdDataProvider = obdDataProvider,
+        _logProvider = logProvider;
+
+  /// 设置写入特征
+  void setWriteCharacteristic(fb.BluetoothCharacteristic? characteristic) {
+    _writeCharacteristic = characteristic;
+  }
+
+  /// 解析 OBD 响应
+  ObdParseResult parseResponse(String response) {
+    // 过滤 ELM327 提示符和空响应
+    if (response.startsWith(">") || response.isEmpty) {
+      return const ObdParseResult();
+    }
+
+    // 非标准 OBD 响应
+    if (!response.startsWith("41")) {
+      _logProvider?.addLog('OBD', LogType.warning, '非标准 OBD 响应: $response');
+      return const ObdParseResult();
+    }
+
+    final parts = response.split(" ").where((s) => s.isNotEmpty).toList();
+    if (parts.length < 3) {
+      return const ObdParseResult();
+    }
+
+    final pid = parts[1];
+
+    switch (pid) {
+      case "0C": // RPM = ((A*256)+B)/4
+        if (parts.length >= 4) {
+          final a = int.tryParse(parts[2], radix: 16) ?? 0;
+          final b = int.tryParse(parts[3], radix: 16) ?? 0;
+          return ObdParseResult(rpm: ((a * 256) + b) ~/ 4);
+        }
+        break;
+      case "0D": // 车速
+        if (parts.length >= 3) {
+          return ObdParseResult(speed: int.tryParse(parts[2], radix: 16) ?? 0);
+        }
+        break;
+      case "05": // 冷却液温度 = A-40
+        if (parts.length >= 3) {
+          final temp = int.tryParse(parts[2], radix: 16) ?? 0;
+          return ObdParseResult(coolantTemp: temp - 40);
+        }
+        break;
+      case "11": // 节气门位置 = A*100/255
+        if (parts.length >= 3) {
+          final position = int.tryParse(parts[2], radix: 16) ?? 0;
+          return ObdParseResult(throttle: (position * 100) ~/ 255);
+        }
+        break;
+      case "0F": // 进气温度 = A-40
+        if (parts.length >= 3) {
+          final temp = int.tryParse(parts[2], radix: 16) ?? 0;
+          return ObdParseResult(intakeTemp: temp - 40);
+        }
+        break;
+      case "0B": // 进气歧管压力
+        if (parts.length >= 3) {
+          return ObdParseResult(pressure: int.tryParse(parts[2], radix: 16) ?? 0);
+        }
+        break;
+      case "04": // 引擎负荷 = A*100/255
+        if (parts.length >= 3) {
+          final load = int.tryParse(parts[2], radix: 16) ?? 0;
+          return ObdParseResult(load: (load * 100) ~/ 255);
+        }
+        break;
+      case "45": // 绝对节气门位置 = A*100/255 (同 0111)
+        if (parts.length >= 3) {
+          final position = int.tryParse(parts[2], radix: 16) ?? 0;
+          return ObdParseResult(throttle: (position * 100) ~/ 255);
+        }
+        break;
+      case "42": // 控制模块电压 = ((A*256)+B)/1000
+        if (parts.length >= 4) {
+          final a = int.tryParse(parts[2], radix: 16) ?? 0;
+          final b = int.tryParse(parts[3], radix: 16) ?? 0;
+          return ObdParseResult(voltage: ((a * 256) + b) / 1000.0);
+        }
+        break;
+    }
+    return const ObdParseResult();
+  }
+
+  /// 处理 OBD 通知
+  void handleNotification(List<int> value) {
+    if (value.isEmpty) return;
+
+    try {
+      final response = utf8.decode(value, allowMalformed: true).trim();
+      _logProvider?.addLog('OBD', LogType.info, '收到原始数据: $response');
+      final result = parseResponse(response);
+
+      // 应用解析结果
+      _obdDataProvider.updateRealTimeData(
+        rpm: result.rpm,
+        speed: result.speed,
+        throttle: result.throttle,
+        load: result.load,
+        coolantTemp: result.coolantTemp,
+        intakeTemp: result.intakeTemp,
+        pressure: result.pressure,
+        voltage: result.voltage,
+      );
+    } catch (e) {
+      _logProvider?.addLog('OBD', LogType.error, '解析数据失败: $e');
+    }
+  }
+
+  /// 发送 OBD 命令
+  Future<void> sendCommand(String command) async {
+    if (_writeCharacteristic == null) {
+      _logProvider?.addLog('OBD', LogType.warning, '写入特征为空，跳过命令: $command');
+      return;
+    }
+    try {
+      final bytes = utf8.encode("$command\r");
+      await _writeCharacteristic!.write(bytes, withoutResponse: false);
+      _logProvider?.addLog('OBD', LogType.info, '发送命令: $command');
+    } catch (e) {
+      _logProvider?.addLog('OBD', LogType.error, '发送命令失败: $command, 错误: $e');
+    }
+  }
+
+  /// 启动分级轮询
+  void startPolling() {
+    _logProvider?.addLog('OBD', LogType.info, '启动 OBD 轮询（分级模式）...');
+
+    _pollingTimer?.cancel();
+    int highFreqIndex = 0;
+    int mediumFreqIndex = 0;
+    int lowFreqIndex = 0;
+    int tickCount = 0;
+
+    _pollingTimer = Timer.periodic(
+      Duration(milliseconds: pollingBaseInterval),
+      (_) async {
+        if (_writeCharacteristic == null) {
+          _logProvider?.addLog('OBD', LogType.warning, '写入特征为空');
+          return;
+        }
+
+        String command;
+        if (tickCount % 10 == 0) {
+          command = lowFreqPids[lowFreqIndex];
+          lowFreqIndex = (lowFreqIndex + 1) % lowFreqPids.length;
+        } else if (tickCount % 4 == 0) {
+          command = mediumFreqPids[mediumFreqIndex];
+          mediumFreqIndex = (mediumFreqIndex + 1) % mediumFreqPids.length;
+        } else {
+          command = highFreqPids[highFreqIndex];
+          highFreqIndex = (highFreqIndex + 1) % highFreqPids.length;
+        }
+        await sendCommand(command);
+        tickCount++;
+        if (tickCount >= 1000) tickCount = 0;
+      },
+    );
+
+    _logProvider?.addLog('OBD', LogType.success, 'OBD 分级轮询已启动');
+  }
+
+  /// 停止轮询
+  void stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+    _logProvider?.addLog('OBD', LogType.info, 'OBD 轮询已停止');
+  }
+
+  /// 释放资源
+  void dispose() {
+    stopPolling();
+    _writeCharacteristic = null;
+  }
+}

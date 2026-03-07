@@ -2,22 +2,25 @@
 class OBDData {
   final int rpm;
   final int speed;
-  final int gear;
-  final int throttle;
-  final int load;
-  final int leanAngle;
-  final String leanDirection;
-  final int pressure;
-  final double voltage;
-  final int coolantTemp;
-  final int intakeTemp;
+  final int throttle;// 油门开度
+  final int load;//发动机负载
+  final String leanDirection;// 压弯方向，左右
+  final int pressure; // 进气歧管压力MAP
+  final double voltage; // 电压
+  final int coolantTemp; // 冷却液水温
+  final int intakeTemp; // 进气温度
+
   final List<int> rpmHistory;
   final List<int> velocityHistory;
+  final int leanAngle; // 压弯倾角
+
+  // final int gear;// 档位
+
 
   OBDData({
     required this.rpm,
     required this.speed,
-    required this.gear,
+    // required this.gear,
     required this.throttle,
     required this.load,
     required this.leanAngle,
@@ -33,7 +36,7 @@ class OBDData {
   OBDData copyWith({
     int? rpm,
     int? speed,
-    int? gear,
+    // int? gear,
     int? throttle,
     int? load,
     int? leanAngle,
@@ -48,7 +51,7 @@ class OBDData {
     return OBDData(
       rpm: rpm ?? this.rpm,
       speed: speed ?? this.speed,
-      gear: gear ?? this.gear,
+      // gear: gear ?? this.gear,
       throttle: throttle ?? this.throttle,
       load: load ?? this.load,
       leanAngle: leanAngle ?? this.leanAngle,

@@ -117,19 +117,8 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> {
                 // 重新扫描按钮
                 GestureDetector(
                   onTap: provider.isScanning ? null : _handleRescan,
-                  child: Container(
+                  child: Padding(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: provider.isScanning
-                          ? AppTheme.surface.withOpacity(0.5)
-                          : AppTheme.primary20,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: provider.isScanning
-                            ? AppTheme.primary20
-                            : AppTheme.primary.withOpacity(0.3),
-                      ),
-                    ),
                     child: Icon(
                       provider.isScanning ? Icons.sync : Icons.refresh,
                       color: provider.isScanning

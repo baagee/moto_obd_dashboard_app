@@ -25,7 +25,7 @@ class OBDDataProvider extends ChangeNotifier {
   OBDData _data = OBDData(
     rpm: defaultRpm,
     speed: defaultSpeed,
-    gear: defaultGear,
+    // gear: defaultGear,
     throttle: defaultThrottle,
     load: defaultLoad,
     leanAngle: defaultLeanAngle,
@@ -86,12 +86,12 @@ class OBDDataProvider extends ChangeNotifier {
 
     // 计算档位
     final currentSpeed = speed ?? _data.speed;
-    final gear = _calculateGear(currentSpeed);
+    // final gear = _calculateGear(currentSpeed);
 
     _data = _data.copyWith(
       rpm: rpm ?? _data.rpm,
       speed: currentSpeed,
-      gear: gear,
+      // gear: gear,
       throttle: throttle ?? _data.throttle,
       load: load ?? _data.load,
       coolantTemp: coolantTemp ?? _data.coolantTemp,
@@ -115,7 +115,7 @@ class OBDDataProvider extends ChangeNotifier {
     _data = OBDData(
       rpm: defaultRpm,
       speed: defaultSpeed,
-      gear: defaultGear,
+      // gear: defaultGear,
       throttle: defaultThrottle,
       load: defaultLoad,
       leanAngle: defaultLeanAngle,
