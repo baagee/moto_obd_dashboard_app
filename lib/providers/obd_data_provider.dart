@@ -149,12 +149,22 @@ class OBDDataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  int _calculateGear(int speed) {
-    if (speed < 30) return 1;
-    if (speed < 60) return 2;
-    if (speed < 100) return 3;
-    if (speed < 150) return 4;
-    if (speed < 200) return 5;
-    return 6;
+  /// 更新倾角数据（由 SensorService 调用）
+  void updateLeanAngle(int angle, String direction) {
+    _data = _data.copyWith(
+      leanAngle: angle,
+      leanDirection: direction,
+    );
+    notifyListeners();
+  }
+
+  /// 零点校准（将当前角度设为零点）
+  void calibrateLeanAngle() {
+    // 校准后角度归零
+    _data = _data.copyWith(
+      leanAngle: 0,
+      leanDirection: 'NONE',
+    );
+    notifyListeners();
   }
 }
