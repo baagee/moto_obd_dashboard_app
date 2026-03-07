@@ -25,8 +25,7 @@ class BluetoothProvider extends ChangeNotifier {
   BluetoothDeviceModel? _lastConnectedDevice;
 
   // 重连相关
-  // 从 BluetoothConstants 引用
-  static final int maxReconnectAttempts = BluetoothConstants.maxReconnectAttempts;
+  // 从 BluetoothConstants 引用最大重连次数
   bool _isAutoReconnecting = false;
 
   // OBD 相关
@@ -89,7 +88,10 @@ class BluetoothProvider extends ChangeNotifier {
     await _checkPermission();
     await _checkBluetoothStatus();
 
-    // 监听蓝牙状态变化
+    // 先加载上次设备
+    await _loadLastDevice();
+
+    // 监听蓝牙状态变化（必须在自动重连之前设置，确保状态回调能触发）
     _adapterSubscription = fb.FlutterBluePlus.adapterState.listen((state) {
       final wasOn = _isBluetoothOn;
       _isBluetoothOn = state == fb.BluetoothAdapterState.on;
@@ -107,9 +109,6 @@ class BluetoothProvider extends ChangeNotifier {
 
       notifyListeners();
     });
-
-    // 加载上次设备
-    await _loadLastDevice();
 
     // 如果上次有连接的设备且当前未连接，尝试自动重连
     if (_lastConnectedDevice != null && !_isDeviceConnected && _isBluetoothOn) {
@@ -174,9 +173,9 @@ class BluetoothProvider extends ChangeNotifier {
   Future<void> _attemptReconnect(BluetoothDeviceModel device) async {
     int reconnectAttempts = 0;
 
-    while (reconnectAttempts < maxReconnectAttempts && !_isDeviceConnected) {
+    while (reconnectAttempts < BluetoothConstants.maxReconnectAttempts && !_isDeviceConnected) {
       reconnectAttempts++;
-      _logCallback?.call('Bluetooth', LogType.info, '自动重连尝试 $reconnectAttempts/$maxReconnectAttempts');
+      _logCallback?.call('Bluetooth', LogType.info, '自动重连尝试 $reconnectAttempts/$BluetoothConstants.maxReconnectAttempts');
 
       try {
         await connectToDevice(device);
@@ -188,12 +187,12 @@ class BluetoothProvider extends ChangeNotifier {
         _logCallback?.call('Bluetooth', LogType.error, '重连失败: $e');
       }
 
-      if (reconnectAttempts < maxReconnectAttempts && !_isDeviceConnected) {
+      if (reconnectAttempts < BluetoothConstants.maxReconnectAttempts && !_isDeviceConnected) {
         await Future.delayed(BluetoothConstants.reconnectRetryInterval);
       }
     }
 
-    if (!_isDeviceConnected && reconnectAttempts >= maxReconnectAttempts) {
+    if (!_isDeviceConnected && reconnectAttempts >= BluetoothConstants.maxReconnectAttempts) {
       _logCallback?.call('Bluetooth', LogType.error, '自动重连失败，已达到最大重试次数');
       // 连接失败，清除保存的设备信息，让用户重新选择
       // await DeviceStorageService.clearLastDevice();
@@ -323,7 +322,7 @@ class BluetoothProvider extends ChangeNotifier {
     // 开始扫描
     try {
       await fb.FlutterBluePlus.startScan(
-        timeout: BluetoothConstants.connectionTimeout,
+        timeout: BluetoothConstants.scanTimeout,
       );
     } catch (e) {
       _logCallback?.call('Bluetooth', LogType.error, '扫描失败: $e');
@@ -375,7 +374,7 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 断开旧设备
     if (_connectedDevice != null) {
-      await disconnectDevice();
+      await _disconnectInternal();
     }
 
     // 更新状态为连接中
@@ -484,13 +483,9 @@ class BluetoothProvider extends ChangeNotifier {
   void _handleConnectionError(BluetoothDeviceModel device, int index, Object error) {
     _logCallback?.call('Bluetooth', LogType.error, '连接失败: $error');
 
-    // 更新状态为断开
-    if (index != -1) {
-      _scannedDevices[index] = _scannedDevices[index].copyWith(
-        status: DeviceConnectionStatus.disconnected,
-      );
-    }
-    notifyListeners();
+    // 调用清理方法，确保资源完全释放
+    // _cleanupConnection 内部会调用 notifyListeners()
+    _cleanupConnection(shouldReconnect: false);
   }
 
   /// ========== ELM327 初始化（增加详细日志） ==========
@@ -643,6 +638,27 @@ class BluetoothProvider extends ChangeNotifier {
     }
     // 被动断开，尝试自动重连
     _cleanupConnection(shouldReconnect: true);
+  }
+
+  /// 内部断开连接（不设置用户主动断开标志）
+  /// 用于在连接新设备前断开旧设备
+  Future<void> _disconnectInternal() async {
+    final deviceToDisconnect = _connectedDevice;
+    final deviceName = deviceToDisconnect?.name ?? 'Unknown';
+
+    _logCallback?.call('Bluetooth', LogType.info, '正在断开旧设备: $deviceName...');
+
+    // 使用 shouldReconnect = false 进行清理
+    _cleanupConnection(shouldReconnect: false);
+
+    // 断开蓝牙设备
+    if (deviceToDisconnect?.flutterDevice != null) {
+      try {
+        await deviceToDisconnect!.flutterDevice!.disconnect();
+      } catch (e) {
+        // 静默处理断开错误
+      }
+    }
   }
 
   /// 断开连接（由用户手动触发）
