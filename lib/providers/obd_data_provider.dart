@@ -45,6 +45,7 @@ class OBDDataProvider extends ChangeNotifier {
   final List<int> _rpmHistory = List.filled(maxDataPoints, 0);
   final List<int> _velocityHistory = List.filled(maxDataPoints, 0);
   final List<int> _pressureHistory = [];
+  final List<int> _timestampHistory = [];
 
   // 连接状态
   bool _isDeviceConnected = false;
@@ -53,6 +54,7 @@ class OBDDataProvider extends ChangeNotifier {
   OBDData get data => _data;
   List<RidingEvent> get events => _events;
   List<int> get pressureHistory => _pressureHistory;
+  List<int> get timestampHistory => _timestampHistory;
   bool get isDeviceConnected => _isDeviceConnected;
 
   OBDDataProvider() {
@@ -69,7 +71,13 @@ class OBDDataProvider extends ChangeNotifier {
     int? intakeTemp,
     int? pressure,
     double? voltage,
+    int? timestamp,
   }) {
+    // 更新时间戳历史
+    if (timestamp != null) {
+      _timestampHistory.add(timestamp);
+      if (_timestampHistory.length > maxDataPoints) _timestampHistory.removeAt(0);
+    }
     // 更新历史数据
     if (rpm != null) {
       _rpmHistory.add(rpm);
@@ -111,6 +119,7 @@ class OBDDataProvider extends ChangeNotifier {
     _rpmHistory.fillRange(0, maxDataPoints, 0);
     _velocityHistory.fillRange(0, maxDataPoints, 0);
     _pressureHistory.clear();
+    _timestampHistory.clear();
 
     _data = OBDData(
       rpm: defaultRpm,

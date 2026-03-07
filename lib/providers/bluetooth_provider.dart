@@ -477,7 +477,6 @@ class BluetoothProvider extends ChangeNotifier {
     }
 
     _logProvider?.addLog('Bluetooth', LogType.success, '已连接到 ${device.name}');
-    _logProvider?.addLog('OBD', LogType.success, 'OBD 数据流已启动');
     notifyListeners();
   }
 
@@ -606,11 +605,9 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 停止 OBD 轮询
     _obdService?.stopPolling();
-    _logProvider?.addLog('OBD', LogType.warning, 'OBD 轮询已停止（异常断开）');
 
     // 重置数据
     _obdDataProvider?.resetData();
-    _logProvider?.addLog('OBD', LogType.warning, 'OBD 数据已重置（异常断开）');
 
     // 如果非手动断开，尝试自动重连
     if (wasConnected && previousDevice != null && !_isAutoReconnecting) {
@@ -625,7 +622,6 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 停止 OBD 轮询
     _obdService?.stopPolling();
-    _logProvider?.addLog('OBD', LogType.info, 'OBD 轮询已停止');
 
     // 取消通知监听
     _obdNotificationSubscription?.cancel();
@@ -643,7 +639,6 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 通知 OBDDataProvider 重置数据为默认值
     _obdDataProvider?.resetData();
-    _logProvider?.addLog('OBD', LogType.info, 'OBD 数据已重置');
 
     _connectionSubscription?.cancel();
     _connectionSubscription = null;

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/log_provider.dart';
 import '../theme/app_theme.dart';
 import '../models/obd_data.dart';
+import '../widgets/cyber_button.dart';
 
 /// 日志过滤类型
 enum LogFilterType {
@@ -49,22 +50,21 @@ class _LogsScreenState extends State<LogsScreen> {
           style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
         ),
         actions: [
-          TextButton(
+          CyberButton.secondary(
+            text: 'CANCEL',
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: AppTheme.textMuted),
-            ),
+            height: 32,
+            fontSize: 10,
           ),
-          TextButton(
+          const SizedBox(width: 8),
+          CyberButton.danger(
+            text: 'CLEAR',
             onPressed: () {
               provider.clearLogs();
               Navigator.pop(context);
             },
-            child: Text(
-              'Clear',
-              style: TextStyle(color: AppTheme.accentRed),
-            ),
+            height: 32,
+            fontSize: 10,
           ),
         ],
       ),

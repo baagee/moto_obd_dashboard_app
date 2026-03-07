@@ -7,14 +7,15 @@ import '../providers/log_provider.dart';
 
 /// OBD 数据解析结果
 class ObdParseResult {
-  final int? rpm;
-  final int? speed;
-  final int? throttle;
-  final int? load;
-  final int? coolantTemp;
-  final int? intakeTemp;
-  final int? pressure;
-  final double? voltage;
+  final int? rpm; // 转速
+  final int? speed; // 时速
+  final int? throttle; // 油门开度
+  final int? load; // 发动机负载
+  final int? coolantTemp; // 水温
+  final int? intakeTemp; // 进气温度
+  final int? pressure; // 进气歧管压力
+  final double? voltage; // 电压
+  final int timestamp; // 采集时间戳（毫秒）
 
   const ObdParseResult({
     this.rpm,
@@ -25,6 +26,7 @@ class ObdParseResult {
     this.intakeTemp,
     this.pressure,
     this.voltage,
+    this.timestamp = 0,
   });
 }
 
@@ -54,21 +56,21 @@ class OBDService {
   }
 
   /// 解析 OBD 响应
-  ObdParseResult parseResponse(String response) {
+  ObdParseResult? parseResponse(String response) {
     // 过滤 ELM327 提示符和空响应
     if (response.startsWith(">") || response.isEmpty) {
-      return const ObdParseResult();
+      return null;
     }
 
     // 非标准 OBD 响应
     if (!response.startsWith("41")) {
       _logProvider?.addLog('OBD', LogType.warning, '非标准 OBD 响应: $response');
-      return const ObdParseResult();
+      return null;
     }
 
     final parts = response.split(" ").where((s) => s.isNotEmpty).toList();
     if (parts.length < 3) {
-      return const ObdParseResult();
+      return null;
     }
 
     final pid = parts[1];
@@ -115,11 +117,11 @@ class OBDService {
           return ObdParseResult(load: (load * 100) ~/ 255);
         }
         break;
-      case "45": // 绝对节气门位置 = A*100/255 (同 0111)
-        if (parts.length >= 3) {
-          final position = int.tryParse(parts[2], radix: 16) ?? 0;
-          return ObdParseResult(throttle: (position * 100) ~/ 255);
-        }
+      case "45": // 绝对节气门位置 = A*100/255 (同 0111) 重复了，先注释下
+        // if (parts.length >= 3) {
+        //   final position = int.tryParse(parts[2], radix: 16) ?? 0;
+        //   return ObdParseResult(throttle: (position * 100) ~/ 255);
+        // }
         break;
       case "42": // 控制模块电压 = ((A*256)+B)/1000
         if (parts.length >= 4) {
@@ -129,19 +131,24 @@ class OBDService {
         }
         break;
     }
-    return const ObdParseResult();
+    return null;
   }
 
   /// 处理 OBD 通知
   void handleNotification(List<int> value) {
     if (value.isEmpty) return;
 
+    // 记录数据采集时间戳
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+
     try {
       final response = utf8.decode(value, allowMalformed: true).trim();
       _logProvider?.addLog('OBD', LogType.info, '收到原始数据: $response');
       final result = parseResponse(response);
-
-      // 应用解析结果
+      if (result == null) {
+        return;
+      }
+      // 应用解析结果（包含时间戳）
       _obdDataProvider.updateRealTimeData(
         rpm: result.rpm,
         speed: result.speed,
@@ -151,6 +158,7 @@ class OBDService {
         intakeTemp: result.intakeTemp,
         pressure: result.pressure,
         voltage: result.voltage,
+        timestamp: timestamp,
       );
     } catch (e) {
       _logProvider?.addLog('OBD', LogType.error, '解析数据失败: $e');
