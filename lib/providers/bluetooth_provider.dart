@@ -25,7 +25,6 @@ class BluetoothProvider extends ChangeNotifier {
   BluetoothDeviceModel? _lastConnectedDevice;
 
   // 重连相关
-  int _reconnectAttempts = 0;
   // 从 BluetoothConstants 引用
   static final int maxReconnectAttempts = BluetoothConstants.maxReconnectAttempts;
   bool _isAutoReconnecting = false;
@@ -36,16 +35,14 @@ class BluetoothProvider extends ChangeNotifier {
   fb.BluetoothCharacteristic? _writeCharacteristic;
   fb.BluetoothCharacteristic? _notifyCharacteristic;
   StreamSubscription<List<int>>? _obdNotificationSubscription;
-  Timer? _obdPollingTimer;
-  // 中频 PID - 节气门、进气温度、压力 (5Hz, 200ms)
-  static const List<String> mediumFreqPids = ['0111', '010F', '010B'];
-  // 低频 PID - 水温、负载、电压等 (2Hz, 500ms)
-  static const List<String> lowFreqPids = ['0105', '0104', '0145', '0142'];
 
   StreamSubscription<fb.BluetoothAdapterState>? _adapterSubscription;
   StreamSubscription<List<fb.ScanResult>>? _scanSubscription;
   StreamSubscription<fb.BluetoothConnectionState>? _connectionSubscription;
   Timer? _scanTimer;
+
+  // 用户是否正在主动断开连接（避免在 disconnectDevice 中重复触发清理）
+  bool _isManuallyDisconnecting = false;
 
   // 日志回调 - 降低耦合度
   void Function(String source, LogType type, String message)? _logCallback;
@@ -139,7 +136,6 @@ class BluetoothProvider extends ChangeNotifier {
     if (_lastConnectedDevice == null || _isAutoReconnecting) return;
 
     _isAutoReconnecting = true;
-    _reconnectAttempts = 0;
 
     // 开始扫描查找上次设备
     await startScan();
@@ -176,9 +172,11 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 尝试重连
   Future<void> _attemptReconnect(BluetoothDeviceModel device) async {
-    while (_reconnectAttempts < maxReconnectAttempts && !_isDeviceConnected) {
-      _reconnectAttempts++;
-      _logCallback?.call('Bluetooth', LogType.info, '自动重连尝试 $_reconnectAttempts/$maxReconnectAttempts');
+    int reconnectAttempts = 0;
+
+    while (reconnectAttempts < maxReconnectAttempts && !_isDeviceConnected) {
+      reconnectAttempts++;
+      _logCallback?.call('Bluetooth', LogType.info, '自动重连尝试 $reconnectAttempts/$maxReconnectAttempts');
 
       try {
         await connectToDevice(device);
@@ -190,12 +188,12 @@ class BluetoothProvider extends ChangeNotifier {
         _logCallback?.call('Bluetooth', LogType.error, '重连失败: $e');
       }
 
-      if (_reconnectAttempts < maxReconnectAttempts && !_isDeviceConnected) {
+      if (reconnectAttempts < maxReconnectAttempts && !_isDeviceConnected) {
         await Future.delayed(BluetoothConstants.reconnectRetryInterval);
       }
     }
 
-    if (!_isDeviceConnected && _reconnectAttempts >= maxReconnectAttempts) {
+    if (!_isDeviceConnected && reconnectAttempts >= maxReconnectAttempts) {
       _logCallback?.call('Bluetooth', LogType.error, '自动重连失败，已达到最大重试次数');
       // 连接失败，清除保存的设备信息，让用户重新选择
       // await DeviceStorageService.clearLastDevice();
@@ -584,15 +582,31 @@ class BluetoothProvider extends ChangeNotifier {
     }
   }
 
-  /// 处理断开连接
-  void _handleDisconnection() {
-    final wasConnected = _isDeviceConnected;
+  /// 清理连接资源（供内部使用）
+  ///
+  /// [shouldReconnect] - 清理后是否尝试自动重连
+  void _cleanupConnection({required bool shouldReconnect}) {
     final previousDevice = _connectedDevice;
+    final wasConnected = _isDeviceConnected;
 
-    _connectedDevice = null;
-    _isDeviceConnected = false;
+    // 停止 OBD 轮询
+    _obdService?.stopPolling();
 
-    // 更新列表中的设备状态
+    // 取消通知监听
+    _obdNotificationSubscription?.cancel();
+    _obdNotificationSubscription = null;
+
+    // 取消连接状态监听
+    _connectionSubscription?.cancel();
+    _connectionSubscription = null;
+
+    // 取消通知订阅（静默失败）
+    if (_notifyCharacteristic != null) {
+      _notifyCharacteristic!.setNotifyValue(false).catchError((_) {});
+      _notifyCharacteristic = null;
+    }
+
+    // 更新设备列表状态
     if (previousDevice != null) {
       final index = _scannedDevices.indexWhere((d) => d.id == previousDevice.id);
       if (index != -1) {
@@ -602,71 +616,58 @@ class BluetoothProvider extends ChangeNotifier {
       }
     }
 
-    notifyListeners();
+    // 重置状态
+    _connectedDevice = null;
+    _isDeviceConnected = false;
+    _isManuallyDisconnecting = false;
 
-    // 停止 OBD 轮询
-    _obdService?.stopPolling();
-
-    // 重置数据
+    // 重置 OBD 数据
     _obdDataProvider.resetData();
 
-    // 如果非手动断开，尝试自动重连
-    if (wasConnected && previousDevice != null && !_isAutoReconnecting) {
+    notifyListeners();
+
+    // 如果是异常断开且不是自动重连中，尝试自动重连
+    // 只有在非主动断开 且 之前已连接 且 有之前设备 时才重连
+    if (shouldReconnect && wasConnected && previousDevice != null && !_isAutoReconnecting) {
       _logCallback?.call('Bluetooth', LogType.warning, '检测到异常断开，尝试自动重连...');
       _attemptReconnect(previousDevice);
     }
   }
 
-  /// 断开连接
+  /// 处理断开连接（由蓝牙状态监听器触发）
+  void _handleDisconnection() {
+    // 如果是用户主动断开，这里不需要做任何事
+    // 因为 disconnectDevice 已经处理完了
+    if (_isManuallyDisconnecting) {
+      return;
+    }
+    // 被动断开，尝试自动重连
+    _cleanupConnection(shouldReconnect: true);
+  }
+
+  /// 断开连接（由用户手动触发）
   Future<void> disconnectDevice() async {
+    // 先保存设备引用（用于调用实际的 disconnect）
+    final deviceToDisconnect = _connectedDevice;
+    final deviceName = deviceToDisconnect?.name ?? 'Unknown';
+
     _logCallback?.call('Bluetooth', LogType.info, '开始断开连接...');
 
-    // 停止 OBD 轮询
-    _obdService?.stopPolling();
+    // 设置标志，防止状态回调重复处理
+    _isManuallyDisconnecting = true;
 
-    // 取消通知监听
-    _obdNotificationSubscription?.cancel();
-    _obdNotificationSubscription = null;
+    // 清理所有资源（不自动重连）
+    _cleanupConnection(shouldReconnect: false);
 
-    // 取消通知订阅
-    if (_notifyCharacteristic != null) {
+    // 主动断开蓝牙设备（此时状态已清理，即使触发回调也无害）
+    if (deviceToDisconnect?.flutterDevice != null) {
       try {
-        await _notifyCharacteristic!.setNotifyValue(false);
-        _logCallback?.call('Bluetooth', LogType.info, '已取消通知订阅');
-      } catch (e) {
-        _logCallback?.call('Bluetooth', LogType.warning, '取消通知订阅失败: $e');
-      }
-    }
-
-    // 通知 OBDDataProvider 重置数据为默认值
-    _obdDataProvider.resetData();
-
-    _connectionSubscription?.cancel();
-    _connectionSubscription = null;
-
-    if (_connectedDevice?.flutterDevice != null) {
-      try {
-        await _connectedDevice!.flutterDevice!.disconnect();
-        _logCallback?.call('Bluetooth', LogType.warning, '已断开与 ${_connectedDevice!.name} 的连接');
+        await deviceToDisconnect!.flutterDevice!.disconnect();
+        _logCallback?.call('Bluetooth', LogType.warning, '已断开与 $deviceName 的连接');
       } catch (e) {
         _logCallback?.call('Bluetooth', LogType.error, '断开连接失败: $e');
       }
     }
-
-    // 更新列表中的设备状态
-    if (_connectedDevice != null) {
-      final index = _scannedDevices.indexWhere((d) => d.id == _connectedDevice!.id);
-      if (index != -1) {
-        _scannedDevices[index] = _scannedDevices[index].copyWith(
-          status: DeviceConnectionStatus.disconnected,
-        );
-      }
-    }
-
-    _connectedDevice = null;
-    _isDeviceConnected = false;
-    _reconnectAttempts = 0;
-    notifyListeners();
   }
 
   /// 清除上次保存的设备信息
@@ -689,7 +690,6 @@ class BluetoothProvider extends ChangeNotifier {
     _connectionSubscription?.cancel();
     _obdNotificationSubscription?.cancel();
     _scanTimer?.cancel();
-    _obdPollingTimer?.cancel();
     _obdService?.dispose();
     super.dispose();
   }

@@ -8,13 +8,13 @@ class BluetoothConstants {
 
   /// 蓝牙设备扫描超时时间
   /// 超过此时间后停止扫描，扫描过程中发现的所有设备将展示给用户
-  static const Duration scanTimeout = Duration(seconds: 6);
+  static const Duration scanTimeout = Duration(seconds: 4);
 
   // ==================== 蓝牙连接相关 ====================
 
   /// 蓝牙设备连接超时时间
   /// 发起连接请求后超过此时间未成功建立连接则视为连接失败
-  static const Duration connectionTimeout = Duration(seconds: 6);
+  static const Duration connectionTimeout = Duration(seconds: 3);
 
   /// ELM327 初始化命令发送间隔（毫秒）
   /// 初始化过程中发送 AT 命令之间的间隔时间，间隔过短可能导致响应错乱
@@ -32,11 +32,11 @@ class BluetoothConstants {
 
   /// 自动重连前等待扫描发现设备的时间
   /// 连接断开后等待扫描找到目标设备的时间，确保设备在可见范围内
-  static const Duration autoReconnectWait = Duration(seconds: 5);
+  static const Duration autoReconnectWait = scanTimeout;
 
   /// 自动重连重试间隔
   /// 每次重连尝试失败后等待再重试的时间间隔
-  static const Duration reconnectRetryInterval = Duration(seconds: 2);
+  static const Duration reconnectRetryInterval = Duration(seconds: 1);
 
   // ==================== OBD 数据轮询相关 ====================
 

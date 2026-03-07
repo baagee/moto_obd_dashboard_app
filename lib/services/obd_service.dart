@@ -39,6 +39,7 @@ class OBDService {
 
   fb.BluetoothCharacteristic? _writeCharacteristic;
   Timer? _pollingTimer;
+  bool _isPollingActive = false;  // 轮询是否处于活动状态
 
   // 分级轮询常量 - 从 BluetoothConstants 引用
   static final int pollingBaseInterval = BluetoothConstants.pollingBaseIntervalMs;
@@ -168,8 +169,8 @@ class OBDService {
 
   /// 发送 OBD 命令
   Future<void> sendCommand(String command) async {
-    if (_writeCharacteristic == null) {
-      logCallback?.call('OBD', LogType.warning, '写入特征为空，跳过命令: $command');
+    // 如果轮询未启动或写入特征为空，跳过发送
+    if (!_isPollingActive || _writeCharacteristic == null) {
       return;
     }
     try {
@@ -183,6 +184,10 @@ class OBDService {
 
   /// 启动分级轮询
   void startPolling() {
+    if (_isPollingActive) {
+      return;
+    }
+    _isPollingActive = true;
     logCallback?.call('OBD', LogType.info, '启动 OBD 轮询（分级模式）...');
 
     _pollingTimer?.cancel();
@@ -221,6 +226,7 @@ class OBDService {
 
   /// 停止轮询
   void stopPolling() {
+    _isPollingActive = false;
     _pollingTimer?.cancel();
     _pollingTimer = null;
     logCallback?.call('OBD', LogType.info, 'OBD 轮询已停止');
