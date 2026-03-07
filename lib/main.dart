@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'providers/obd_data_provider.dart';
 import 'providers/bluetooth_provider.dart';
 import 'providers/log_provider.dart';
+import 'providers/sensor_provider.dart';
 import 'screens/main_container.dart';
 
 void main() {
@@ -30,6 +31,20 @@ void main() {
         ),
         ChangeNotifierProvider<LogProvider>(
           create: (_) => LogProvider(),
+        ),
+
+        // 传感器 Provider - 管理倾角传感器（依赖 OBDDataProvider + LogProvider）
+        ChangeNotifierProxyProvider2<OBDDataProvider, LogProvider, SensorProvider>(
+          create: (context) => SensorProvider(
+            obdDataProvider: context.read<OBDDataProvider>(),
+            logProvider: context.read<LogProvider>(),
+          ),
+          update: (context, obdDataProvider, logProvider, previous) =>
+              previous ??
+              SensorProvider(
+                obdDataProvider: obdDataProvider,
+                logProvider: logProvider,
+              ),
         ),
 
         // ProxyProvider - 通过依赖注入创建 BluetoothProvider

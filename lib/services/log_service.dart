@@ -10,6 +10,7 @@ class LogSource {
   static const String bluetooth = 'Bluetooth';
   static const String obd = 'OBD';
   static const String elm327 = 'ELM327';
+  static const String sensor = 'Sensor';
 }
 
 /// 日志服务 - 负责日志的实时写入和分享

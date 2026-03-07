@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/bluetooth_provider.dart';
 import '../providers/log_provider.dart';
+import '../providers/sensor_provider.dart';
 import '../widgets/bluetooth_status_icon.dart';
 import '../widgets/bluetooth_alert_dialog.dart';
 import 'dashboard_screen.dart';
@@ -36,9 +37,13 @@ class _MainContainerState extends State<MainContainer> {
   Future<void> _initializeBluetooth() async {
     final bluetoothProvider = context.read<BluetoothProvider>();
     final logProvider = context.read<LogProvider>();
+    final sensorProvider = context.read<SensorProvider>();
 
     // 初始化日志系统
     await logProvider.initialize();
+
+    // 初始化倾角传感器（APP 启动时立即生效）
+    sensorProvider.initialize();
 
     // 初始化蓝牙（依赖已通过 ProxyProvider 注入）
     await bluetoothProvider.initialize();
