@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../providers/bluetooth_provider.dart';
 import '../providers/log_provider.dart';
 import '../providers/sensor_provider.dart';
+import '../providers/riding_stats_provider.dart';
 import '../widgets/bluetooth_status_icon.dart';
 import '../widgets/bluetooth_alert_dialog.dart';
 import 'dashboard_screen.dart';
@@ -21,6 +22,7 @@ class MainContainer extends StatefulWidget {
 class _MainContainerState extends State<MainContainer> {
   int _currentIndex = 0;
   bool _hasCheckedBluetooth = false;
+  bool _hasStartedRide = false;
 
   final List<Widget> _pages = const [
     DashboardScreen(),
@@ -46,6 +48,7 @@ class _MainContainerState extends State<MainContainer> {
     sensorProvider.initialize();
 
     // 初始化蓝牙（依赖已通过 ProxyProvider 注入）
+    // 骑行统计在蓝牙连接成功后自动开始
     await bluetoothProvider.initialize();
     _hasCheckedBluetooth = true;
     await _checkAndShowBluetoothDialog();
@@ -88,25 +91,40 @@ class _MainContainerState extends State<MainContainer> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          // 顶部导航栏
-          _TopNavigationBar(
-            currentIndex: _currentIndex,
-            onNavigate: _navigateTo,
-            onLinkVehiclePressed: _navigateToBluetoothScan,
-          ),
+    return Consumer<BluetoothProvider>(
+      builder: (context, bluetoothProvider, child) {
+        // 检测连接成功瞬间，启动骑行统计
+        final isConnected = bluetoothProvider.isDeviceConnected;
+        if (isConnected && !_hasStartedRide) {
+          _hasStartedRide = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.read<RidingStatsProvider>().startRide();
+          });
+        }
 
-          // 页面内容
-          Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _pages,
-            ),
+        return Scaffold(
+          body: Column(
+            children: [
+              // 顶部导航栏
+              _TopNavigationBar(
+                currentIndex: _currentIndex,
+                onNavigate: _navigateTo,
+                onLinkVehiclePressed: _navigateToBluetoothScan,
+                isConnected: isConnected,
+                deviceName: bluetoothProvider.connectedDevice?.name,
+              ),
+
+              // 页面内容
+              Expanded(
+                child: IndexedStack(
+                  index: _currentIndex,
+                  children: _pages,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -115,11 +133,15 @@ class _TopNavigationBar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onNavigate;
   final VoidCallback? onLinkVehiclePressed;
+  final bool isConnected;
+  final String? deviceName;
 
   const _TopNavigationBar({
     required this.currentIndex,
     required this.onNavigate,
     this.onLinkVehiclePressed,
+    required this.isConnected,
+    this.deviceName,
   });
 
   @override
@@ -223,40 +245,29 @@ class _TopNavigationBar extends StatelessWidget {
           const SizedBox(width: 10),
 
           // Link Vehicle按钮 - 根据连接状态显示不同文案
-          Consumer<BluetoothProvider>(
-            builder: (context, bluetoothProvider, child) {
-              final isConnected = bluetoothProvider.isDeviceConnected;
-              final deviceName = bluetoothProvider.connectedDevice?.name;
-
-              final buttonText = isConnected && deviceName != null
-                  ? deviceName
-                  : '设备未连接';
-
-              return GestureDetector(
-                onTap: onLinkVehiclePressed,
-                child: Container(
-                  height: 21,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: isConnected ? AppTheme.accentGreen : AppTheme.primary,
-                    borderRadius: BorderRadius.circular(5),
-                    boxShadow: AppTheme.glowShadow(isConnected ? AppTheme.accentGreen : AppTheme.primary),
+          GestureDetector(
+            onTap: onLinkVehiclePressed,
+            child: Container(
+              height: 21,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: isConnected ? AppTheme.accentGreen : AppTheme.primary,
+                borderRadius: BorderRadius.circular(5),
+                boxShadow: AppTheme.glowShadow(isConnected ? AppTheme.accentGreen : AppTheme.primary),
+              ),
+              child: Center(
+                child: Text(
+                  isConnected && deviceName != null ? deviceName! : '设备未连接',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 7,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
                   ),
-                  child: Center(
-                    child: Text(
-                      buttonText,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 7,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              );
-            },
+              ),
+            ),
           ),
 
           const SizedBox(width: 6),

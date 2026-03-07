@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/obd_data.dart';
-import '../providers/obd_data_provider.dart';
+import '../models/riding_event.dart';
+import '../providers/riding_stats_provider.dart';
 import '../theme/app_theme.dart';
 
 /// 骑行事件面板
@@ -10,8 +10,10 @@ class RidingEventsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<OBDDataProvider>(
+    return Consumer<RidingStatsProvider>(
       builder: (context, provider, child) {
+        final events = provider.eventHistory;
+
         return Container(
           padding: const EdgeInsets.all(8),
           decoration: AppTheme.surfaceBorder(),
@@ -25,18 +27,25 @@ class RidingEventsPanel extends StatelessWidget {
 
               // 事件列表
               Expanded(
-                child: ListView.separated(
-                  padding: EdgeInsets.zero,
-                  itemCount: provider.events.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 4),
-                  itemBuilder: (context, index) {
-                    final event = provider.events[index];
-                    return _EventItem(
-                      key: ValueKey(event.timestamp),
-                      event: event,
-                    );
-                  },
-                ),
+                child: events.isEmpty
+                    ? const Center(
+                        child: Text(
+                          '暂无事件',
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 10),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: EdgeInsets.zero,
+                        itemCount: events.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 4),
+                        itemBuilder: (context, index) {
+                          final event = events[index];
+                          return _EventItem(
+                            key: ValueKey(event.timestamp),
+                            event: event,
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -53,52 +62,163 @@ class _EventItem extends StatelessWidget {
 
   Color get _color {
     switch (event.type) {
-      case EventType.warning:
+      case RidingEventType.performanceBurst:
         return AppTheme.accentRed;
-      case EventType.success:
+      case RidingEventType.efficientCruising:
         return AppTheme.accentGreen;
-      case EventType.info:
+      case RidingEventType.engineOverheating:
+        return AppTheme.accentRed;
+      case RidingEventType.voltageAnomaly:
+        return Colors.amber;
+      case RidingEventType.longRiding:
         return AppTheme.primary;
+      case RidingEventType.highEngineLoad:
+        return Colors.orange;
+      case RidingEventType.engineWarmup:
+        return Colors.amber;
+      case RidingEventType.coldEnvironmentRisk:
+        return AppTheme.accentCyan;
+      case RidingEventType.extremeLean:
+        return Colors.purple;
     }
   }
 
   IconData get _icon {
     switch (event.type) {
-      case EventType.warning:
-        return Icons.warning;
-      case EventType.success:
-        return Icons.check_circle;
-      case EventType.info:
-        return Icons.sports_motorsports;
+      case RidingEventType.performanceBurst:
+        return Icons.speed;
+      case RidingEventType.efficientCruising:
+        return Icons.eco;
+      case RidingEventType.engineOverheating:
+        return Icons.whatshot;
+      case RidingEventType.voltageAnomaly:
+        return Icons.battery_alert;
+      case RidingEventType.longRiding:
+        return Icons.timer;
+      case RidingEventType.highEngineLoad:
+        return Icons.engineering;
+      case RidingEventType.engineWarmup:
+        return Icons.ac_unit;
+      case RidingEventType.coldEnvironmentRisk:
+        return Icons.severe_cold;
+      case RidingEventType.extremeLean:
+        return Icons.rotate_right;
     }
+  }
+
+  void _showDetailDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.backgroundDark,
+        title: Row(
+          children: [
+            Icon(_icon, color: _color, size: 24),
+            const SizedBox(width: 8),
+            Text(
+              event.title,
+              style: TextStyle(color: _color, fontSize: 18),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DetailRow(label: '事件类型', value: event.type.toString()),
+              _DetailRow(label: '描述', value: event.description),
+              _DetailRow(label: '触发值', value: event.triggerValue.toStringAsFixed(1)),
+              _DetailRow(label: '阈值', value: event.threshold.toStringAsFixed(1)),
+              _DetailRow(
+                label: '触发时间',
+                value: '${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}:${event.timestamp.second.toString().padLeft(2, '0')}',
+              ),
+              if (event.additionalData.isNotEmpty) ...[
+                const Divider(color: AppTheme.textMuted),
+                const Text('扩展信息', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                const SizedBox(height: 4),
+                ...event.additionalData.entries.map(
+                  (e) => _DetailRow(label: e.key, value: e.value.toString()),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭', style: TextStyle(color: AppTheme.primary)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: _color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(6),
-        border: Border(
-          left: BorderSide(color: _color, width: 3),
+    return GestureDetector(
+      onTap: () => _showDetailDialog(context),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: _color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border(
+            left: BorderSide(color: _color, width: 3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(_icon, color: _color, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event.title,
+                    style: AppTheme.labelTiny.copyWith(color: _color),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}',
+                    style: AppTheme.valueSmall.copyWith(fontSize: 9),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(_icon, color: _color, size: 18),
-          const SizedBox(width: 8),
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+            ),
+          ),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event.title.toUpperCase(),
-                  style: AppTheme.labelTiny.copyWith(color: _color),
-                ),
-                const SizedBox(height: 2),
-                Text(event.message, style: AppTheme.valueSmall),
-              ],
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
             ),
           ),
         ],

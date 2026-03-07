@@ -36,6 +36,7 @@ flutter clean && flutter pub get && flutter build apk --debug
   - `OBDDataProvider` - OBD 数据状态管理
   - `BluetoothProvider` - 蓝牙权限、扫描、连接状态管理（含 OBD 会话管理）
   - `LogProvider` - 业务日志管理
+  - `RidingStatsProvider` - 骑行统计（2Hz降频采样、5秒时间窗口、事件检测）
 
 ### 项目结构
 
@@ -48,7 +49,8 @@ lib/
 ├── providers/
 │   ├── obd_data_provider.dart   # OBD 数据状态管理（实时数据更新、历史数据）
 │   ├── bluetooth_provider.dart  # 蓝牙权限、扫描、连接、ELM327初始化、OBD轮询
-│   └── log_provider.dart        # 业务日志管理（内存+文件双写）
+│   ├── log_provider.dart        # 业务日志管理（内存+文件双写）
+│   └── riding_stats_provider.dart # 骑行统计（2Hz降频采样、时间窗口事件检测）
 ├── services/
 │   ├── bluetooth_service.dart   # 蓝牙权限检测、状态检测、设置跳转
 │   ├── obd_service.dart         # OBD 协议解析、分级轮询、通知处理

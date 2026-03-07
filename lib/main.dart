@@ -6,6 +6,7 @@ import 'providers/obd_data_provider.dart';
 import 'providers/bluetooth_provider.dart';
 import 'providers/log_provider.dart';
 import 'providers/sensor_provider.dart';
+import 'providers/riding_stats_provider.dart';
 import 'screens/main_container.dart';
 
 void main() {
@@ -57,6 +58,20 @@ void main() {
           update: (context, obdDataProvider, logProvider, previous) =>
               previous ??
               BluetoothProvider(
+                obdDataProvider: obdDataProvider,
+                logProvider: logProvider,
+              ),
+        ),
+
+        // 骑行统计 Provider - 管理事件检测和统计（依赖 OBDDataProvider + LogProvider）
+        ChangeNotifierProxyProvider2<OBDDataProvider, LogProvider, RidingStatsProvider>(
+          create: (context) => RidingStatsProvider(
+            obdDataProvider: context.read<OBDDataProvider>(),
+            logProvider: context.read<LogProvider>(),
+          ),
+          update: (context, obdDataProvider, logProvider, previous) =>
+              previous ??
+              RidingStatsProvider(
                 obdDataProvider: obdDataProvider,
                 logProvider: logProvider,
               ),
