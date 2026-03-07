@@ -24,6 +24,53 @@ class LogsScreen extends StatefulWidget {
 class _LogsScreenState extends State<LogsScreen> {
   LogFilterType _currentFilter = LogFilterType.all;
 
+  /// 显示清空日志确认对话框
+  void _showClearConfirmDialog(BuildContext context, LogProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppTheme.accentRed.withOpacity(0.3)),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppTheme.accentOrange),
+            const SizedBox(width: 8),
+            const Text(
+              'Clear Logs',
+              style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to clear all logs? This action cannot be undone.',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              provider.clearLogs();
+              Navigator.pop(context);
+            },
+            child: Text(
+              'Clear',
+              style: TextStyle(color: AppTheme.accentRed),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 根据过滤类型获取过滤后的日志
   List<DiagnosticLog> _getFilteredLogs(LogProvider provider) {
     if (_currentFilter == LogFilterType.all) {
@@ -77,6 +124,7 @@ class _LogsScreenState extends State<LogsScreen> {
                   });
                 },
                 onExport: () => provider.shareLogs(),
+                onClear: () => _showClearConfirmDialog(context, provider),
               );
             },
           ),
@@ -143,12 +191,14 @@ class _CompactHeader extends StatelessWidget {
   final LogFilterType currentFilter;
   final ValueChanged<LogFilterType> onFilterChanged;
   final VoidCallback onExport;
+  final VoidCallback onClear;
 
   const _CompactHeader({
     required this.counts,
     required this.currentFilter,
     required this.onFilterChanged,
     required this.onExport,
+    required this.onClear,
   });
 
   @override
@@ -239,36 +289,76 @@ class _CompactHeader extends StatelessWidget {
 
           const SizedBox(width: 12),
 
-          // 右侧：导出按钮
-          GestureDetector(
-            onTap: onExport,
-            child: Container(
-              height: 24,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.circular(5),
-                boxShadow: AppTheme.glowShadow(AppTheme.primary),
-              ),
-              child: const Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.download, color: Colors.white, size: 12),
-                    SizedBox(width: 4),
-                    Text(
-                      'EXPORT',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
-                      ),
+          // 右侧：操作按钮组
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 清空按钮
+              GestureDetector(
+                onTap: onClear,
+                child: Container(
+                  height: 24,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: AppTheme.accentRed.withOpacity(0.5),
                     ),
-                  ],
+                  ),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.delete_outline, color: AppTheme.accentRed.withOpacity(0.7), size: 12),
+                        const SizedBox(width: 4),
+                        Text(
+                          'CLEAR',
+                          style: TextStyle(
+                            color: AppTheme.accentRed.withOpacity(0.7),
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+              // 导出按钮
+              GestureDetector(
+                onTap: onExport,
+                child: Container(
+                  height: 24,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary,
+                    borderRadius: BorderRadius.circular(5),
+                    boxShadow: AppTheme.glowShadow(AppTheme.primary),
+                  ),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.download, color: Colors.white, size: 12),
+                        SizedBox(width: 4),
+                        Text(
+                          'EXPORT',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

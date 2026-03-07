@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
 import '../models/bluetooth_device.dart';
 import '../models/obd_data.dart';
 import '../services/bluetooth_service.dart' as app_bluetooth;
 import '../services/device_storage_service.dart';
 import 'log_provider.dart';
+import 'obd_data_provider.dart';
 
 /// 蓝牙状态 Provider - 管理蓝牙权限和状态
 class BluetoothProvider extends ChangeNotifier {
@@ -25,6 +28,27 @@ class BluetoothProvider extends ChangeNotifier {
   int _reconnectAttempts = 0;
   static const int maxReconnectAttempts = 2;
   bool _isAutoReconnecting = false;
+
+  // OBD 相关
+  OBDDataProvider? _obdDataProvider;
+  BluetoothCharacteristic? _writeCharacteristic;
+  BluetoothCharacteristic? _notifyCharacteristic;
+  StreamSubscription<List<int>>? _obdNotificationSubscription;
+  Timer? _obdPollingTimer;
+  static const int obdCommandInterval = 200;
+
+  // OBD PID 列表（查询模式 01）
+  static const List<String> obdPids = [
+    '010C', // 发动机转速 RPM
+    '010D', // 车速 VSS
+    '0105', // 冷却液温度
+    '0111', // 节气门位置 TP
+    '010F', // 进气温度 IAT
+    '010B', // 进气歧管压力 MAP
+    '0104', // 引擎负荷
+    '0145', // 绝对节气门位置
+    '0142', // 控制模块电压
+  ];
 
   StreamSubscription<BluetoothAdapterState>? _adapterSubscription;
   StreamSubscription<List<ScanResult>>? _scanSubscription;
@@ -51,6 +75,12 @@ class BluetoothProvider extends ChangeNotifier {
   /// 设置日志 Provider
   void setLogProvider(LogProvider logProvider) {
     _logProvider = logProvider;
+  }
+
+  /// 设置 OBDDataProvider 引用
+  void setOBDDataProvider(OBDDataProvider provider) {
+    _obdDataProvider = provider;
+    _logProvider?.addLog('OBD', LogType.info, 'OBDDataProvider 已关联');
   }
 
   /// 初始化蓝牙状态检测
@@ -117,20 +147,30 @@ class BluetoothProvider extends ChangeNotifier {
     await startScan();
 
     // 等待扫描结果
-    await Future.delayed(const Duration(seconds: 4));
+    await Future.delayed(const Duration(seconds: 5));
 
-    // 查找设备
-    final device = _scannedDevices.firstWhere(
-      (d) => d.id == _lastConnectedDevice!.id,
-      orElse: () => _lastConnectedDevice!,
-    );
+    // 检查是否在扫描结果中找到设备（优先 ID 匹配）
+    var foundDevice = _scannedDevices.where((d) => d.id == _lastConnectedDevice!.id).toList();
 
-    // 如果在列表中找到（信号强度足够）
-    if (_scannedDevices.any((d) => d.id == _lastConnectedDevice!.id)) {
-      await _attemptReconnect(device);
-    } else {
-      _logProvider?.addLog('Bluetooth', LogType.warning, '未找到上次设备: ${_lastConnectedDevice!.name}');
+    // 如果 ID 匹配失败，尝试使用名称匹配（某些设备使用随机 MAC 地址）
+    if (foundDevice.isEmpty && _lastConnectedDevice!.name.isNotEmpty) {
+      foundDevice = _scannedDevices.where((d) => d.name == _lastConnectedDevice!.name).toList();
+      if (foundDevice.isNotEmpty) {
+        _logProvider?.addLog('Bluetooth', LogType.info, '通过名称匹配到设备: ${foundDevice.first.name}');
+      }
     }
+
+    if (foundDevice.isEmpty) {
+      _logProvider?.addLog('Bluetooth', LogType.warning, '未找到上次设备: ${_lastConnectedDevice!.name}，请手动重试');
+      // 保留设备信息，让用户可以手动点击重连
+      _isAutoReconnecting = false;
+      notifyListeners();
+      return;
+    }
+
+    // 使用扫描到的设备（有 flutterDevice 引用）
+    final device = foundDevice.first;
+    await _attemptReconnect(device);
 
     _isAutoReconnecting = false;
     notifyListeners();
@@ -159,6 +199,10 @@ class BluetoothProvider extends ChangeNotifier {
 
     if (!_isDeviceConnected && _reconnectAttempts >= maxReconnectAttempts) {
       _logProvider?.addLog('Bluetooth', LogType.error, '自动重连失败，已达到最大重试次数');
+      // 连接失败，清除保存的设备信息，让用户重新选择
+      await DeviceStorageService.clearLastDevice();
+      _lastConnectedDevice = null;
+      _logProvider?.addLog('Bluetooth', LogType.info, '已清除上次设备信息');
     }
   }
 
@@ -235,8 +279,8 @@ class BluetoothProvider extends ChangeNotifier {
 
     _logProvider?.addLog('Bluetooth', LogType.info, '开始扫描蓝牙设备...');
 
-    // 设置3秒超时
-    _scanTimer = Timer(const Duration(seconds: 3), () {
+    // 设置6秒超时
+    _scanTimer = Timer(const Duration(seconds: 6), () {
       stopScan();
     });
 
@@ -251,7 +295,25 @@ class BluetoothProvider extends ChangeNotifier {
       // 按信号强度排序（从高到低）
       filteredDevices.sort((a, b) => b.rssi.compareTo(a.rssi));
 
+      // 输出扫描到的设备详情
+      for (final device in filteredDevices) {
+        _logProvider?.addLog('Bluetooth', LogType.info, '扫描到设备: ${device.name} (${device.id}) RSSI: ${device.rssi}');
+      }
+
       _scannedDevices = filteredDevices;
+
+      // 检查已连接设备是否在扫描列表中，如果在则更新状态
+      if (_connectedDevice != null) {
+        final connectedIndex = _scannedDevices.indexWhere(
+          (d) => d.id == _connectedDevice!.id || d.name == _connectedDevice!.name,
+        );
+        if (connectedIndex != -1) {
+          _scannedDevices[connectedIndex] = _scannedDevices[connectedIndex].copyWith(
+            status: DeviceConnectionStatus.connected,
+          );
+        }
+      }
+
       _hasScanned = true;
       notifyListeners();
     });
@@ -259,7 +321,7 @@ class BluetoothProvider extends ChangeNotifier {
     // 开始扫描
     try {
       await FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 3),
+        timeout: const Duration(seconds: 6),
       );
     } catch (e) {
       _logProvider?.addLog('Bluetooth', LogType.error, '扫描失败: $e');
@@ -283,6 +345,7 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 连接设备（真实连接）
   Future<void> connectToDevice(BluetoothDeviceModel device) async {
+    // 前置检查
     if (device.flutterDevice == null) {
       _logProvider?.addLog('Bluetooth', LogType.error, '设备对象无效');
       return;
@@ -290,129 +353,380 @@ class BluetoothProvider extends ChangeNotifier {
 
     _logProvider?.addLog('Bluetooth', LogType.info, '正在连接 ${device.name}...');
 
-    // 先断开之前已连接的设备
+    // 断开旧设备
     if (_connectedDevice != null) {
       await disconnectDevice();
     }
 
-    // 更新设备状态为连接中
+    // 更新状态为连接中
     final index = _scannedDevices.indexWhere((d) => d.id == device.id);
+    _updateDeviceConnectingStatus(device, index);
+
+    try {
+      // 连接蓝牙设备并监听状态变化
+      await _connectBluetoothDevice(device);
+
+      // 注意：连接成功后的初始化逻辑在 _handleConnectionStateChanged 中统一处理
+      // 这样可以确保任何连接成功（包括自动重连）都会执行完整的初始化流程
+
+    } catch (e) {
+      _handleConnectionError(device, index, e);
+    }
+  }
+
+  /// 启动 OBD 会话（连接成功后的完整初始化流程）
+  /// 由 _handleConnectionStateChanged 在连接成功时调用
+  Future<void> _startObdSession(BluetoothDeviceModel device, int deviceIndex) async {
+    if (device.flutterDevice == null) {
+      _logProvider?.addLog('Bluetooth', LogType.error, '设备对象无效，无法启动 OBD 会话');
+      return;
+    }
+
+    try {
+      // 发现服务并匹配特征
+      final services = await device.flutterDevice!.discoverServices();
+      await _discoverAndMatchCharacteristics(device, services);
+
+      // 初始化 ELM327
+      await _initializeElm327();
+
+      // 启动 OBD 轮询
+      _startObdPolling();
+
+      // 更新为已连接状态
+      _updateDeviceConnectedStatus(device, deviceIndex);
+
+    } catch (e) {
+      _logProvider?.addLog('Bluetooth', LogType.error, '启动 OBD 会话失败: $e');
+      _handleConnectionError(device, deviceIndex, e);
+    }
+  }
+
+  /// 更新设备状态为连接中
+  void _updateDeviceConnectingStatus(BluetoothDeviceModel device, int index) {
     if (index != -1) {
       _scannedDevices[index] = _scannedDevices[index].copyWith(
         status: DeviceConnectionStatus.connecting,
       );
       notifyListeners();
     }
+  }
+
+  /// 连接蓝牙设备
+  Future<void> _connectBluetoothDevice(BluetoothDeviceModel device) async {
+    await device.flutterDevice!.connect(
+      timeout: const Duration(seconds: 6),
+      autoConnect: true,
+    );
+
+    // 监听连接状态变化
+    _connectionSubscription?.cancel();
+    _connectionSubscription = device.flutterDevice!.connectionState.listen((state) {
+      _handleConnectionStateChanged(state, device);
+    });
+  }
+
+  /// 发现服务并匹配特征
+  Future<void> _discoverAndMatchCharacteristics(
+    BluetoothDeviceModel device,
+    List<BluetoothService> services,
+  ) async {
+    _logProvider?.addLog('Bluetooth', LogType.info, '开始发现服务...');
+    _logProvider?.addLog('Bluetooth', LogType.info, '发现 ${services.length} 个服务');
+
+
+    final characteristics = services.expand((s) => s.characteristics).toList();
+    _trySmartMatching(characteristics);
+  }
+
+  /// 更新为已连接状态
+  Future<void> _updateDeviceConnectedStatus(BluetoothDeviceModel device, int index) async {
+    if (index != -1) {
+      _scannedDevices[index] = _scannedDevices[index].copyWith(
+        status: DeviceConnectionStatus.connected,
+        sentBytes: 0,
+        receivedBytes: 0,
+        connectionStability: 100.0,
+      );
+      _connectedDevice = _scannedDevices[index];
+      _lastConnectedDevice = _scannedDevices[index];
+      _isDeviceConnected = true;
+
+      // 保存设备信息
+      await DeviceStorageService.saveLastDevice(_connectedDevice!);
+    }
+
+    _logProvider?.addLog('Bluetooth', LogType.success, '已连接到 ${device.name}');
+    _logProvider?.addLog('OBD', LogType.success, 'OBD 数据流已启动');
+    notifyListeners();
+  }
+
+  /// 处理连接失败
+  void _handleConnectionError(BluetoothDeviceModel device, int index, Object error) {
+    _logProvider?.addLog('Bluetooth', LogType.error, '连接失败: $error');
+
+    // 更新状态为断开
+    if (index != -1) {
+      _scannedDevices[index] = _scannedDevices[index].copyWith(
+        status: DeviceConnectionStatus.disconnected,
+      );
+    }
+    notifyListeners();
+  }
+
+  /// ========== ELM327 初始化（增加详细日志） ==========
+  Future<void> _initializeElm327() async {
+    _logProvider?.addLog('ELM327', LogType.info, '开始初始化 ELM327...');
 
     try {
-      // 连接设备
-      await device.flutterDevice!.connect(
-        timeout: const Duration(seconds: 10),
-        autoConnect: false,
-      );
+      _logProvider?.addLog('ELM327', LogType.info, '发送 ATZ (复位)...');
+      await _sendObdCommand("ATZ");
+      await Future.delayed(const Duration(milliseconds: 1000));
 
-      // 监听连接状态变化
-      _connectionSubscription?.cancel();
-      _connectionSubscription = device.flutterDevice!.connectionState.listen((state) {
-        _handleConnectionStateChanged(state, device);
-      });
+      _logProvider?.addLog('ELM327', LogType.info, '发送 ATE0 (关闭回显)...');
+      await _sendObdCommand("ATE0");
+      await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
-      // 发现服务并获取 UUID
-      await _discoverServices(device);
+      _logProvider?.addLog('ELM327', LogType.info, '发送 ATL0 (关闭行尾)...');
+      await _sendObdCommand("ATL0");
+      await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
-      // 更新为已连接状态
-      if (index != -1) {
-        _scannedDevices[index] = _scannedDevices[index].copyWith(
-          status: DeviceConnectionStatus.connected,
-          sentBytes: 0,
-          receivedBytes: 0,
-          connectionStability: 100.0,
-        );
-        _connectedDevice = _scannedDevices[index];
-        _lastConnectedDevice = _scannedDevices[index];
-        _isDeviceConnected = true;
+      _logProvider?.addLog('ELM327', LogType.info, '发送 ATH0 (关闭头信息)...');
+      await _sendObdCommand("ATH0");
+      await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
-        // 保存设备信息
-        await DeviceStorageService.saveLastDevice(_connectedDevice!);
-      }
+      _logProvider?.addLog('ELM327', LogType.info, '发送 ATSP0 (自动协议)...');
+      await _sendObdCommand("ATSP0");
+      await Future.delayed(const Duration(milliseconds: obdCommandInterval));
 
-      _logProvider?.addLog('Bluetooth', LogType.success, '已连接到 ${device.name}');
-      notifyListeners();
-
+      _logProvider?.addLog('ELM327', LogType.success, 'ELM327 初始化完成');
     } catch (e) {
-      _logProvider?.addLog('Bluetooth', LogType.error, '连接失败: $e');
-
-      // 更新状态为断开
-      if (index != -1) {
-        _scannedDevices[index] = _scannedDevices[index].copyWith(
-          status: DeviceConnectionStatus.disconnected,
-        );
-      }
-      notifyListeners();
+      _logProvider?.addLog('ELM327', LogType.error, '初始化失败: $e');
+      rethrow;
     }
   }
 
-  /// 发现服务并获取 UUID
-  /// 修正逻辑：先匹配服务 UUID，再查找特征
-  Future<void> _discoverServices(BluetoothDeviceModel device) async {
+  /// ========== 发送 OBD 命令（增加日志） ==========
+  Future<void> _sendObdCommand(String command) async {
+    if (_writeCharacteristic == null) {
+      _logProvider?.addLog('OBD', LogType.warning, '写入特征为空，跳过命令: $command');
+      return;
+    }
+
     try {
-      final services = await device.flutterDevice!.discoverServices();
+      final bytes = utf8.encode("$command\r");
+      await _writeCharacteristic!.write(bytes, withoutResponse: false);
+      _logProvider?.addLog('OBD', LogType.info, '发送命令: $command');
+    } catch (e) {
+      _logProvider?.addLog('OBD', LogType.error, '发送命令失败: $command, 错误: $e');
+    }
+  }
 
-      // 步骤1: 检查设备的服务 UUID 是否在预定义的 ELM327 UUID 列表中（服务级别匹配）
-      for (final service in services) {
-        final serviceUuid = service.uuid.str.toLowerCase();
+  /// ========== 处理 OBD 通知（增加详细日志） ==========
+  void _handleObdNotification(List<int> value) {
+    if (value.isEmpty) {
+      _logProvider?.addLog('OBD', LogType.warning, '收到空数据');
+      return;
+    }
 
-        // 检查是否匹配默认 UUID
-        if (serviceUuid == Elm327Uuids.notifyUuid.toLowerCase() ||
-            serviceUuid == Elm327Uuids.writeUuid.toLowerCase()) {
-          device.notifyUuid = Elm327Uuids.notifyUuid;
-          device.writeUuid = Elm327Uuids.writeUuid;
-          _logProvider?.addLog('Bluetooth', LogType.info, '匹配到默认 ELM327 UUID');
+    try {
+      final response = utf8.decode(value, allowMalformed: true).trim();
+      _logProvider?.addLog('OBD', LogType.info, '收到原始数据: $response');
+      _processObdResponse(response);
+    } catch (e) {
+      _logProvider?.addLog('OBD', LogType.error, '解析数据失败: $e, 原始数据: $value');
+    }
+  }
+
+  /// ========== 解析 OBD 响应（增加详细日志） ==========
+  void _processObdResponse(String response) {
+    // 过滤 ELM327 提示符
+    if (response.startsWith(">")) {
+      _logProvider?.addLog('OBD', LogType.info, '跳过 ELM327 提示符');
+      return;
+    }
+
+    if (response.isEmpty) {
+      _logProvider?.addLog('OBD', LogType.info, '跳过空响应');
+      return;
+    }
+
+    // 非标准 OBD 响应（非 41 xx yy 格式）
+    if (!response.startsWith("41")) {
+      _logProvider?.addLog('OBD', LogType.warning, '非标准 OBD 响应: $response');
+      return;
+    }
+
+    final parts = response.split(" ").where((s) => s.isNotEmpty).toList();
+    if (parts.length < 3) {
+      _logProvider?.addLog('OBD', LogType.warning, 'OBD 数据长度不足: $response');
+      return;
+    }
+
+    final pid = parts[1];
+    _logProvider?.addLog('OBD', LogType.info, '解析 PID: $pid, 原始数据: $response');
+
+    switch (pid) {
+      case "0C": // RPM = ((A*256)+B)/4
+        if (parts.length >= 4) {
+          final a = int.tryParse(parts[2], radix: 16) ?? 0;
+          final b = int.tryParse(parts[3], radix: 16) ?? 0;
+          final rpm = ((a * 256) + b) ~/ 4;
+          _logProvider?.addLog('OBD', LogType.info, 'RPM: $rpm');
+          _obdDataProvider?.updateRealTimeData(rpm: rpm);
+        }
+        break;
+      case "0D": // 车速
+        if (parts.length >= 3) {
+          final speed = int.tryParse(parts[2], radix: 16) ?? 0;
+          _logProvider?.addLog('OBD', LogType.info, '车速: $speed km/h');
+          _obdDataProvider?.updateRealTimeData(speed: speed);
+        }
+        break;
+      case "05": // 冷却液温度 = A-40
+        if (parts.length >= 3) {
+          final temp = int.tryParse(parts[2], radix: 16) ?? 0;
+          final celsius = temp - 40;
+          _logProvider?.addLog('OBD', LogType.info, '冷却液温度: $celsius°C');
+          _obdDataProvider?.updateRealTimeData(coolantTemp: celsius);
+        }
+        break;
+      case "11": // 节气门位置 = A*100/255
+        if (parts.length >= 3) {
+          final position = int.tryParse(parts[2], radix: 16) ?? 0;
+          final percent = (position * 100) ~/ 255;
+          _logProvider?.addLog('OBD', LogType.info, '节气门位置: $percent%');
+          _obdDataProvider?.updateRealTimeData(throttle: percent);
+        }
+        break;
+      case "0F": // 进气温度 = A-40
+        if (parts.length >= 3) {
+          final temp = int.tryParse(parts[2], radix: 16) ?? 0;
+          final celsius = temp - 40;
+          _logProvider?.addLog('OBD', LogType.info, '进气温度: $celsius°C');
+          _obdDataProvider?.updateRealTimeData(intakeTemp: celsius);
+        }
+        break;
+      case "0B": // 进气歧管压力
+        if (parts.length >= 3) {
+          final pressure = int.tryParse(parts[2], radix: 16) ?? 0;
+          _logProvider?.addLog('OBD', LogType.info, '进气歧管压力: $pressure kPa');
+          _obdDataProvider?.updateRealTimeData(pressure: pressure);
+        }
+        break;
+      case "04": // 引擎负荷 = A*100/255
+        if (parts.length >= 3) {
+          final load = int.tryParse(parts[2], radix: 16) ?? 0;
+          final percent = (load * 100) ~/ 255;
+          _logProvider?.addLog('OBD', LogType.info, '引擎负荷: $percent%');
+          _obdDataProvider?.updateRealTimeData(load: percent);
+        }
+        break;
+      case "45": // 绝对节气门位置 = A*100/255
+        if (parts.length >= 3) {
+          final position = int.tryParse(parts[2], radix: 16) ?? 0;
+          final percent = (position * 100) ~/ 255;
+          _logProvider?.addLog('OBD', LogType.info, '绝对节气门位置: $percent%');
+          _obdDataProvider?.updateRealTimeData(throttle: percent);
+        }
+        break;
+      case "42": // 控制模块电压 = ((A*256)+B)/1000
+        if (parts.length >= 4) {
+          final a = int.tryParse(parts[2], radix: 16) ?? 0;
+          final b = int.tryParse(parts[3], radix: 16) ?? 0;
+          final voltage = ((a * 256) + b) / 1000.0;
+          _logProvider?.addLog('OBD', LogType.info, '电压: ${voltage.toStringAsFixed(2)}V');
+          _obdDataProvider?.updateRealTimeData(voltage: voltage);
+        }
+        break;
+      default:
+        _logProvider?.addLog('OBD', LogType.info, '未知的 PID: $pid');
+    }
+  }
+
+  /// ========== OBD 轮询（增加日志） ==========
+  void _startObdPolling() {
+    _logProvider?.addLog('OBD', LogType.info, '启动 OBD 轮询...');
+
+    _obdPollingTimer?.cancel();
+    int currentPidIndex = 0;
+
+    _obdPollingTimer = Timer.periodic(
+      Duration(milliseconds: obdCommandInterval),
+      (_) async {
+        if (!_isDeviceConnected) {
+          _logProvider?.addLog('OBD', LogType.warning, '设备已断开，停止轮询');
+          _stopObdPolling();
           return;
         }
 
-        // 检查是否匹配 alternativeUuids
-        for (final alt in Elm327Uuids.alternativeUuids) {
-          if (serviceUuid == alt['notify']!.toLowerCase() ||
-              serviceUuid == alt['write']!.toLowerCase()) {
-            device.notifyUuid = alt['notify'];
-            device.writeUuid = alt['write'];
-            _logProvider?.addLog('Bluetooth', LogType.info, '匹配到 ELM327 备用 UUID: $alt');
-            return;
-          }
+        if (_writeCharacteristic == null) {
+          _logProvider?.addLog('OBD', LogType.warning, '写入特征为空');
+          return;
         }
+
+        final command = obdPids[currentPidIndex];
+        await _sendObdCommand(command);
+        currentPidIndex = (currentPidIndex + 1) % obdPids.length;
+      },
+    );
+
+    _logProvider?.addLog('OBD', LogType.success, 'OBD 轮询已启动');
+  }
+
+  void _stopObdPolling() {
+    _obdPollingTimer?.cancel();
+    _obdPollingTimer = null;
+    _logProvider?.addLog('OBD', LogType.info, 'OBD 轮询已停止');
+  }
+
+
+  Future<void> _trySmartMatching(List<fb.BluetoothCharacteristic> characteristics) async {
+    fb.BluetoothCharacteristic? notifyChar;
+    fb.BluetoothCharacteristic? writeChar;
+
+    for (final char in characteristics) {
+      if (notifyChar == null && char.properties.notify) {
+        notifyChar = char;
+      } else if (writeChar == null && (char.properties.write || char.properties.writeWithoutResponse)) {
+        writeChar = char;
       }
-
-      // 步骤2: 如果没匹配，回退到从特征中查找
-      for (final service in services) {
-        for (final char in service.characteristics) {
-          if (char.properties.notify && device.notifyUuid == null) {
-            device.notifyUuid = char.uuid.str;
-          }
-          if ((char.properties.write || char.properties.writeWithoutResponse) &&
-              device.writeUuid == null) {
-            device.writeUuid = char.uuid.str;
-          }
-        }
-      }
-
-      // 默认值
-      device.notifyUuid ??= Elm327Uuids.notifyUuid;
-      device.writeUuid ??= Elm327Uuids.writeUuid;
-
-      _logProvider?.addLog('Bluetooth', LogType.info, '服务 UUID - Notify: ${device.notifyUuid}, Write: ${device.writeUuid}');
-    } catch (e) {
-      _logProvider?.addLog('Bluetooth', LogType.warning, '发现服务失败，使用默认 UUID');
-      device.notifyUuid = Elm327Uuids.notifyUuid;
-      device.writeUuid = Elm327Uuids.writeUuid;
     }
+
+    if (notifyChar != null && writeChar != null) {
+      _writeCharacteristic = writeChar;
+      _logProvider?.addLog('Bluetooth', LogType.success, '匹配写入特征: ${_writeCharacteristic?.uuid.str}');
+
+      _logProvider?.addLog('Bluetooth', LogType.success, '智能匹配通知特征: ${notifyChar.uuid.str}');
+
+      // 订阅通知
+      try {
+        await notifyChar.setNotifyValue(true);
+        _logProvider?.addLog('Bluetooth', LogType.info, '已订阅通知特征');
+        _obdNotificationSubscription?.cancel();
+        _obdNotificationSubscription = notifyChar.lastValueStream.listen(
+          _handleObdNotification,
+          onError: (e) => _logProvider?.addLog('Bluetooth', LogType.error, '通知监听数据错误: $e'),
+        );
+      } catch (e) {
+        _logProvider?.addLog('Bluetooth', LogType.error, '订阅通知失败: $e');
+      }
+      return;
+    }
+    _logProvider?.addLog('Bluetooth', LogType.error, '未匹配到写入&通知service');
   }
 
   /// 处理连接状态变化
-  void _handleConnectionStateChanged(BluetoothConnectionState state, BluetoothDeviceModel device) {
+  Future<void> _handleConnectionStateChanged(BluetoothConnectionState state, BluetoothDeviceModel device) async {
     switch (state) {
       case BluetoothConnectionState.connected:
-        _logProvider?.addLog('Bluetooth', LogType.success, '设备已连接: ${device.name}');
+        _logProvider?.addLog('Bluetooth', LogType.success, '设备已连接: ${device.name}，正在启动 OBD 会话...');
+
+        // 查找设备在列表中的索引
+        final index = _scannedDevices.indexWhere((d) => d.id == device.id || d.name == device.name);
+
+        // 启动完整的 OBD 会话初始化流程
+        await _startObdSession(device, index);
         break;
       case BluetoothConnectionState.disconnected:
         _logProvider?.addLog('Bluetooth', LogType.warning, '设备已断开: ${device.name}');
@@ -443,6 +757,14 @@ class BluetoothProvider extends ChangeNotifier {
 
     notifyListeners();
 
+    // 停止 OBD 轮询
+    _stopObdPolling();
+    _logProvider?.addLog('OBD', LogType.warning, 'OBD 轮询已停止（异常断开）');
+
+    // 重置数据
+    _obdDataProvider?.resetData();
+    _logProvider?.addLog('OBD', LogType.warning, 'OBD 数据已重置（异常断开）');
+
     // 如果非手动断开，尝试自动重连
     if (wasConnected && previousDevice != null && !_isAutoReconnecting) {
       _logProvider?.addLog('Bluetooth', LogType.warning, '检测到异常断开，尝试自动重连...');
@@ -452,6 +774,30 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 断开连接
   Future<void> disconnectDevice() async {
+    _logProvider?.addLog('Bluetooth', LogType.info, '开始断开连接...');
+
+    // 停止 OBD 轮询
+    _stopObdPolling();
+    _logProvider?.addLog('OBD', LogType.info, 'OBD 轮询已停止');
+
+    // 取消通知监听
+    _obdNotificationSubscription?.cancel();
+    _obdNotificationSubscription = null;
+
+    // 取消通知订阅
+    if (_notifyCharacteristic != null) {
+      try {
+        await _notifyCharacteristic!.setNotifyValue(false);
+        _logProvider?.addLog('Bluetooth', LogType.info, '已取消通知订阅');
+      } catch (e) {
+        _logProvider?.addLog('Bluetooth', LogType.warning, '取消通知订阅失败: $e');
+      }
+    }
+
+    // 通知 OBDDataProvider 重置数据为默认值
+    _obdDataProvider?.resetData();
+    _logProvider?.addLog('OBD', LogType.info, 'OBD 数据已重置');
+
     _connectionSubscription?.cancel();
     _connectionSubscription = null;
 
@@ -490,8 +836,10 @@ class BluetoothProvider extends ChangeNotifier {
     _adapterSubscription?.cancel();
     _scanSubscription?.cancel();
     _connectionSubscription?.cancel();
+    _obdNotificationSubscription?.cancel();
     _scanTimer?.cancel();
     _connectionSimulationTimer?.cancel();
+    _obdPollingTimer?.cancel();
     super.dispose();
   }
 }

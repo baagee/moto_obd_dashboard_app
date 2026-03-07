@@ -29,11 +29,21 @@ class OBDDashboardApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 创建 Provider 实例
+    final obdProvider = OBDDataProvider();
+    final bluetoothProvider = BluetoothProvider();
+    final logProvider = LogProvider();
+
+    // 建立 BluetoothProvider 和 OBDDataProvider 的关联
+    bluetoothProvider.setOBDDataProvider(obdProvider);
+    // 建立 BluetoothProvider 和 LogProvider 的关联
+    bluetoothProvider.setLogProvider(logProvider);
+
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => OBDDataProvider()),
-        ChangeNotifierProvider(create: (_) => BluetoothProvider()),
-        ChangeNotifierProvider(create: (_) => LogProvider()),
+        ChangeNotifierProvider<OBDDataProvider>.value(value: obdProvider),
+        ChangeNotifierProvider<BluetoothProvider>.value(value: bluetoothProvider),
+        ChangeNotifierProvider<LogProvider>.value(value: logProvider),
       ],
       child: MaterialApp(
         title: 'CYBER-CYCLE OBD',
