@@ -5,8 +5,12 @@ import '../providers/bluetooth_provider.dart';
 import '../providers/log_provider.dart';
 import '../providers/sensor_provider.dart';
 import '../providers/riding_stats_provider.dart';
+import '../services/audio_service.dart';
+import '../models/riding_event.dart';
+import '../models/event_voice_config.dart';
 import '../widgets/bluetooth_status_icon.dart';
 import '../widgets/bluetooth_alert_dialog.dart';
+import '../widgets/event_notification_dialog.dart';
 import 'dashboard_screen.dart';
 import 'logs_screen.dart';
 import 'bluetooth_scan_screen.dart';
@@ -23,6 +27,7 @@ class _MainContainerState extends State<MainContainer> {
   int _currentIndex = 0;
   bool _hasCheckedBluetooth = false;
   bool _hasStartedRide = false;
+  bool _hasShownEventNotification = false;
 
   final List<Widget> _pages = const [
     DashboardScreen(),
@@ -89,45 +94,90 @@ class _MainContainerState extends State<MainContainer> {
     _navigateTo(2);
   }
 
+  /// 显示事件通知弹窗并播放语音
+  void _showEventNotification(RidingEvent event) {
+    if (!mounted) return;
+
+    final audioService = context.read<AudioService>();
+    final config = EventVoiceConfigManager.getConfig(event.type);
+
+    // 播放语音
+    if (config != null) {
+      audioService.playAsset(config.audioAssetPath);
+    }
+
+    // 显示弹窗
+    EventNotificationDialog.show(
+      context: context,
+      event: event,
+      onProgressUpdate: (progress) {
+        // 更新进度条
+      },
+      onComplete: () {
+        // 语音播放完成
+        audioService.stop();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<BluetoothProvider>(
       builder: (context, bluetoothProvider, child) {
-        // 检测连接成功瞬间，启动骑行统计
-        final isConnected = bluetoothProvider.isDeviceConnected;
-        // 连接状态从 connected 变为 disconnected 时重置
-        if (!isConnected && _hasStartedRide) {
-          _hasStartedRide = false;
-          context.read<RidingStatsProvider>().endRide();
-        }
-        if (isConnected && !_hasStartedRide) {
-          _hasStartedRide = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            context.read<RidingStatsProvider>().startRide();
-          });
-        }
+        // 监听骑行事件
+        return Consumer<RidingStatsProvider>(
+          builder: (context, statsProvider, child) {
+            final latestEvent = statsProvider.latestEvent;
+            if (latestEvent != null && !_hasShownEventNotification) {
+              _hasShownEventNotification = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _showEventNotification(latestEvent);
+                // 清除最新事件，避免重复显示
+                statsProvider.clearLatestEvent();
+                // 重置标志，允许显示下一个事件
+                Future.delayed(const Duration(seconds: 2), () {
+                  _hasShownEventNotification = false;
+                });
+              });
+            }
 
-        return Scaffold(
-          body: Column(
-            children: [
-              // 顶部导航栏
-              _TopNavigationBar(
-                currentIndex: _currentIndex,
-                onNavigate: _navigateTo,
-                onLinkVehiclePressed: _navigateToBluetoothScan,
-                isConnected: isConnected,
-                deviceName: bluetoothProvider.connectedDevice?.name,
-              ),
+            // 检测连接成功瞬间，启动骑行统计
+            final isConnected = bluetoothProvider.isDeviceConnected;
+            // 连接状态从 connected 变为 disconnected 时重置
+            if (!isConnected && _hasStartedRide) {
+              _hasStartedRide = false;
+              context.read<RidingStatsProvider>().endRide();
+            }
+            if (isConnected && !_hasStartedRide) {
+              _hasStartedRide = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.read<RidingStatsProvider>().startRide();
+              });
+            }
 
-              // 页面内容
-              Expanded(
-                child: IndexedStack(
-                  index: _currentIndex,
-                  children: _pages,
-                ),
+            return Scaffold(
+              body: Column(
+                children: [
+                  // 顶部导航栏
+                  _TopNavigationBar(
+                    currentIndex: _currentIndex,
+                    onNavigate: _navigateTo,
+                    onLinkVehiclePressed: _navigateToBluetoothScan,
+                    isConnected: isConnected,
+                    deviceName: bluetoothProvider.connectedDevice?.name,
+                  ),
+
+                  // 页面内容
+                  Expanded(
+                    child: IndexedStack(
+                      index: _currentIndex,
+                      children: _pages,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

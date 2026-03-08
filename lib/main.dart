@@ -7,6 +7,7 @@ import 'providers/bluetooth_provider.dart';
 import 'providers/log_provider.dart';
 import 'providers/sensor_provider.dart';
 import 'providers/riding_stats_provider.dart';
+import 'services/audio_service.dart';
 import 'screens/main_container.dart';
 
 void main() {
@@ -32,6 +33,10 @@ void main() {
         ),
         ChangeNotifierProvider<LogProvider>(
           create: (_) => LogProvider(),
+        ),
+        // 音频服务 Provider
+        ChangeNotifierProvider<AudioService>(
+          create: (_) => AudioService(),
         ),
 
         // 传感器 Provider - 管理倾角传感器（依赖 OBDDataProvider + LogProvider）
@@ -63,17 +68,19 @@ void main() {
               ),
         ),
 
-        // 骑行统计 Provider - 管理事件检测和统计（依赖 OBDDataProvider + LogProvider）
+        // 骑行统计 Provider - 管理事件检测和统计（依赖 OBDDataProvider + LogProvider + AudioService）
         ChangeNotifierProxyProvider2<OBDDataProvider, LogProvider, RidingStatsProvider>(
           create: (context) => RidingStatsProvider(
             obdDataProvider: context.read<OBDDataProvider>(),
             logProvider: context.read<LogProvider>(),
+            audioService: context.read<AudioService>(),
           ),
           update: (context, obdDataProvider, logProvider, previous) =>
               previous ??
               RidingStatsProvider(
                 obdDataProvider: obdDataProvider,
                 logProvider: logProvider,
+                audioService: context.read<AudioService>(),
               ),
         ),
       ],

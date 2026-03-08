@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/obd_data.dart';
 import '../models/riding_event.dart' as stats;
+import '../models/event_voice_config.dart';
+import '../services/audio_service.dart';
 import 'log_provider.dart';
 import 'loggable.dart';
 import 'obd_data_provider.dart';
@@ -11,9 +13,21 @@ import 'obd_data_provider.dart';
 /// 负责数据采样、事件检测、统计汇总
 class RidingStatsProvider extends ChangeNotifier {
   final OBDDataProvider _obdDataProvider;
+  final AudioService? _audioService;
 
   // 日志回调
   late final void Function(String source, LogType type, String message) _logCallback;
+
+  // 最新添加的事件（用于外部监听）
+  stats.RidingEvent? _latestEvent;
+
+  /// 获取最新事件
+  stats.RidingEvent? get latestEvent => _latestEvent;
+
+  /// 清除最新事件（消费后调用）
+  void clearLatestEvent() {
+    _latestEvent = null;
+  }
 
   // 采样间隔 2Hz
   static const Duration sampleInterval = Duration(milliseconds: 500);
@@ -55,8 +69,33 @@ class RidingStatsProvider extends ChangeNotifier {
   RidingStatsProvider({
     required OBDDataProvider obdDataProvider,
     required LogProvider logProvider,
-  })  : _obdDataProvider = obdDataProvider {
+    AudioService? audioService,
+  })  : _obdDataProvider = obdDataProvider,
+        _audioService = audioService {
     _logCallback = createLogger(logProvider);
+  }
+
+  /// 播放事件语音
+  /// 返回进度更新回调（用于进度条显示）
+  void Function(double)? playEventVoice(stats.RidingEvent event) {
+    final config = EventVoiceConfigManager.getConfig(event.type);
+    if (config == null || _audioService == null) return null;
+
+    // 设置进度更新回调
+    void onProgressUpdate(double progress) {
+      // 回调由外部传入
+    }
+
+    // 设置播放完成回调
+    _audioService!.onComplete = () {
+      // 播放完成
+    };
+
+    // 播放音频
+    _audioService!.playAsset(config.audioAssetPath);
+
+    // 返回进度更新回调
+    return _audioService!.onProgressUpdate;
   }
 
   /// 开始骑行
@@ -303,6 +342,9 @@ class RidingStatsProvider extends ChangeNotifier {
     if (_eventHistory.length > 100) {
       _eventHistory.removeLast();
     }
+
+    // 设置最新事件（供外部监听显示弹窗）
+    _latestEvent = event;
 
     // _statistics = _statistics.copyWith(
     //   eventCounts: Map.from(_statistics.eventCounts),
