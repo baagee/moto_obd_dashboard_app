@@ -119,7 +119,7 @@ class CyberDialog extends StatelessWidget {
             content,
 
             // 按钮区域
-            if (actions != null || context.mounted) ...[
+            if (actions != null && actions!.isNotEmpty) ...[
               const SizedBox(height: 20),
               _buildActions(context),
             ],

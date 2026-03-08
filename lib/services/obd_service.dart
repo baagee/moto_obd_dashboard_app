@@ -99,7 +99,7 @@ class OBDService {
 
     // 非标准 OBD 响应
     if (!response.startsWith("41")) {
-      logCallback?.call('OBD', LogType.warning, '非标准 OBD 响应: $response');
+      // logCallback?.call('OBD', LogType.warning, '非标准 OBD 响应: $response');
       return null;
     }
 
