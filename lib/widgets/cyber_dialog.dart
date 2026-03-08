@@ -115,8 +115,13 @@ class CyberDialog extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // 内容区域
-            content,
+            // 内容区域（添加最大高度约束，确保可滚动）
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.5,
+              ),
+              child: content,
+            ),
 
             // 按钮区域
             if (actions != null && actions!.isNotEmpty) ...[
