@@ -36,8 +36,9 @@ class EventNotificationDialog extends StatefulWidget {
 
 class _EventNotificationDialogState extends State<EventNotificationDialog>
     with SingleTickerProviderStateMixin {
-  late AnimationController _shakeController;
+  late AnimationController _animController;
   late Animation<double> _shakeAnimation;
+  late Animation<double> _neonAnimation;
 
   /// 动画抖动偏移量
   double _shakeOffset = 0.0;
@@ -47,47 +48,54 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
   @override
   void initState() {
     super.initState();
-    _initShakeAnimation();
-    _startShakeAnimation();
+    _initAnimations();
+    _startAnimations();
   }
 
-  void _initShakeAnimation() {
-    // 抖动更快(60ms)，幅度更大(6px)
-    _shakeController = AnimationController(
+  void _initAnimations() {
+    // 使用单个动画控制器
+    _animController = AnimationController(
       duration: const Duration(milliseconds: 60),
       vsync: this,
     );
 
-    _shakeAnimation = Tween<double>(begin: -3.0, end: 3.0).animate(
-      CurvedAnimation(parent: _shakeController, curve: Curves.easeInOut),
+    // 抖动动画：从 -6 到 6
+    _shakeAnimation = Tween<double>(begin: -6.0, end: 6.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
 
-    _shakeAnimation.addListener(() {
-      setState(() {
-        _shakeOffset = _shakeAnimation.value;
-      });
+    // 霓虹闪烁动画：透明度 0.5 到 1.0
+    _neonAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
+    );
+
+    _animController.addListener(_onAnimationUpdate);
+  }
+
+  void _onAnimationUpdate() {
+    setState(() {
+      _shakeOffset = _shakeAnimation.value;
     });
   }
 
-  void _startShakeAnimation() {
+  void _startAnimations() {
     // 快速抖动：每60ms切换一次方向
     _shakeTimer = Timer.periodic(const Duration(milliseconds: 60), (_) {
-      if (_shakeController.status == AnimationStatus.completed) {
-        _shakeController.reverse();
+      if (_animController.status == AnimationStatus.completed) {
+        _animController.reverse();
       } else {
-        _shakeController.forward();
+        _animController.forward();
       }
     });
 
-    // 3秒后停止抖动并自动关闭弹窗
+    // 3秒后停止动画并自动关闭弹窗
     Future.delayed(const Duration(seconds: 3), () {
       _shakeTimer?.cancel();
-      _shakeController.stop();
+      _animController.stop();
       if (mounted) {
         setState(() {
           _shakeOffset = 0;
         });
-        // 自动关闭弹窗
         Navigator.of(context).pop();
       }
     });
@@ -96,7 +104,7 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
   @override
   void dispose() {
     _shakeTimer?.cancel();
-    _shakeController.dispose();
+    _animController.dispose();
     super.dispose();
   }
 
@@ -183,74 +191,85 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      child: Transform.translate(
-        offset: Offset(_shakeOffset, 0),
-        child: Container(
-          width: 320,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: eventColor.withOpacity(0.5),
-              width: 1,
-            ),
-            boxShadow: AppTheme.glowShadow(eventColor, blur: 20, opacity: 0.3),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 标题行
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: eventColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      _getEventIcon(),
-                      color: eventColor,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      widget.event.title,
-                      style: TextStyle(
-                        color: eventColor,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+      child: AnimatedBuilder(
+        animation: _animController,
+        builder: (context, child) {
+          // 霓虹闪烁：边框颜色在 0.5-1.0 透明度之间变化
+          final neonOpacity = _neonAnimation.value;
+          final neonColor = eventColor.withOpacity(neonOpacity);
+
+          return Transform.translate(
+            offset: Offset(_shakeOffset, 0),
+            child: Container(
+              width: 320,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: neonColor,
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: eventColor.withOpacity(neonOpacity * 0.5),
+                    blurRadius: 20 * neonOpacity,
+                    spreadRadius: 0,
                   ),
                 ],
               ),
-
-              const SizedBox(height: 10),
-
-              // 事件描述
-              Text(
-                widget.event.description,
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 11,
-                  height: 1.4,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 标题行
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: eventColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          _getEventIcon(),
+                          color: eventColor,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.event.title,
+                          style: TextStyle(
+                            color: eventColor,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // 事件描述
+                  Text(
+                    widget.event.description,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 11,
+                      height: 1.4,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 10),
+                  // 扩展信息显示
+                  _buildAdditionalInfo(eventColor),
+                ],
               ),
-
-              const SizedBox(height: 10),
-
-              // 扩展信息显示
-              _buildAdditionalInfo(eventColor),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
