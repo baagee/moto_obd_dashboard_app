@@ -4,31 +4,21 @@ import '../models/riding_event.dart';
 import '../theme/app_theme.dart';
 
 /// 骑行事件通知弹窗
-/// 带半透明背景、抖动动画、进度条显示
+/// 带抖动动画显示
 /// 样式参考 CyberDialog
 class EventNotificationDialog extends StatefulWidget {
   /// 事件对象
   final RidingEvent event;
 
-  /// 语音播放进度回调
-  final void Function(double progress)? onProgressUpdate;
-
-  /// 语音播放完成回调
-  final VoidCallback? onComplete;
-
   const EventNotificationDialog({
     super.key,
     required this.event,
-    this.onProgressUpdate,
-    this.onComplete,
   });
 
   /// 显示弹窗的便捷方法
   static Future<void> show({
     required BuildContext context,
     required RidingEvent event,
-    void Function(double progress)? onProgressUpdate,
-    VoidCallback? onComplete,
   }) {
     return showDialog<void>(
       context: context,
@@ -36,8 +26,6 @@ class EventNotificationDialog extends StatefulWidget {
       barrierColor: Colors.black.withOpacity(0.7),
       builder: (context) => EventNotificationDialog(
         event: event,
-        onProgressUpdate: onProgressUpdate,
-        onComplete: onComplete,
       ),
     );
   }
@@ -50,9 +38,6 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
     with SingleTickerProviderStateMixin {
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
-
-  /// 当前播放进度 (0.0 - 1.0)
-  double _progress = 0.0;
 
   /// 动画抖动偏移量
   double _shakeOffset = 0.0;
@@ -67,8 +52,9 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
   }
 
   void _initShakeAnimation() {
+    // 抖动更快(60ms)，幅度更大(6px)
     _shakeController = AnimationController(
-      duration: const Duration(milliseconds: 100),
+      duration: const Duration(milliseconds: 60),
       vsync: this,
     );
 
@@ -84,8 +70,8 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
   }
 
   void _startShakeAnimation() {
-    // 快速抖动：每100ms切换一次方向
-    _shakeTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+    // 快速抖动：每60ms切换一次方向
+    _shakeTimer = Timer.periodic(const Duration(milliseconds: 60), (_) {
       if (_shakeController.status == AnimationStatus.completed) {
         _shakeController.reverse();
       } else {
@@ -93,7 +79,7 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
       }
     });
 
-    // 3秒后停止抖动
+    // 3秒后停止抖动并自动关闭弹窗
     Future.delayed(const Duration(seconds: 3), () {
       _shakeTimer?.cancel();
       _shakeController.stop();
@@ -101,6 +87,8 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
         setState(() {
           _shakeOffset = 0;
         });
+        // 自动关闭弹窗
+        Navigator.of(context).pop();
       }
     });
   }
@@ -110,16 +98,6 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
     _shakeTimer?.cancel();
     _shakeController.dispose();
     super.dispose();
-  }
-
-  /// 更新进度条
-  void updateProgress(double progress) {
-    if (mounted) {
-      setState(() {
-        _progress = progress.clamp(0.0, 1.0);
-      });
-      widget.onProgressUpdate?.call(_progress);
-    }
   }
 
   /// 获取事件对应的颜色
@@ -170,6 +148,35 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
     }
   }
 
+  /// 构建扩展信息显示 - 直接展示 additionalData 所有字段
+  Widget _buildAdditionalInfo(Color eventColor) {
+    final data = widget.event.additionalData;
+    if (data.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: data.entries.map((entry) {
+        String value = entry.value?.toString() ?? '';
+        // 格式化数值
+        if (entry.value is double) {
+          value = (entry.value as double).toStringAsFixed(1);
+        } else if (entry.value is int) {
+          value = entry.value.toString();
+        }
+        return Text(
+          '${entry.key}: $value',
+          style: TextStyle(
+            color: eventColor.withOpacity(0.8),
+            fontSize: 10,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventColor = _getEventColor();
@@ -180,7 +187,7 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
         offset: Offset(_shakeOffset, 0),
         child: Container(
           width: 320,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppTheme.surface,
             borderRadius: BorderRadius.circular(12),
@@ -194,19 +201,6 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 顶部进度条
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-                child: LinearProgressIndicator(
-                  value: _progress,
-                  backgroundColor: Colors.transparent,
-                  valueColor: AlwaysStoppedAnimation<Color>(eventColor),
-                  minHeight: 3,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
               // 标题行
               Row(
                 children: [
@@ -219,16 +213,16 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
                     child: Icon(
                       _getEventIcon(),
                       color: eventColor,
-                      size: 24,
+                      size: 20,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       widget.event.title,
                       style: TextStyle(
                         color: eventColor,
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -236,50 +230,24 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
                 ],
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
               // 事件描述
               Text(
                 widget.event.description,
                 style: const TextStyle(
                   color: AppTheme.textSecondary,
-                  fontSize: 12,
+                  fontSize: 11,
                   height: 1.4,
                 ),
-                maxLines: 3,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
-              // 进度指示
-              Row(
-                children: [
-                  Icon(
-                    _progress >= 1.0 ? Icons.check_circle : Icons.volume_up,
-                    color: eventColor.withOpacity(0.8),
-                    size: 14,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _progress >= 1.0 ? '播报完成' : '语音播报中...',
-                    style: TextStyle(
-                      color: eventColor.withOpacity(0.8),
-                      fontSize: 10,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const Spacer(),
-                  // 进度百分比
-                  Text(
-                    '${(_progress * 100).toInt()}%',
-                    style: TextStyle(
-                      color: eventColor.withOpacity(0.6),
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
-              ),
+              // 扩展信息显示
+              _buildAdditionalInfo(eventColor),
             ],
           ),
         ),

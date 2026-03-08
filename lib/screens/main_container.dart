@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/bluetooth_provider.dart';
@@ -39,7 +41,43 @@ class _MainContainerState extends State<MainContainer> {
   void initState() {
     super.initState();
     _initializeBluetooth();
+    // ====== [测试代码] APP启动3秒后自动添加测试事件 ======
+    // TODO: 测试完成后删除此代码
+    // Future.delayed(const Duration(seconds: 3), () {
+    //   if (mounted) {
+    //     _triggerTestEvent();
+    //   }
+    // });
+    // ====== [测试代码结束] ======
   }
+
+  /// ====== [测试方法] 触发测试事件 ======
+  /// TODO: 测试完成后删除此方法
+  void _triggerTestEvent() {
+    final statsProvider = context.read<RidingStatsProvider>();
+
+    // 创建测试事件
+    final testEvent = RidingEvent(
+      type: RidingEventType.performanceBurst,
+      title: '性能爆发',
+      description: '测试事件：发动机转速高于6300rpm且车速快速攀升',
+      triggerValue: 7500.0,
+      threshold: 6300.0,
+      timestamp: DateTime.now(),
+      additionalData: {
+        'isTestEvent': true, // 标记为测试事件
+        'condition': 'test mode',
+      },
+    );
+
+    // 手动触发测试事件（通过修改 RidingStatsProvider 的 latestEvent）
+    // 这里直接调用 _showEventNotification 来测试弹窗
+    _showEventNotification(testEvent);
+
+    // 打印日志
+    debugPrint('[测试] 已触发测试事件: ${testEvent.title}');
+  }
+  /// ====== [测试方法结束] ======
 
   Future<void> _initializeBluetooth() async {
     final bluetoothProvider = context.read<BluetoothProvider>();
@@ -110,19 +148,25 @@ class _MainContainerState extends State<MainContainer> {
     EventNotificationDialog.show(
       context: context,
       event: event,
-      onProgressUpdate: (progress) {
-        // 更新进度条
-      },
-      onComplete: () {
-        // 语音播放完成
-        audioService.stop();
-      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<BluetoothProvider>(
+    // 拦截返回键，最小化应用到桌面而不是退出
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (!didPop) {
+          // 最小化应用到系统桌面
+          final intent = AndroidIntent(
+            action: 'android.intent.action.MAIN',
+            category: 'android.intent.category.HOME',
+          );
+          await intent.launch();
+        }
+      },
+      child: Consumer<BluetoothProvider>(
       builder: (context, bluetoothProvider, child) {
         // 监听骑行事件
         return Consumer<RidingStatsProvider>(
@@ -180,6 +224,7 @@ class _MainContainerState extends State<MainContainer> {
           },
         );
       },
+      ),
     );
   }
 }
