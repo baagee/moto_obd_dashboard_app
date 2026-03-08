@@ -4,6 +4,7 @@ import '../providers/log_provider.dart';
 import '../theme/app_theme.dart';
 import '../models/obd_data.dart';
 import '../widgets/cyber_button.dart';
+import '../widgets/cyber_dialog.dart';
 
 /// 日志过滤类型
 enum LogFilterType {
@@ -27,47 +28,33 @@ class _LogsScreenState extends State<LogsScreen> {
 
   /// 显示清空日志确认对话框
   void _showClearConfirmDialog(BuildContext context, LogProvider provider) {
-    showDialog(
+    CyberDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: AppTheme.accentRed.withOpacity(0.3)),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: AppTheme.accentOrange),
-            const SizedBox(width: 8),
-            const Text(
-              'Clear Logs',
-              style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
-            ),
-          ],
-        ),
-        content: const Text(
-          'Are you sure you want to clear all logs? This action cannot be undone.',
-          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-        ),
-        actions: [
-          CyberButton.secondary(
-            text: '取消',
-            onPressed: () => Navigator.pop(context),
-            height: 32,
-            fontSize: 10,
-          ),
-          const SizedBox(width: 8),
-          CyberButton.danger(
-            text: '确认',
-            onPressed: () {
-              provider.clearLogs();
-              Navigator.pop(context);
-            },
-            height: 32,
-            fontSize: 10,
-          ),
-        ],
+      title: 'Clear Logs',
+      icon: Icons.warning_amber_rounded,
+      accentColor: AppTheme.accentOrange,
+      content: const Text(
+        'Are you sure you want to clear all logs? This action cannot be undone.',
+        style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
       ),
+      actions: [
+        CyberButton.secondary(
+          text: '取消',
+          onPressed: () => Navigator.pop(context),
+          height: 32,
+          fontSize: 10,
+        ),
+        const SizedBox(width: 8),
+        CyberButton.danger(
+          text: '确认',
+          onPressed: () {
+            provider.clearLogs();
+            Navigator.pop(context);
+          },
+          height: 32,
+          fontSize: 10,
+        ),
+      ],
     );
   }
 

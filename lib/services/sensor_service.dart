@@ -18,7 +18,7 @@ class SensorService {
   })  : _obdDataProvider = obdDataProvider;
 
   // 采样间隔 10Hz = 100ms
-  static const int sampleIntervalMs = 20;
+  static const int sampleIntervalMs = 15;
 
   // 互补滤波系数
   static const double alpha = 0.98;

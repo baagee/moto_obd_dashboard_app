@@ -8,6 +8,7 @@ import '../services/bluetooth_service.dart' as app_bluetooth;
 import '../services/device_storage_service.dart';
 import '../services/obd_service.dart';
 import 'log_provider.dart';
+import 'loggable.dart';
 import 'obd_data_provider.dart';
 
 /// 蓝牙状态 Provider - 管理蓝牙权限和状态
@@ -43,8 +44,8 @@ class BluetoothProvider extends ChangeNotifier {
   // 用户是否正在主动断开连接（避免在 disconnectDevice 中重复触发清理）
   bool _isManuallyDisconnecting = false;
 
-  // 日志回调 - 降低耦合度
-  void Function(String source, LogType type, String message)? _logCallback;
+  // 日志回调
+  late final void Function(String source, LogType type, String message) _logCallback;
 
   // 过滤阈值
   static const int minRssi = -90; // 过滤弱信号设备
@@ -67,7 +68,7 @@ class BluetoothProvider extends ChangeNotifier {
     required LogProvider logProvider,
   })  : _obdDataProvider = obdDataProvider {
     // 初始化日志回调
-    _logCallback = (source, type, message) => logProvider.addLog(source, type, message);
+    _logCallback = createLogger(logProvider);
 
     // 初始化 OBDService
     _obdService = OBDService(
@@ -83,6 +84,10 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 输出初始化日志
     _logCallback?.call('Bluetooth', LogType.info, '蓝牙服务初始化中...');
+
+    // 先取消已存在的订阅，避免内存泄漏和重复监听
+    await _adapterSubscription?.cancel();
+    _adapterSubscription = null;
 
     // 初始检测
     await _checkPermission();
@@ -133,7 +138,10 @@ class BluetoothProvider extends ChangeNotifier {
   /// 自动重连上次设备
   Future<void> _autoReconnectLastDevice() async {
     if (_lastConnectedDevice == null || _isAutoReconnecting) return;
-
+    if (!_isBluetoothOn) {
+      _logCallback?.call('Bluetooth', LogType.warning, '蓝牙未开启，无法自动重连');
+      return;
+    }
     _isAutoReconnecting = true;
 
     // 开始扫描查找上次设备
@@ -141,6 +149,7 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 等待扫描结果
     await Future.delayed(BluetoothConstants.autoReconnectWait);
+    _logCallback?.call('Bluetooth', LogType.info, '自动连接扫描到的设备: $_scannedDevices');
 
     // 检查是否在扫描结果中找到设备（优先 ID 匹配）
     var foundDevice = _scannedDevices.where((d) => d.id == _lastConnectedDevice!.id).toList();
@@ -268,6 +277,10 @@ class BluetoothProvider extends ChangeNotifier {
   Future<void> startScan() async {
     if (_isScanning) return;
 
+    // 先取消已存在的扫描订阅，避免重复监听
+    await _scanSubscription?.cancel();
+    _scanSubscription = null;
+
     _isScanning = true;
     _scannedDevices = [];
     notifyListeners();
@@ -275,15 +288,17 @@ class BluetoothProvider extends ChangeNotifier {
     _logCallback?.call('Bluetooth', LogType.info, '开始扫描蓝牙设备...');
 
     // 设置6秒超时
+    _scanTimer?.cancel();
     _scanTimer = Timer(BluetoothConstants.scanTimeout, () {
       stopScan();
     });
 
     // 监听扫描结果
     _scanSubscription = fb.FlutterBluePlus.scanResults.listen((results) {
-      // 过滤弱信号设备并按信号强度排序
+      // 过滤弱信号设备和名称为空的设备，并按信号强度排序
+      // 使用 advertisementData.advName 过滤，与模型创建时使用的字段一致
       final filteredDevices = results
-          .where((r) => r.rssi >= minRssi)
+          .where((r) => r.rssi >= minRssi && r.advertisementData.advName.isNotEmpty)
           .map((r) => BluetoothDeviceModel.fromScanResult(r))
           .toList();
 
@@ -407,7 +422,7 @@ class BluetoothProvider extends ChangeNotifier {
       await _discoverAndMatchCharacteristics(device, services);
 
       // 初始化 ELM327
-      await _initializeElm327();
+      await _obdService?.initialize();
 
       // 启动 OBD 轮询
       _obdService?.startPolling();
@@ -486,38 +501,6 @@ class BluetoothProvider extends ChangeNotifier {
     // 调用清理方法，确保资源完全释放
     // _cleanupConnection 内部会调用 notifyListeners()
     _cleanupConnection(shouldReconnect: false);
-  }
-
-  /// ========== ELM327 初始化（增加详细日志） ==========
-  Future<void> _initializeElm327() async {
-    _logCallback?.call('ELM327', LogType.info, '开始初始化 ELM327...');
-
-    try {
-      _logCallback?.call('ELM327', LogType.info, '发送 ATZ (复位)...');
-      await _obdService?.sendCommand("ATZ");
-      await Future.delayed(BluetoothConstants.elm327InitWait);
-
-      _logCallback?.call('ELM327', LogType.info, '发送 ATE0 (关闭回显)...');
-      await _obdService?.sendCommand("ATE0");
-      await Future.delayed(BluetoothConstants.obdCommandInterval);
-
-      _logCallback?.call('ELM327', LogType.info, '发送 ATL0 (关闭行尾)...');
-      await _obdService?.sendCommand("ATL0");
-      await Future.delayed(BluetoothConstants.obdCommandInterval);
-
-      _logCallback?.call('ELM327', LogType.info, '发送 ATH0 (关闭头信息)...');
-      await _obdService?.sendCommand("ATH0");
-      await Future.delayed(BluetoothConstants.obdCommandInterval);
-
-      _logCallback?.call('ELM327', LogType.info, '发送 ATSP0 (自动协议)...');
-      await _obdService?.sendCommand("ATSP0");
-      await Future.delayed(BluetoothConstants.obdCommandInterval);
-
-      _logCallback?.call('ELM327', LogType.success, 'ELM327 初始化完成');
-    } catch (e) {
-      _logCallback?.call('ELM327', LogType.error, '初始化失败: $e');
-      rethrow;
-    }
   }
 
   Future<void> _trySmartMatching(List<fb.BluetoothCharacteristic> characteristics) async {

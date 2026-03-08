@@ -278,10 +278,6 @@ class _LastConnectedState extends StatelessWidget {
                         ),
                       ),
                     ),
-                  const Icon(
-                    Icons.history,
-                    color: AppTheme.textMuted,
-                  ),
                 ],
               ),
             ],

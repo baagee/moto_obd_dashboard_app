@@ -58,6 +58,38 @@ class OBDService {
     _writeCharacteristic = characteristic;
   }
 
+  /// 初始化 ELM327 适配器
+  Future<void> initialize() async {
+    if (_writeCharacteristic == null) {
+      logCallback?.call('ELM327', LogType.error, '写入特征未设置');
+      throw Exception('写入特征未设置');
+    }
+
+    logCallback?.call('ELM327', LogType.info, '开始初始化 ELM327...');
+
+    // ATZ 复位
+    await sendCommand("ATZ");
+    await Future.delayed(BluetoothConstants.elm327InitWait);
+
+    // ATE0 关闭回显
+    await sendCommand("ATE0");
+    await Future.delayed(BluetoothConstants.obdCommandInterval);
+
+    // ATL0 关闭行尾
+    await sendCommand("ATL0");
+    await Future.delayed(BluetoothConstants.obdCommandInterval);
+
+    // ATH0 关闭头信息
+    await sendCommand("ATH0");
+    await Future.delayed(BluetoothConstants.obdCommandInterval);
+
+    // ATSP0 自动协议
+    await sendCommand("ATSP0");
+    await Future.delayed(BluetoothConstants.obdCommandInterval);
+
+    logCallback?.call('ELM327', LogType.success, 'ELM327 初始化完成');
+  }
+
   /// 解析 OBD 响应
   ObdParseResult? parseResponse(String response) {
     // 过滤 ELM327 提示符和空响应
@@ -178,7 +210,15 @@ class OBDService {
       await _writeCharacteristic!.write(bytes, withoutResponse: false);
       // logCallback?.call('OBD', LogType.info, '发送命令: $command');
     } catch (e) {
-      logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $e');
+      final errorMsg = e.toString();
+      if (errorMsg.contains('device is disconnected') ||
+          errorMsg.contains('disconnected')) {
+        // 断开错误，停止轮询避免持续报错
+        stopPolling();
+        logCallback?.call('OBD', LogType.warning, '检测到设备断开，已停止轮询');
+      } else {
+        logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $e');
+      }
     }
   }
 

@@ -4,13 +4,16 @@ import 'package:flutter/foundation.dart';
 import '../models/obd_data.dart';
 import '../models/riding_event.dart' as stats;
 import 'log_provider.dart';
+import 'loggable.dart';
 import 'obd_data_provider.dart';
 
 /// 骑行统计 Provider
 /// 负责数据采样、事件检测、统计汇总
 class RidingStatsProvider extends ChangeNotifier {
   final OBDDataProvider _obdDataProvider;
-  void Function(String source, LogType type, String message)? _logCallback;
+
+  // 日志回调
+  late final void Function(String source, LogType type, String message) _logCallback;
 
   // 采样间隔 2Hz
   static const Duration sampleInterval = Duration(milliseconds: 500);
@@ -53,7 +56,7 @@ class RidingStatsProvider extends ChangeNotifier {
     required OBDDataProvider obdDataProvider,
     required LogProvider logProvider,
   })  : _obdDataProvider = obdDataProvider {
-    _logCallback = (source, type, message) => logProvider.addLog(source, type, message);
+    _logCallback = createLogger(logProvider);
   }
 
   /// 开始骑行

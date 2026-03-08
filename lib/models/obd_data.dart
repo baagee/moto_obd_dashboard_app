@@ -73,21 +73,6 @@ enum EventType {
   success,
 }
 
-/// 骑行事件模型
-class RidingEvent {
-  final EventType type;
-  final String title;
-  final String message;
-  final DateTime timestamp;
-
-  RidingEvent({
-    required this.type,
-    required this.title,
-    required this.message,
-    DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
-}
-
 /// 诊断日志类型
 enum LogType {
   success,

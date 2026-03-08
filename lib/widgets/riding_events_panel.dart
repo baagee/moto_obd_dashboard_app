@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/riding_event.dart';
 import '../providers/riding_stats_provider.dart';
 import '../theme/app_theme.dart';
+import 'cyber_dialog.dart';
 
 /// 骑行事件面板
 class RidingEventsPanel extends StatelessWidget {
@@ -107,50 +108,36 @@ class _EventItem extends StatelessWidget {
   }
 
   void _showDetailDialog(BuildContext context) {
-    showDialog(
+    CyberDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.backgroundDark,
-        title: Row(
+      title: event.title,
+      icon: _icon,
+      accentColor: _color,
+      barrierDismissible: true,
+      actions: const [],
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(_icon, color: _color, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              event.title,
-              style: TextStyle(color: _color, fontSize: 18),
+            _DetailRow(label: '事件类型', value: event.type.toString()),
+            _DetailRow(label: '描述', value: event.description),
+            _DetailRow(label: '触发值', value: event.triggerValue.toStringAsFixed(1)),
+            _DetailRow(label: '阈值', value: event.threshold.toStringAsFixed(1)),
+            _DetailRow(
+              label: '触发时间',
+              value: '${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}:${event.timestamp.second.toString().padLeft(2, '0')}',
             ),
+            if (event.additionalData.isNotEmpty) ...[
+              const Divider(color: AppTheme.textMuted),
+              const Text('扩展信息', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+              const SizedBox(height: 4),
+              ...event.additionalData.entries.map(
+                (e) => _DetailRow(label: e.key, value: e.value.toString()),
+              ),
+            ],
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _DetailRow(label: '事件类型', value: event.type.toString()),
-              _DetailRow(label: '描述', value: event.description),
-              _DetailRow(label: '触发值', value: event.triggerValue.toStringAsFixed(1)),
-              _DetailRow(label: '阈值', value: event.threshold.toStringAsFixed(1)),
-              _DetailRow(
-                label: '触发时间',
-                value: '${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}:${event.timestamp.second.toString().padLeft(2, '0')}',
-              ),
-              if (event.additionalData.isNotEmpty) ...[
-                const Divider(color: AppTheme.textMuted),
-                const Text('扩展信息', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-                const SizedBox(height: 4),
-                ...event.additionalData.entries.map(
-                  (e) => _DetailRow(label: e.key, value: e.value.toString()),
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('关闭', style: TextStyle(color: AppTheme.primary)),
-          ),
-        ],
       ),
     );
   }

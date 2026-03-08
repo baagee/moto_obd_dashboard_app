@@ -52,20 +52,11 @@ class TelemetryChartCard extends StatelessWidget {
                       isLeft: true,
                     ),
 
-                    // 中间图表
+                    // 中间图表 - 使用 RepaintBoundary 隔离重绘
                     Expanded(
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: CustomPaint(
-                              size: Size.infinite,
-                              painter: TelemetryChartPainter(
-                                rpmHistory: data.rpmHistory,
-                                velocityHistory: data.velocityHistory,
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: _ChartArea(
+                        rpmHistory: data.rpmHistory,
+                        velocityHistory: data.velocityHistory,
                       ),
                     ),
 
@@ -135,6 +126,30 @@ class _YAxisLabels extends StatelessWidget {
             textAlign: isLeft ? TextAlign.right : TextAlign.left,
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+/// 图表绘制区域 - 使用 RepaintBoundary 隔离重绘
+class _ChartArea extends StatelessWidget {
+  final List<int> rpmHistory;
+  final List<int> velocityHistory;
+
+  const _ChartArea({
+    required this.rpmHistory,
+    required this.velocityHistory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: CustomPaint(
+        size: Size.infinite,
+        painter: TelemetryChartPainter(
+          rpmHistory: rpmHistory,
+          velocityHistory: velocityHistory,
+        ),
       ),
     );
   }

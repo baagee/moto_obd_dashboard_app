@@ -95,6 +95,11 @@ class _MainContainerState extends State<MainContainer> {
       builder: (context, bluetoothProvider, child) {
         // 检测连接成功瞬间，启动骑行统计
         final isConnected = bluetoothProvider.isDeviceConnected;
+        // 连接状态从 connected 变为 disconnected 时重置
+        if (!isConnected && _hasStartedRide) {
+          _hasStartedRide = false;
+          context.read<RidingStatsProvider>().endRide();
+        }
         if (isConnected && !_hasStartedRide) {
           _hasStartedRide = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {

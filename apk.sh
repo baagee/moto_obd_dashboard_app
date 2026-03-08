@@ -14,7 +14,7 @@
 
 flutter clean
 flutter pub get
-flutter build apk
+flutter build apk --release
 
 SRC='build/app/outputs/flutter-apk/app-release.apk'
 DEST="build/app/outputs/flutter-apk"
