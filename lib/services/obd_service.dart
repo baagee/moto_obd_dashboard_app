@@ -213,7 +213,8 @@ class OBDService {
       final errorMsg = e.toString();
       if (errorMsg.contains('device is disconnected') ||
           errorMsg.contains('disconnected')) {
-        // 断开错误，停止轮询避免持续报错
+        // 立即同步设置标志，防止并发导致重复日志
+        _isPollingActive = false;
         stopPolling();
         logCallback?.call('OBD', LogType.warning, '检测到设备断开，已停止轮询');
       } else {
@@ -239,8 +240,8 @@ class OBDService {
     _pollingTimer = Timer.periodic(
       Duration(milliseconds: pollingBaseInterval),
       (_) async {
-        if (_writeCharacteristic == null) {
-          logCallback?.call('OBD', LogType.warning, '写入特征为空');
+        if (_writeCharacteristic == null || _isPollingActive == false) {
+          logCallback?.call('OBD', LogType.warning, '写入特征为空，isPollingActive=false');
           return;
         }
 

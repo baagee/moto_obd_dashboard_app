@@ -14,8 +14,6 @@ class BluetoothDeviceModel {
   final String macAddress;
   final int rssi;
   DeviceConnectionStatus status;
-  int sentBytes;
-  int receivedBytes;
   double connectionStability;
 
   // flutter_blue_plus 设备引用
@@ -27,8 +25,6 @@ class BluetoothDeviceModel {
     required this.macAddress,
     required this.rssi,
     this.status = DeviceConnectionStatus.disconnected,
-    this.sentBytes = 0,
-    this.receivedBytes = 0,
     this.connectionStability = 0.0,
     this.flutterDevice,
   });
@@ -58,8 +54,6 @@ class BluetoothDeviceModel {
     String? macAddress,
     int? rssi,
     DeviceConnectionStatus? status,
-    int? sentBytes,
-    int? receivedBytes,
     double? connectionStability,
     BluetoothDevice? flutterDevice,
   }) {
@@ -69,8 +63,6 @@ class BluetoothDeviceModel {
       macAddress: macAddress ?? this.macAddress,
       rssi: rssi ?? this.rssi,
       status: status ?? this.status,
-      sentBytes: sentBytes ?? this.sentBytes,
-      receivedBytes: receivedBytes ?? this.receivedBytes,
       connectionStability: connectionStability ?? this.connectionStability,
       flutterDevice: flutterDevice ?? this.flutterDevice,
     );

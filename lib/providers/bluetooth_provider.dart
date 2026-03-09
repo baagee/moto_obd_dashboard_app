@@ -39,6 +39,7 @@ class BluetoothProvider extends ChangeNotifier {
   StreamSubscription<List<fb.ScanResult>>? _scanSubscription;
   StreamSubscription<fb.BluetoothConnectionState>? _connectionSubscription;
   Timer? _scanTimer;
+  Timer? _rssiMonitorTimer;
 
   // 用户是否正在主动断开连接（避免在 disconnectDevice 中重复触发清理）
   bool _isManuallyDisconnecting = false;
@@ -74,7 +75,6 @@ class BluetoothProvider extends ChangeNotifier {
       obdDataProvider: obdDataProvider,
       logCallback: _logCallback,
     );
-    _logCallback?.call('OBD', LogType.info, 'OBDDataProvider 已关联');
   }
 
   /// 初始化蓝牙状态检测
@@ -470,8 +470,6 @@ class BluetoothProvider extends ChangeNotifier {
     if (index != -1) {
       _scannedDevices[index] = _scannedDevices[index].copyWith(
         status: DeviceConnectionStatus.connected,
-        sentBytes: 0,
-        receivedBytes: 0,
         connectionStability: 100.0,
       );
       _connectedDevice = _scannedDevices[index];
@@ -483,6 +481,9 @@ class BluetoothProvider extends ChangeNotifier {
 
     _logCallback?.call('Bluetooth', LogType.success, '已连接到 ${device.name}');
     notifyListeners();
+
+    // 启动 RSSI 监测
+    _startRssiMonitoring();
   }
 
   /// 处理连接失败
@@ -569,6 +570,9 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 停止 OBD 轮询
     _obdService?.stopPolling();
+
+    // 停止 RSSI 监测
+    _stopRssiMonitoring();
 
     // 取消通知监听
     _obdNotificationSubscription?.cancel();
@@ -682,6 +686,59 @@ class BluetoothProvider extends ChangeNotifier {
     return _isInitialized && hasPermission && !_isBluetoothOn;
   }
 
+  /// RSSI 转稳定性百分比
+  /// RSSI 范围: -50(强) ~ -90(弱)，映射到 100% ~ 50%
+  double _rssiToStability(int rssi) {
+    if (rssi >= -50) return 100.0;
+    if (rssi < -90) return 50.0;
+    // 线性插值: (-50 到 -90 区间，映射到 100% 到 50%)
+    return 100.0 + ((rssi + 50) / 40) * 50;
+  }
+
+  /// 启动 RSSI 监测
+  void _startRssiMonitoring() {
+    _rssiMonitorTimer?.cancel();
+    _rssiMonitorTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      await _updateRssiAndStability();
+    });
+    // 立即更新一次
+    _updateRssiAndStability();
+  }
+
+  /// 停止 RSSI 监测
+  void _stopRssiMonitoring() {
+    _rssiMonitorTimer?.cancel();
+    _rssiMonitorTimer = null;
+  }
+
+  /// 更新 RSSI 和稳定性
+  Future<void> _updateRssiAndStability() async {
+    if (_connectedDevice?.flutterDevice == null) return;
+    try {
+      final rssi = await _connectedDevice!.flutterDevice!.readRssi();
+      final stability = _rssiToStability(rssi);
+      _connectedDevice = _connectedDevice!.copyWith(
+        rssi: rssi,
+        connectionStability: stability,
+      );
+
+      // 同时更新扫描列表中的设备
+      final index = _scannedDevices.indexWhere((d) => d.id == _connectedDevice!.id);
+      if (index != -1) {
+        _scannedDevices[index] = _connectedDevice!;
+      }
+
+      notifyListeners();
+    } catch (e) {
+      final errorMsg = e.toString();
+      _logCallback?.call('Bluetooth', LogType.warning, '更新 RSSI 和稳定性异常:$errorMsg');
+      // RSSI 读取失败时静默处理
+      if (errorMsg.contains('device is disconnected') || errorMsg.contains('disconnected')) {
+        _stopRssiMonitoring();
+      }
+    }
+  }
+
   @override
   void dispose() {
     _adapterSubscription?.cancel();
@@ -689,6 +746,7 @@ class BluetoothProvider extends ChangeNotifier {
     _connectionSubscription?.cancel();
     _obdNotificationSubscription?.cancel();
     _scanTimer?.cancel();
+    _rssiMonitorTimer?.cancel();
     _obdService?.dispose();
     super.dispose();
   }
