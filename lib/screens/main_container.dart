@@ -178,8 +178,8 @@ class _MainContainerState extends State<MainContainer> {
                 _showEventNotification(latestEvent);
                 // 清除最新事件，避免重复显示
                 statsProvider.clearLatestEvent();
-                // 重置标志，允许显示下一个事件
-                Future.delayed(const Duration(seconds: 2), () {
+                // 重置标志，允许显示下一个事件（3.5秒确保弹窗3秒关闭后再解锁）
+                Future.delayed(const Duration(milliseconds: 3500), () {
                   _hasShownEventNotification = false;
                 });
               });

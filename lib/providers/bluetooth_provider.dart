@@ -598,6 +598,13 @@ class BluetoothProvider extends ChangeNotifier {
       }
     }
 
+    // 兜底处理：确保所有设备都重置为 disconnected
+    // 防止重连失败后设备状态仍显示"连接中"
+    for (int i = 0; i < _scannedDevices.length; i++) {
+      _scannedDevices[i] = _scannedDevices[i].copyWith(
+        status: DeviceConnectionStatus.disconnected,);
+    }
+
     // 重置状态
     _connectedDevice = null;
     _isManuallyDisconnecting = false;

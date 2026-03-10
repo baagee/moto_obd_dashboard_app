@@ -36,11 +36,11 @@ class RidingStatsProvider extends ChangeNotifier {
   static const Duration windowDuration = Duration(seconds: 5);
 
   // 事件冷却时间（防止重复触发）
-  static const Duration eventCooldown = Duration(seconds: 10);
-  static const Duration extremeLeanCooldown = Duration(seconds: 5);
-  static const Duration longRidingCooldown = Duration(seconds: 60);
-  static const Duration efficientCruisingCooldown = Duration(seconds: 30);
-  static const Duration coldEnvironmentCooldown = Duration(seconds: 30);
+  static const Duration eventCooldown = Duration(seconds: 30);
+  static const Duration extremeLeanCooldown = Duration(seconds: 60);
+  static const Duration longRidingCooldown = Duration(seconds: 1200);
+  static const Duration efficientCruisingCooldown = Duration(seconds: 300);
+  static const Duration coldEnvironmentCooldown = Duration(seconds: 120);
 
   // 数据采样器
   final DataSampler _sampler = DataSampler();
@@ -77,26 +77,26 @@ class RidingStatsProvider extends ChangeNotifier {
 
   /// 播放事件语音
   /// 返回进度更新回调（用于进度条显示）
-  void Function(double)? playEventVoice(stats.RidingEvent event) {
-    final config = EventVoiceConfigManager.getConfig(event.type);
-    if (config == null || _audioService == null) return null;
-
-    // 设置进度更新回调
-    void onProgressUpdate(double progress) {
-      // 回调由外部传入
-    }
-
-    // 设置播放完成回调
-    _audioService!.onComplete = () {
-      // 播放完成
-    };
-
-    // 播放音频
-    _audioService!.playAsset(config.audioAssetPath);
-
-    // 返回进度更新回调
-    return _audioService!.onProgressUpdate;
-  }
+  // void Function(double)? playEventVoice(stats.RidingEvent event) {
+  //   final config = EventVoiceConfigManager.getConfig(event.type);
+  //   if (config == null || _audioService == null) return null;
+  //
+  //   // 设置进度更新回调
+  //   void onProgressUpdate(double progress) {
+  //     // 回调由外部传入
+  //   }
+  //
+  //   // 设置播放完成回调
+  //   _audioService!.onComplete = () {
+  //     // 播放完成
+  //   };
+  //
+  //   // 播放音频
+  //   _audioService!.playAsset(config.audioAssetPath);
+  //
+  //   // 返回进度更新回调
+  //   return _audioService!.onProgressUpdate;
+  // }
 
   /// 开始骑行
   void startRide() {

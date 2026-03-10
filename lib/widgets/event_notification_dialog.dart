@@ -37,13 +37,9 @@ class EventNotificationDialog extends StatefulWidget {
 class _EventNotificationDialogState extends State<EventNotificationDialog>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
-  late Animation<double> _shakeAnimation;
   late Animation<double> _neonAnimation;
 
-  /// 动画抖动偏移量
-  double _shakeOffset = 0.0;
-
-  Timer? _shakeTimer;
+  Timer? _blinkTimer;
 
   @override
   void initState() {
@@ -53,34 +49,21 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
   }
 
   void _initAnimations() {
-    // 使用单个动画控制器
+    // 使用单个动画控制器（加快到40ms，闪烁更快）
     _animController = AnimationController(
-      duration: const Duration(milliseconds: 60),
+      duration: const Duration(milliseconds: 40),
       vsync: this,
     );
 
-    // 抖动动画：从 -6 到 6
-    _shakeAnimation = Tween<double>(begin: -6.0, end: 6.0).animate(
+    // 霓虹闪烁动画：透明度 0.3 到 1.0（更明显）
+    _neonAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
-
-    // 霓虹闪烁动画：透明度 0.5 到 1.0
-    _neonAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
-    );
-
-    _animController.addListener(_onAnimationUpdate);
-  }
-
-  void _onAnimationUpdate() {
-    setState(() {
-      _shakeOffset = _shakeAnimation.value;
-    });
   }
 
   void _startAnimations() {
-    // 快速抖动：每60ms切换一次方向
-    _shakeTimer = Timer.periodic(const Duration(milliseconds: 60), (_) {
+    // 快速闪烁：每40ms切换一次方向
+    _blinkTimer = Timer.periodic(const Duration(milliseconds: 40), (_) {
       if (_animController.status == AnimationStatus.completed) {
         _animController.reverse();
       } else {
@@ -90,12 +73,9 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
 
     // 3秒后停止动画并自动关闭弹窗
     Future.delayed(const Duration(seconds: 3), () {
-      _shakeTimer?.cancel();
+      _blinkTimer?.cancel();
       _animController.stop();
       if (mounted) {
-        setState(() {
-          _shakeOffset = 0;
-        });
         Navigator.of(context).pop();
       }
     });
@@ -103,7 +83,7 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
 
   @override
   void dispose() {
-    _shakeTimer?.cancel();
+    _blinkTimer?.cancel();
     _animController.dispose();
     super.dispose();
   }
@@ -194,31 +174,29 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
       child: AnimatedBuilder(
         animation: _animController,
         builder: (context, child) {
-          // 霓虹闪烁：边框颜色在 0.5-1.0 透明度之间变化
+          // 霓虹闪烁：边框颜色在 0.3-1.0 透明度之间变化
           final neonOpacity = _neonAnimation.value;
           final neonColor = eventColor.withOpacity(neonOpacity);
 
-          return Transform.translate(
-            offset: Offset(_shakeOffset, 0),
-            child: Container(
-              width: 320,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: neonColor,
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: eventColor.withOpacity(neonOpacity * 0.5),
-                    blurRadius: 20 * neonOpacity,
-                    spreadRadius: 0,
-                  ),
-                ],
+          return Container(
+            width: 320,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: neonColor,
+                width: 2,
               ),
-              child: Column(
+              boxShadow: [
+                BoxShadow(
+                  color: eventColor.withOpacity(neonOpacity * 0.5),
+                  blurRadius: 20 * neonOpacity,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -267,7 +245,6 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
                   _buildAdditionalInfo(eventColor),
                 ],
               ),
-            ),
           );
         },
       ),
