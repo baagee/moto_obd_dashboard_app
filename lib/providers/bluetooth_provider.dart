@@ -147,7 +147,7 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 等待扫描结果
     await Future.delayed(BluetoothConstants.scanWaitTimeout);
-    _logCallback?.call('Bluetooth', LogType.info, '自动连接扫描到的设备: $_scannedDevices');
+    // _logCallback?.call('Bluetooth', LogType.info, '自动连接扫描到的设备: $_scannedDevices');
 
     // 检查是否在扫描结果中找到设备（优先 ID 匹配）
     var foundDevice = _scannedDevices.where((d) => d.id == _lastConnectedDevice!.id).toList();

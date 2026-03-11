@@ -8,11 +8,11 @@ class BluetoothConstants {
 
   /// 蓝牙设备扫描超时时间
   /// 超过此时间后停止扫描，扫描过程中发现的所有设备将展示给用户
-  static const Duration scanTimeout = Duration(seconds: 4);
+  static const Duration scanTimeout = Duration(seconds: 3);
 
   /// 自动重连前等待扫描发现设备的时间
   /// 连接断开后等待扫描找到目标设备的时间，确保设备在可见范围内
-  static const Duration scanWaitTimeout = Duration(milliseconds: 4300);
+  static const Duration scanWaitTimeout = Duration(milliseconds: 3300);
 
   // ==================== 蓝牙连接相关 ====================
 

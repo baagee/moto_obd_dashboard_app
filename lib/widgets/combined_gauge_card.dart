@@ -51,6 +51,34 @@ class CombinedGaugePainter extends CustomPainter {
   static const int warnSpeed = 150;
   static const int dangerSpeed = 200;
 
+  /// 车速到角度的非线性映射
+  /// 0-180km/h 占据前 85% 角度，180-250 占据后 15%
+  double _speedToAngle(double speed) {
+    const double normalMax = 180;
+    const double normalRatio = 0.85;
+
+    if (speed <= normalMax) {
+      return (speed / normalMax) * normalRatio * pi;
+    } else {
+      final extra = (speed - normalMax) / (maxSpeed - normalMax);
+      return (normalRatio + extra * (1 - normalRatio)) * pi;
+    }
+  }
+
+  /// RPM 到角度的非线性映射
+  /// 0-8000RPM 占据前 85% 角度，8000-12000 占据后 15%
+  double _rpmToAngle(double rpm) {
+    const double normalMax = 8000;
+    const double normalRatio = 0.85;
+
+    if (rpm <= normalMax) {
+      return (rpm / normalMax) * normalRatio * pi;
+    } else {
+      final extra = (rpm - normalMax) / (maxRpm - normalMax);
+      return (normalRatio + extra * (1 - normalRatio)) * pi;
+    }
+  }
+
   CombinedGaugePainter({
     required this.rpm,
     required this.speed,
@@ -128,8 +156,7 @@ class CombinedGaugePainter extends CustomPainter {
   }
 
   void _drawRPMProgress(Canvas canvas, Offset center, double radius) {
-    final progress = rpm / maxRpm;
-    final sweepAngle = pi * progress;
+    final sweepAngle = _rpmToAngle(rpm.toDouble());
 
     // 阶段颜色 - 使用 AppTheme 颜色
     Color color;
@@ -173,8 +200,7 @@ class CombinedGaugePainter extends CustomPainter {
   }
 
   void _drawSpeedProgress(Canvas canvas, Offset center, double radius) {
-    final progress = speed / maxSpeed;
-    final sweepAngle = pi * progress;
+    final sweepAngle = _speedToAngle(speed.toDouble());
 
     // 阶段颜色 - 使用 AppTheme 颜色
     Color color;
@@ -218,14 +244,14 @@ class CombinedGaugePainter extends CustomPainter {
   }
 
   void _drawRPMPointer(Canvas canvas, Offset center, double radius) {
-    final progress = rpm / maxRpm;
-    if (progress <= 0) return;
+    if (rpm <= 0) return;
 
     // 固定颜色 - 橙色，与数字蓝色区分
     const color = Color(0xFFFF9800);
 
-    // 顺时针角度：从 π 到 2π，经过上方
-    final angle = pi + progress * pi;
+    // 使用非线性映射计算角度
+    final sweepAngle = _rpmToAngle(rpm.toDouble());
+    final angle = pi + sweepAngle;
     final pointerLength = radius - 35;
     final headRadius = radius * 0.06; // 水滴头部半径
 
@@ -282,14 +308,14 @@ class CombinedGaugePainter extends CustomPainter {
   }
 
   void _drawSpeedPointer(Canvas canvas, Offset center, double radius) {
-    final progress = speed / maxSpeed;
-    if (progress <= 0) return;
+    if (speed <= 0) return;
 
     // 固定颜色 - 品红色，与数字青色区分
     const color = Color(0xFFE91E63);
 
-    // 逆时针角度：从 π 到 0，经过下方
-    final angle = pi - progress * pi;
+    // 使用非线性映射计算角度（逆时针）
+    final sweepAngle = _speedToAngle(speed.toDouble());
+    final angle = pi - sweepAngle;
     final pointerLength = radius - 35;
     final headRadius = radius * 0.06; // 水滴头部半径
 
@@ -357,12 +383,44 @@ class CombinedGaugePainter extends CustomPainter {
       fontWeight: FontWeight.w500,
     );
 
-    // 上半圆刻度 (RPM) - 顺时针从π到2π，经过上方
-    for (int i = 0; i <= maxRpm; i += 2000) {
-      if (i == 0) continue; // 跳过0
+    // 公共0刻度 - 在正下方（π角度）绘制一个共用的0刻度线和标签
+    {
+      const zeroAngle = pi;
+      final innerRadius = radius - 32;
+      final outerRadius = radius - 22;
 
+      // 绘制刻度线
+      final x1 = center.dx + innerRadius * cos(zeroAngle);
+      final y1 = center.dy + innerRadius * sin(zeroAngle);
+      final x2 = center.dx + outerRadius * cos(zeroAngle);
+      final y2 = center.dy + outerRadius * sin(zeroAngle);
+      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), tickPaint);
+
+      // 显示 "0" 标签
+      final textSpan = TextSpan(
+        text: '0',
+        style: textStyle,
+      );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      final textRadius = radius - 42;
+      final textX = center.dx + textRadius * cos(zeroAngle) - textPainter.width / 2;
+      final textY = center.dy + textRadius * sin(zeroAngle) - textPainter.height / 2;
+
+      textPainter.paint(canvas, Offset(textX, textY));
+    }
+
+    // 上半圆刻度 (RPM) - 顺时针从π到2π，经过上方
+    // 使用非线性映射：0-8000占前85%角度，8000-12000占后15%
+    // 大刻度：1k, 2k, 3k, 4k, 5k, 6k, 7k, 8k, 10k, 12k
+    final rpmMajorTicks = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 10000, 12000];
+    for (final i in rpmMajorTicks) {
       // 顺时针：π → 3π/2 → 2π
-      final angle = pi + (i / maxRpm) * pi;
+      final sweepAngle = _rpmToAngle(i.toDouble());
+      final angle = pi + sweepAngle;
       final innerRadius = radius - 32;
       final outerRadius = radius - 22;
 
@@ -390,16 +448,17 @@ class CombinedGaugePainter extends CustomPainter {
       textPainter.paint(canvas, Offset(textX, textY));
     }
 
-    // 细粒度刻度 (RPM) - 每500一个，显示在进度弧内部
+    // 细粒度刻度 (RPM) - 只在常用区域0-8000显示，每1000一个
     final fineTickPaint = Paint()
       ..color = AppTheme.primary60
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
 
-    for (int i = 0; i <= maxRpm; i += 500) {
-      if (i == 0 || i % 2000 == 0) continue; // 跳过0和大刻度位置
-
-      final angle = pi + (i / maxRpm) * pi;
+    // 常用区域每1000一个细刻度（排除已显示的大刻度）
+    final rpmFineTicks = [500, 1500, 2500, 3500, 4500, 5500, 6500, 7500];
+    for (final i in rpmFineTicks) {
+      final sweepAngle = _rpmToAngle(i.toDouble());
+      final angle = pi + sweepAngle;
       // 显示在进度弧内部（更靠近圆心）
       final innerRadius = radius - 40;
       final outerRadius = radius - 30;
@@ -413,11 +472,13 @@ class CombinedGaugePainter extends CustomPainter {
     }
 
     // 下半圆刻度 (Speed) - 逆时针从π到0，经过下方
-    for (int i = 0; i <= maxSpeed; i += 50) {
-      if (i == maxSpeed) continue; // 跳过250
-
+    // 使用非线性映射：0-180占前85%角度，180-250占后15%
+    // 大刻度：30, 60, 90, 120, 150, 180, 210, 240
+    final speedMajorTicks = [30, 60, 90, 120, 150, 180, 210, 230];
+    for (final i in speedMajorTicks) {
       // 逆时针：π → π/2 → 0
-      final angle = pi - (i / maxSpeed) * pi;
+      final sweepAngle = _speedToAngle(i.toDouble());
+      final angle = pi - sweepAngle;
       final innerRadius = radius - 32;
       final outerRadius = radius - 22;
 
@@ -445,11 +506,12 @@ class CombinedGaugePainter extends CustomPainter {
       textPainter.paint(canvas, Offset(textX, textY));
     }
 
-    // 细粒度刻度 (Speed) - 每10一个，显示在进度弧内部
-    for (int i = 0; i <= maxSpeed; i += 10) {
-      if (i == 0 || i % 50 == 0) continue; // 跳过0和大刻度位置
-
-      final angle = pi - (i / maxSpeed) * pi;
+    // 细粒度刻度 (Speed) - 只在常用区域0-180显示
+    // 额外添加的细刻度（排除已显示的大刻度）
+    final speedFineTicks = [10, 20, 40, 50, 70, 80, 100, 110, 130, 140, 160, 170];
+    for (final i in speedFineTicks) {
+      final sweepAngle = _speedToAngle(i.toDouble());
+      final angle = pi - sweepAngle;
       // 显示在进度弧内部（更靠近圆心）
       final innerRadius = radius - 40;
       final outerRadius = radius - 30;
