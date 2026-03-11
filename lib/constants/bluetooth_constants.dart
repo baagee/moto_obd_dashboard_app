@@ -10,6 +10,10 @@ class BluetoothConstants {
   /// 超过此时间后停止扫描，扫描过程中发现的所有设备将展示给用户
   static const Duration scanTimeout = Duration(seconds: 4);
 
+  /// 自动重连前等待扫描发现设备的时间
+  /// 连接断开后等待扫描找到目标设备的时间，确保设备在可见范围内
+  static const Duration scanWaitTimeout = Duration(milliseconds: 4300);
+
   // ==================== 蓝牙连接相关 ====================
 
   /// 蓝牙设备连接超时时间
@@ -29,10 +33,6 @@ class BluetoothConstants {
   /// 最大自动重连次数
   /// 连接断开后尝试自动重连的最大次数，达到次数后停止重连并提示用户
   static const int maxReconnectAttempts = 2;
-
-  /// 自动重连前等待扫描发现设备的时间
-  /// 连接断开后等待扫描找到目标设备的时间，确保设备在可见范围内
-  static const Duration autoReconnectWait = scanTimeout;
 
   /// 自动重连重试间隔
   /// 每次重连尝试失败后等待再重试的时间间隔
