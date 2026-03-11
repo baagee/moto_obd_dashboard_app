@@ -42,7 +42,7 @@ class OBDService {
   bool _isPollingActive = false;  // 轮询是否处于活动状态
 
   // 分级轮询常量 - 从 BluetoothConstants 引用
-  static final int pollingBaseInterval = BluetoothConstants.pollingBaseIntervalMs;
+  static const int pollingBaseInterval = BluetoothConstants.pollingBaseIntervalMs;
   static const List<String> highFreqPids = ['010D', '010C'];
   static const List<String> mediumFreqPids = ['0111', '010F', '010B'];
   static const List<String> lowFreqPids = ['0105', '0104', '0145', '0142'];
@@ -203,6 +203,7 @@ class OBDService {
   Future<void> sendCommand(String command) async {
     // 如果轮询未启动或写入特征为空，跳过发送
     if (!_isPollingActive || _writeCharacteristic == null) {
+      logCallback?.call('OBD', LogType.warning, 'sendCommand 跳过: _isPollingActive=$_isPollingActive, _writeCharacteristic=${_writeCharacteristic != null}');
       return;
     }
     try {
@@ -238,7 +239,7 @@ class OBDService {
     int tickCount = 0;
 
     _pollingTimer = Timer.periodic(
-      Duration(milliseconds: pollingBaseInterval),
+      const Duration(milliseconds: pollingBaseInterval),
       (_) async {
         if (_writeCharacteristic == null || _isPollingActive == false) {
           logCallback?.call('OBD', LogType.warning, '写入特征为空，isPollingActive=false');
