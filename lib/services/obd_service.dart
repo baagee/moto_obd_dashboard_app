@@ -202,22 +202,19 @@ class OBDService {
   /// 发送 OBD 命令
   Future<void> sendCommand(String command) async {
     // 如果轮询未启动或写入特征为空，跳过发送
-    if (!_isPollingActive || _writeCharacteristic == null) {
-      logCallback?.call('OBD', LogType.warning, 'sendCommand 跳过: _isPollingActive=$_isPollingActive, _writeCharacteristic=${_writeCharacteristic != null}');
+    if (_writeCharacteristic == null) {
+      logCallback?.call('OBD', LogType.warning, 'sendCommand 跳过: _writeCharacteristic=${_writeCharacteristic != null}');
       return;
     }
     try {
       final bytes = utf8.encode("$command\r");
       await _writeCharacteristic!.write(bytes, withoutResponse: false);
-      // logCallback?.call('OBD', LogType.info, '发送命令: $command');
     } catch (e) {
       final errorMsg = e.toString();
       if (errorMsg.contains('device is disconnected') ||
           errorMsg.contains('disconnected')) {
-        // 立即同步设置标志，防止并发导致重复日志
-        _isPollingActive = false;
         stopPolling();
-        logCallback?.call('OBD', LogType.warning, '检测到设备断开，已停止轮询');
+        // logCallback?.call('OBD', LogType.warning, '检测到设备断开，已停止轮询');
       } else {
         logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $e');
       }

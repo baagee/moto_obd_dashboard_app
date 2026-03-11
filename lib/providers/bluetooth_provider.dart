@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
 import '../constants/bluetooth_constants.dart';
@@ -115,7 +116,6 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 如果上次有连接的设备且当前未连接，尝试自动重连
     if (_lastConnectedDevice != null && _connectedDevice == null && _isBluetoothOn) {
-      _logCallback?.call('Bluetooth', LogType.info, '尝试自动连接上次设备: ${_lastConnectedDevice!.name}');
       await _autoReconnectLastDevice();
     }
 
@@ -144,10 +144,8 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 开始扫描查找上次设备
     await startScan();
-
     // 等待扫描结果
     await Future.delayed(BluetoothConstants.scanWaitTimeout);
-    // _logCallback?.call('Bluetooth', LogType.info, '自动连接扫描到的设备: $_scannedDevices');
 
     // 检查是否在扫描结果中找到设备（优先 ID 匹配）
     var foundDevice = _scannedDevices.where((d) => d.id == _lastConnectedDevice!.id).toList();
@@ -163,6 +161,7 @@ class BluetoothProvider extends ChangeNotifier {
     if (foundDevice.isNotEmpty) {
       // 使用扫描到的设备（有 flutterDevice 引用）
       final device = foundDevice.first;
+      _logCallback?.call('Bluetooth', LogType.info, '尝试自动连接上次设备: ${device.name}');
       await _attemptReconnect(device);
     } else {
       _logCallback?.call('Bluetooth', LogType.warning,
@@ -402,14 +401,13 @@ class BluetoothProvider extends ChangeNotifier {
       if (!ret) {
         throw Exception('发现服务匹配特征失败');
       }
-      // 更新为已连接状态
-      _updateDeviceConnectedStatus(device, deviceIndex);
       // 初始化 ELM327
       await _obdService?.initialize();
 
       // 启动 OBD 轮询
       _obdService?.startPolling();
-
+      // 更新为已连接状态
+      _updateDeviceConnectedStatus(device, deviceIndex);
     } catch (e) {
       _logCallback?.call('Bluetooth', LogType.error, '启动 OBD 会话失败: $e');
       _handleConnectionError(device, deviceIndex, e);
@@ -701,6 +699,7 @@ class BluetoothProvider extends ChangeNotifier {
       _logCallback?.call('Bluetooth', LogType.warning, '更新 RSSI 和稳定性异常:$errorMsg');
       // RSSI 读取失败时静默处理
       if (errorMsg.contains('device is disconnected') || errorMsg.contains('disconnected')) {
+        _logCallback?.call('Bluetooth', LogType.warning, '设备断开，停止更新 RSSI');
         _stopRssiMonitoring();
       }
     }
