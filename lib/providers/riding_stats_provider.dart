@@ -182,14 +182,14 @@ class RidingStatsProvider extends ChangeNotifier {
   /// 数据有效性检查
   bool _isValidData(OBDData data) {
     // 过滤无效数据（负值、异常大值）
-    if (data.speed < 0 || data.speed > 300) return false;
-    if (data.rpm < 0 || data.rpm > 15000) return false;
-    if (data.coolantTemp < -40 || data.coolantTemp > 150) return false;
-    if (data.voltage < 0 || data.voltage > 20) return false;
-    if (data.load < 0 || data.load > 100) return false;
-    if (data.leanAngle < -90 || data.leanAngle > 90) return false;
-    if (data.intakeTemp < -40 || data.intakeTemp > 60) return false;
-    if (data.throttle < 0 || data.throttle > 100) return false;
+    if (data.speed <= 0 || data.speed > 300) return false;
+    if (data.rpm <= 0 || data.rpm > 15000) return false;
+    if (data.coolantTemp <= -40 || data.coolantTemp > 150) return false;
+    if (data.voltage <= 0 || data.voltage > 20) return false;
+    if (data.load <= 0 || data.load > 100) return false;
+    if (data.leanAngle <= -90 || data.leanAngle > 90) return false;
+    if (data.intakeTemp <= -40 || data.intakeTemp > 60) return false;
+    if (data.throttle <= 0 || data.throttle > 100) return false;
     return true;
   }
 

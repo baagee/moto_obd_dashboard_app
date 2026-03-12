@@ -471,7 +471,7 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 处理连接失败
   void _handleConnectionError(BluetoothDeviceModel device, int index, Object error) {
-    _logCallback?.call('Bluetooth', LogType.error, '连接失败: $error');
+    _logCallback?.call('Bluetooth', LogType.error, '_handleConnectionError: $error');
 
     // 连接失败时，重置设备状态为 disconnected
     if (index != -1) {
@@ -538,6 +538,7 @@ class BluetoothProvider extends ChangeNotifier {
       case fb.BluetoothConnectionState.disconnected:
         _logCallback?.call('Bluetooth', LogType.warning, '设备已断开: ${device.name}');
         _cleanupConnection(shouldReconnect: true);
+        _logCallback?.call('Bluetooth', LogType.warning, 'disconnected callback ${device.name}');
         break;
       default:
         break;
@@ -663,8 +664,8 @@ class BluetoothProvider extends ChangeNotifier {
   /// 启动 RSSI 监测
   void _startRssiMonitoring() {
     _rssiMonitorTimer?.cancel();
-    _rssiMonitorTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      await _updateRssiAndStability();
+    _rssiMonitorTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _updateRssiAndStability();
     });
     // 立即更新一次
     _updateRssiAndStability();

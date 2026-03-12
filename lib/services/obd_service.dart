@@ -235,11 +235,11 @@ class OBDService {
     int lowFreqIndex = 0;
     int tickCount = 0;
 
-    _pollingTimer = Timer.periodic(
-      const Duration(milliseconds: pollingBaseInterval),
-      (_) async {
+    _pollingTimer = Timer.periodic(const Duration(milliseconds: pollingBaseInterval),
+      (timer) {
         if (_writeCharacteristic == null || _isPollingActive == false) {
           logCallback?.call('OBD', LogType.warning, '写入特征为空，isPollingActive=false');
+          timer.cancel();
           return;
         }
 
@@ -254,7 +254,7 @@ class OBDService {
           command = highFreqPids[highFreqIndex];
           highFreqIndex = (highFreqIndex + 1) % highFreqPids.length;
         }
-        await sendCommand(command);
+        sendCommand(command);
         tickCount++;
         if (tickCount >= 1000) tickCount = 0;
       },
