@@ -8,6 +8,8 @@ import '../providers/log_provider.dart';
 import '../providers/sensor_provider.dart';
 import '../providers/riding_stats_provider.dart';
 import '../providers/navigation_provider.dart';
+import '../providers/theme_provider.dart';
+import '../models/theme_colors.dart';
 import '../services/audio_service.dart';
 import '../models/riding_event.dart';
 import '../models/event_voice_config.dart';
@@ -248,136 +250,144 @@ class _TopNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundDark.withOpacity(0.8),
-        border: Border(
-          bottom: BorderSide(
-            color: AppTheme.primary.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Logo区域
-          Row(
-            children: [
-              const Icon(
-                Icons.settings_input_antenna,
-                color: AppTheme.primary,
-                size: 18,
-              ),
-              const SizedBox(width: 6),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    text: const TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'CYBER-CYCLE ',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        TextSpan(
-                          text: 'OBD_v2.0',
-                          style: TextStyle(
-                            color: AppTheme.primary,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w300,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Text(
-                    'SYSTEM PROTOCOL ACTIVE',
-                    style: TextStyle(
-                      color: AppTheme.primary,
-                      fontSize: 6,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const Spacer(),
-
-          // 导航菜单
-          Row(
-            children: [
-              _NavItem(
-                'DASHBOARD',
-                isActive: currentIndex == 0,
-                onTap: () => onNavigate(0),
-              ),
-              const SizedBox(width: 12),
-              _NavItem(
-                'LOGS',
-                isActive: currentIndex == 1,
-                onTap: () => onNavigate(1),
-              ),
-              const SizedBox(width: 12),
-              _NavItem(
-                'DEVICES',
-                isActive: currentIndex == 2,
-                onTap: () => onNavigate(2),
-              ),
-            ],
-          ),
-
-          const SizedBox(width: 12),
-
-          // 分隔线
-          Container(
-            height: 15,
-            width: 1,
-            color: AppTheme.primary.withOpacity(0.2),
-          ),
-
-          const SizedBox(width: 10),
-
-          // Link Vehicle按钮 - 根据连接状态显示不同文案
-          GestureDetector(
-            onTap: onLinkVehiclePressed,
-            child: Container(
-              height: 21,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: isConnected ? AppTheme.accentGreen : AppTheme.primary,
-                borderRadius: BorderRadius.circular(5),
-                boxShadow: AppTheme.glowShadow(isConnected ? AppTheme.accentGreen : AppTheme.primary),
-              ),
-              child: Center(
-                child: Text(
-                  isConnected && deviceName != null ? deviceName! : '设备未连接',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 7,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
+        return Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: colors.backgroundDark.withOpacity(0.8),
+            border: Border(
+              bottom: BorderSide(
+                color: colors.primary.withOpacity(0.2),
+                width: 1,
               ),
             ),
           ),
+          child: Row(
+            children: [
+              // Logo区域
+              Row(
+                children: [
+                  Icon(
+                    Icons.settings_input_antenna,
+                    color: colors.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 6),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: 'CYBER-CYCLE ',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            TextSpan(
+                              text: 'OBD_v2.0',
+                              style: TextStyle(
+                                color: colors.primary,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w300,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        'SYSTEM PROTOCOL ACTIVE',
+                        style: TextStyle(
+                          color: colors.primary,
+                          fontSize: 6,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
 
-          const SizedBox(width: 6),
+              const Spacer(),
 
-          // 蓝牙和信号状态图标
-          const BluetoothStatusIcon(),
-        ],
-      ),
+              // 导航菜单
+              Row(
+                children: [
+                  _NavItem(
+                    'DASHBOARD',
+                    isActive: currentIndex == 0,
+                    onTap: () => onNavigate(0),
+                    colors: colors,
+                  ),
+                  const SizedBox(width: 12),
+                  _NavItem(
+                    'LOGS',
+                    isActive: currentIndex == 1,
+                    onTap: () => onNavigate(1),
+                    colors: colors,
+                  ),
+                  const SizedBox(width: 12),
+                  _NavItem(
+                    'DEVICES',
+                    isActive: currentIndex == 2,
+                    onTap: () => onNavigate(2),
+                    colors: colors,
+                  ),
+                ],
+              ),
+
+              const SizedBox(width: 12),
+
+              // 分隔线
+              Container(
+                height: 15,
+                width: 1,
+                color: colors.primary.withOpacity(0.2),
+              ),
+
+              const SizedBox(width: 10),
+
+              // Link Vehicle按钮 - 根据连接状态显示不同文案
+              GestureDetector(
+                onTap: onLinkVehiclePressed,
+                child: Container(
+                  height: 21,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: isConnected ? colors.accentGreen : colors.primary,
+                    borderRadius: BorderRadius.circular(5),
+                    boxShadow: AppTheme.glowShadow(isConnected ? colors.accentGreen : colors.primary),
+                  ),
+                  child: Center(
+                    child: Text(
+                      isConnected && deviceName != null ? deviceName! : '设备未连接',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 7,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 6),
+
+              // 蓝牙和信号状态图标
+              const BluetoothStatusIcon(),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -386,11 +396,13 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback? onTap;
+  final ThemeColors colors;
 
   const _NavItem(
     this.label, {
     this.isActive = false,
     this.onTap,
+    required this.colors,
   });
 
   @override
@@ -404,7 +416,7 @@ class _NavItem extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: isActive ? AppTheme.primary : AppTheme.textSecondary,
+              color: isActive ? colors.primary : colors.textSecondary,
               fontSize: 8,
               fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
             ),
@@ -414,7 +426,7 @@ class _NavItem extends StatelessWidget {
               margin: const EdgeInsets.only(top: 2),
               height: 1,
               width: 40,
-              color: AppTheme.primary,
+              color: colors.primary,
             ),
         ],
       ),
