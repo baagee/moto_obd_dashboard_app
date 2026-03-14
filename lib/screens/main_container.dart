@@ -19,6 +19,7 @@ import '../widgets/event_notification_dialog.dart';
 import 'dashboard_screen.dart';
 import 'logs_screen.dart';
 import 'bluetooth_scan_screen.dart';
+import 'settings_screen.dart';
 
 /// 主容器 - 管理页面导航
 class MainContainer extends StatefulWidget {
@@ -37,6 +38,7 @@ class _MainContainerState extends State<MainContainer> {
     DashboardScreen(),
     LogsScreen(),
     BluetoothScanScreen(),
+    SettingsScreen(),
   ];
 
   @override
@@ -338,6 +340,13 @@ class _TopNavigationBar extends StatelessWidget {
                     'DEVICES',
                     isActive: currentIndex == 2,
                     onTap: () => onNavigate(2),
+                    colors: colors,
+                  ),
+                  const SizedBox(width: 12),
+                  _NavItem(
+                    'SETTINGS',
+                    isActive: currentIndex == 3,
+                    onTap: () => onNavigate(3),
                     colors: colors,
                   ),
                 ],
