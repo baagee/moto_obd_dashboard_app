@@ -9,7 +9,7 @@
 ## Phases
 
 - [x] **Phase 1: Theme Infrastructure** - Foundation: ThemeProvider, ThemeColors model, 4 theme definitions, persistence (completed 2026-03-14)
-- [ ] **Phase 2: Widget Migration** - All widgets refactored to use dynamic theme colors
+- [~] **Phase 2: Widget Migration** - All widgets refactored to use dynamic theme colors (in progress)
 - [ ] **Phase 3: Settings & Auto-Switch** - Settings page UI, manual theme selection, sunrise/sunset auto-switch
 
 ---
@@ -54,7 +54,7 @@ Plans:
 **Plans:** 2/2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Migrate screen files (main_container, dashboard, logs, bluetooth_scan)
+- [x] 02-01-PLAN.md — Migrate screen files (main_container, dashboard, logs, bluetooth_scan)
 - [ ] 02-02-PLAN.md — Migrate widget files (14 widgets: gauge cards, panels, buttons, dialogs, etc.)
 
 ---
@@ -93,7 +93,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Theme Infrastructure | 1/1 | Completed | 2026-03-14 |
-| 2. Widget Migration | 0/2 | Not started | - |
+| 2. Widget Migration | 1/2 | In Progress | 2026-03-15 |
 | 3. Settings & Auto-Switch | 0/1 | Not started | - |
 
 ---
