@@ -67,9 +67,10 @@
 |-------------|-------|--------|
 | THME-01 - THME-04 | Phase 1 | Pending |
 | THME-05 - THME-08 | Phase 1 | Pending |
-| THME-09 - THME-11 | Phase 2 | Pending |
+| THME-15 - THME-20 | Phase 2 | Pending |
+| THME-09 - THME-11 | Phase 3 | Pending |
 | THME-12 - THME-14 | Phase 3 | Pending |
-| THME-15 - THME-22 | Phase 1 | Pending |
+| THME-21 - THME-22 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 22 total
@@ -78,4 +79,4 @@
 
 ---
 *Requirements defined: 2026-03-14*
-*Last updated: 2026-03-14 after initial definition*
+*Last updated: 2026-03-14 after roadmap creation*
