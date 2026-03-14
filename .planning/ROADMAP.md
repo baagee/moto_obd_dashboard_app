@@ -33,7 +33,7 @@
 **Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 01-01-PLAN.md — ThemeProvider + ThemeColors + 4 theme definitions + persistence
+- [x] 01-01-PLAN.md — ThemeProvider + ThemeColors + 4 theme definitions + persistence
 
 ---
 
@@ -48,10 +48,14 @@ Plans:
 1. DashboardScreen displays correctly in all 4 themes
 2. LogsScreen displays correctly in all 4 themes
 3. BluetoothScanScreen displays correctly in all 4 themes
-4. SettingsScreen displays correctly in all 4 themes
+4. SettingsScreen displays correctly in all 4 themes (Note: SettingsScreen is Phase 3)
 5. Gauge widgets (speed, RPM, combined) accept theme colors and display correctly
 
-**Plans:** TBD
+**Plans:** 2/2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Migrate screen files (main_container, dashboard, logs, bluetooth_scan)
+- [ ] 02-02-PLAN.md — Migrate widget files (14 widgets: gauge cards, panels, buttons, dialogs, etc.)
 
 ---
 
@@ -89,7 +93,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Theme Infrastructure | 1/1 | Completed | 2026-03-14 |
-| 2. Widget Migration | 0/1 | Not started | - |
+| 2. Widget Migration | 0/2 | Not started | - |
 | 3. Settings & Auto-Switch | 0/1 | Not started | - |
 
 ---
@@ -97,10 +101,10 @@ Plans:
 ## Notes
 
 - Phase 1 builds foundation - all other phases depend on ThemeProvider working correctly
-- Phase 2 is the bulk of work - 40+ widget files need systematic refactoring
+- Phase 2 is the bulk of work - 18 widget/screen files need systematic refactoring
 - Phase 3 combines user-facing features - settings UI and auto-switch are independent but can share planning
 - Auto-switch requires location permission - graceful fallback if denied
 
 ---
 
-*Last updated: 2026-03-14*
+*Last updated: 2026-03-15*
