@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/theme_colors.dart';
 
 /// 应用主题配置
 class AppTheme {
@@ -105,6 +106,22 @@ class AppTheme {
     );
   }
 
+  /// 使用动态 ThemeColors 的边框样式
+  static BoxDecoration surfaceBorderWithColors(
+    ThemeColors colors, {
+    Color? borderColor,
+    double opacity = 0.2,
+  }) {
+    return BoxDecoration(
+      color: colors.surface.withOpacity(0.5),
+      border: Border.all(
+        color: (borderColor ?? colors.primary).withOpacity(opacity),
+        width: 1,
+      ),
+      borderRadius: BorderRadius.circular(12),
+    );
+  }
+
   // 预定义边框样式
   static const BoxDecoration surfaceBorderDefault = BoxDecoration(
     color: surface,
@@ -119,6 +136,22 @@ class AppTheme {
 
   // ========== 发光效果 ==========
   static List<BoxShadow> glowShadow(Color color, {double blur = 15, double opacity = 0.2}) {
+    return [
+      BoxShadow(
+        color: color.withOpacity(opacity),
+        blurRadius: blur,
+        spreadRadius: 0,
+      ),
+    ];
+  }
+
+  /// 使用动态 ThemeColors 的发光效果
+  static List<BoxShadow> glowShadowWithColors(
+    ThemeColors colors,
+    Color color, {
+    double blur = 15,
+    double opacity = 0.2,
+  }) {
     return [
       BoxShadow(
         color: color.withOpacity(opacity),
