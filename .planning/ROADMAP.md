@@ -10,7 +10,7 @@
 
 - [x] **Phase 1: Theme Infrastructure** - Foundation: ThemeProvider, ThemeColors model, 4 theme definitions, persistence (completed 2026-03-14)
 - [x] **Phase 2: Widget Migration** - All widgets refactored to use dynamic theme colors (completed 2026-03-15)
-- [~] **Phase 3: Settings & Auto-Switch** - Settings page UI, manual theme selection, sunrise/sunset auto-switch (in progress)
+- [x] **Phase 3: Settings & Auto-Switch** - Settings page UI, manual theme selection, sunrise/sunset auto-switch (completed 2026-03-15)
 
 ---
 
@@ -77,7 +77,7 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — Add dependencies, create SunriseSunsetService, extend ThemeProvider with auto-switch
-- [ ] 03-02-PLAN.md — Create SettingsScreen, add to navigation, integrate status bar sync
+- [x] 03-02-PLAN.md — Create SettingsScreen, add to navigation, integrate status bar sync
 
 ---
 
@@ -87,7 +87,7 @@ Plans:
 |-------|--------------|----------|
 | 1 - Theme Infrastructure | THME-01 to THME-08 | Complete |
 | 2 - Widget Migration | THME-15 to THME-20 | Complete |
-| 3 - Settings & Auto-Switch | THME-09 to THME-14, THME-21, THME-22 | 8/22 |
+| 3 - Settings & Auto-Switch | THME-09 to THME-14, THME-21, THME-22 | Complete |
 
 **Total:** 22/22 requirements mapped
 
@@ -99,7 +99,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Theme Infrastructure | 1/1 | Completed | 2026-03-14 |
 | 2. Widget Migration | 2/2 | Completed | 2026-03-15 |
-| 3. Settings & Auto-Switch | 1/2 | In Progress | 2026-03-15 |
+| 3. Settings & Auto-Switch | 2/2 | Completed | 2026-03-15 |
 
 ---
 
