@@ -76,7 +76,7 @@ Plans:
 **Plans:** 2/2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Add dependencies, create SunriseSunsetService, extend ThemeProvider with auto-switch
+- [x] 03-01-PLAN.md — Add dependencies, create SunriseSunsetService, extend ThemeProvider with auto-switch
 - [ ] 03-02-PLAN.md — Create SettingsScreen, add to navigation, integrate status bar sync
 
 ---
@@ -99,7 +99,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Theme Infrastructure | 1/1 | Completed | 2026-03-14 |
 | 2. Widget Migration | 2/2 | Completed | 2026-03-15 |
-| 3. Settings & Auto-Switch | 0/2 | In Progress | - |
+| 3. Settings & Auto-Switch | 1/2 | In Progress | 2026-03-15 |
 
 ---
 
