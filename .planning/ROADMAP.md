@@ -9,8 +9,8 @@
 ## Phases
 
 - [x] **Phase 1: Theme Infrastructure** - Foundation: ThemeProvider, ThemeColors model, 4 theme definitions, persistence (completed 2026-03-14)
-- [~] **Phase 2: Widget Migration** - All widgets refactored to use dynamic theme colors (in progress)
-- [ ] **Phase 3: Settings & Auto-Switch** - Settings page UI, manual theme selection, sunrise/sunset auto-switch
+- [x] **Phase 2: Widget Migration** - All widgets refactored to use dynamic theme colors (completed 2026-03-15)
+- [~] **Phase 3: Settings & Auto-Switch** - Settings page UI, manual theme selection, sunrise/sunset auto-switch (in progress)
 
 ---
 
@@ -55,7 +55,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Migrate screen files (main_container, dashboard, logs, bluetooth_scan)
-- [ ] 02-02-PLAN.md — Migrate widget files (14 widgets: gauge cards, panels, buttons, dialogs, etc.)
+- [x] 02-02-PLAN.md — Migrate widget files (14 widgets: gauge cards, panels, buttons, dialogs, etc.)
 
 ---
 
@@ -73,7 +73,11 @@ Plans:
 4. App requests location permission for auto-switch (if not granted)
 5. Status bar brightness syncs with theme (light theme = dark status bar, dark theme = light status bar)
 
-**Plans:** TBD
+**Plans:** 2/2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Add dependencies, create SunriseSunsetService, extend ThemeProvider with auto-switch
+- [ ] 03-02-PLAN.md — Create SettingsScreen, add to navigation, integrate status bar sync
 
 ---
 
@@ -81,9 +85,11 @@ Plans:
 
 | Phase | Requirements | Coverage |
 |-------|--------------|----------|
-| 1 - Theme Infrastructure | THME-01 to THME-08 | Complete    | 2026-03-14 | 2 - Widget Migration | THME-15 to THME-20 | Complete    | 2026-03-14 | 3 - Settings & Auto-Switch | THME-09 to THME-14, THME-21, THME-22 | 8/22 |
+| 1 - Theme Infrastructure | THME-01 to THME-08 | Complete |
+| 2 - Widget Migration | THME-15 to THME-20 | Complete |
+| 3 - Settings & Auto-Switch | THME-09 to THME-14, THME-21, THME-22 | 8/22 |
 
-**Total:** 22/22 requirements mapped ✓
+**Total:** 22/22 requirements mapped
 
 ---
 
@@ -92,8 +98,8 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Theme Infrastructure | 1/1 | Completed | 2026-03-14 |
-| 2. Widget Migration | 1/2 | In Progress | 2026-03-15 |
-| 3. Settings & Auto-Switch | 0/1 | Not started | - |
+| 2. Widget Migration | 2/2 | Completed | 2026-03-15 |
+| 3. Settings & Auto-Switch | 0/2 | In Progress | - |
 
 ---
 
