@@ -683,10 +683,8 @@ class BluetoothProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       final errorMsg = e.toString();
-      _logCallback.call('Bluetooth', LogType.warning, '更新 RSSI 和稳定性异常:$errorMsg');
       // RSSI 读取失败时静默处理
       if (errorMsg.contains('device is disconnected') || errorMsg.contains('disconnected')) {
-        _logCallback?.call('Bluetooth', LogType.warning, '设备断开，停止更新 RSSI');
         _stopRssiMonitoring();
       }
     }

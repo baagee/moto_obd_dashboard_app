@@ -237,9 +237,6 @@ class OBDService {
     _pollingTimer = Timer.periodic(
       const Duration(milliseconds: pollingBaseInterval),
       (timer) {
-        logCallback?.call('OBD', LogType.warning,
-            "Check: ${identityHashCode(this)} | Timer is null: ${_pollingTimer == null}");
-
         if (_pollingTimer == null) {
           logCallback?.call('OBD', LogType.warning, '_pollingTimer is null');
           return;
