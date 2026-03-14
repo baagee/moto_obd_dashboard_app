@@ -7,17 +7,17 @@
 
 ### Theme Infrastructure
 
-- [ ] **THME-01**: 创建 ThemeColors 数据类，封装每种主题的所有颜色 token
-- [ ] **THME-02**: 定义 4 种主题：赛博蓝、红色、橙色、浅色
-- [ ] **THME-03**: 实现 ThemeProvider (extends ChangeNotifier)，管理当前主题状态
-- [ ] **THME-04**: 使用 shared_preferences 持久化主题偏好设置
+- [x] **THME-01**: 创建 ThemeColors 数据类，封装每种主题的所有颜色 token
+- [x] **THME-02**: 定义 4 种主题：赛博蓝、红色、橙色、浅色
+- [x] **THME-03**: 实现 ThemeProvider (extends ChangeNotifier)，管理当前主题状态
+- [x] **THME-04**: 使用 shared_preferences 持久化主题偏好设置
 
 ### Theme Definitions
 
-- [ ] **THME-05**: 赛博蓝主题 - 深色背景 (#0A1114) + 蓝色强调 (#0DA6F2)
-- [ ] **THME-06**: 红色主题 - 深色背景 + 红色强调 (#FF4D4D)
-- [ ] **THME-07**: 橙色主题 - 深色背景 + 橙色强调 (#FFAB40)
-- [ ] **THME-08**: 浅色主题 - 白色背景 (#FFFFFF) + 黑色文字 (#000000) + 蓝色强调
+- [x] **THME-05**: 赛博蓝主题 - 深色背景 (#0A1114) + 蓝色强调 (#0DA6F2)
+- [x] **THME-06**: 红色主题 - 深色背景 + 红色强调 (#FF4D4D)
+- [x] **THME-07**: 橙色主题 - 深色背景 + 橙色强调 (#FFAB40)
+- [x] **THME-08**: 浅色主题 - 白色背景 (#FFFFFF) + 黑色文字 (#000000) + 蓝色强调
 
 ### Manual Theme Switch
 
