@@ -30,7 +30,10 @@
 4. Theme preference persists across app restarts
 5. ThemeData in main.dart uses AppTheme constants (no duplication)
 
-**Plans:** TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 01-01-PLAN.md — ThemeProvider + ThemeColors + 4 theme definitions + persistence
 
 ---
 
@@ -86,7 +89,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Theme Infrastructure | 0/1 | Not started | - |
+| 1. Theme Infrastructure | 1/1 | Ready to execute | - |
 | 2. Widget Migration | 0/1 | Not started | - |
 | 3. Settings & Auto-Switch | 0/1 | Not started | - |
 
