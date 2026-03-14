@@ -73,7 +73,7 @@ Plans:
 4. App requests location permission for auto-switch (if not granted)
 5. Status bar brightness syncs with theme (light theme = dark status bar, dark theme = light status bar)
 
-**Plans:** 2/2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 03-01-PLAN.md — Add dependencies, create SunriseSunsetService, extend ThemeProvider with auto-switch
@@ -87,15 +87,7 @@ Plans:
 |-------|--------------|----------|
 | 1 - Theme Infrastructure | THME-01 to THME-08 | Complete |
 | 2 - Widget Migration | THME-15 to THME-20 | Complete |
-| 3 - Settings & Auto-Switch | THME-09 to THME-14, THME-21, THME-22 | Complete |
-
-**Total:** 22/22 requirements mapped
-
----
-
-## Progress Table
-
-| Phase | Plans Complete | Status | Completed |
+| 3 - Settings & Auto-Switch | THME-09 to THME-14, THME-21, THME-22 | Complete    | 2026-03-14 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Theme Infrastructure | 1/1 | Completed | 2026-03-14 |
 | 2. Widget Migration | 2/2 | Completed | 2026-03-15 |
