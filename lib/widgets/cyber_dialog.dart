@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 import 'cyber_button.dart';
 
 /// 赛博朋克风格通用弹窗组件
@@ -26,7 +27,7 @@ class CyberDialog extends StatelessWidget {
     super.key,
     required this.title,
     this.icon,
-    this.accentColor = AppTheme.primary,
+    required this.accentColor,
     required this.content,
     this.actions,
     this.width = 320,
@@ -37,7 +38,7 @@ class CyberDialog extends StatelessWidget {
     required BuildContext context,
     required String title,
     IconData? icon,
-    Color accentColor = AppTheme.primary,
+    required Color accentColor,
     required Widget content,
     List<Widget>? actions,
     double width = 320,
@@ -59,78 +60,86 @@ class CyberDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: width,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: accentColor.withOpacity(0.5),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: accentColor.withOpacity(0.2),
-              blurRadius: 20,
-              spreadRadius: 0,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 标题行
-            Row(
-              children: [
-                if (icon != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      icon,
-                      color: accentColor,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                ],
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: accentColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
+        // Use accentColor if provided, otherwise use theme's primary
+        final effectiveAccentColor = accentColor != colors.primary ? accentColor : colors.primary;
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: width,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: effectiveAccentColor.withValues(alpha: 0.5),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: effectiveAccentColor.withValues(alpha: 0.2),
+                  blurRadius: 20,
+                  spreadRadius: 0,
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 标题行
+                Row(
+                  children: [
+                    if (icon != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: effectiveAccentColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: effectiveAccentColor,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          color: effectiveAccentColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
 
-            // 内容区域（添加最大高度约束，确保可滚动）
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.5,
-              ),
-              child: content,
+                // 内容区域（添加最大高度约束，确保可滚动）
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.5,
+                  ),
+                  child: content,
+                ),
+
+                // 按钮区域
+                if (actions != null && actions!.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  _buildActions(context),
+                ],
+              ],
             ),
-
-            // 按钮区域
-            if (actions != null && actions!.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              _buildActions(context),
-            ],
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

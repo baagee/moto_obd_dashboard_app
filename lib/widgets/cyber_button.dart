@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
 
 /// 赛博朋克风格按钮类型
@@ -82,79 +84,85 @@ class CyberButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: height,
-      child: GestureDetector(
-        onTap: isLoading ? null : onPressed,
-        child: _buildButton(),
-      ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
+
+        return SizedBox(
+          width: width,
+          height: height,
+          child: GestureDetector(
+            onTap: isLoading ? null : onPressed,
+            child: _buildButton(colors),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildButton() {
+  Widget _buildButton(colors) {
     switch (type) {
       case CyberButtonType.primary:
-        return _buildPrimaryButton();
+        return _buildPrimaryButton(colors);
       case CyberButtonType.secondary:
-        return _buildSecondaryButton();
+        return _buildSecondaryButton(colors);
       case CyberButtonType.danger:
-        return _buildDangerButton();
+        return _buildDangerButton(colors);
       case CyberButtonType.success:
-        return _buildSuccessButton();
+        return _buildSuccessButton(colors);
     }
   }
 
   /// 主按钮 - 蓝色背景 + 霓虹发光
-  Widget _buildPrimaryButton() {
+  Widget _buildPrimaryButton(colors) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppTheme.primary,
+        color: colors.primary,
         borderRadius: BorderRadius.circular(5),
-        boxShadow: AppTheme.glowShadow(AppTheme.primary, blur: 10),
+        boxShadow: AppTheme.glowShadow(colors.primary, blur: 10),
       ),
       child: _buildContent(Colors.white),
     );
   }
 
   /// 次按钮 - 透明背景 + 边框
-  Widget _buildSecondaryButton() {
+  Widget _buildSecondaryButton(colors) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(5),
         border: Border.all(
-          color: AppTheme.primary.withOpacity(0.8),
+          color: colors.primary.withValues(alpha: 0.8),
           width: 1,
         ),
       ),
-      child: _buildContent(AppTheme.primary),
+      child: _buildContent(colors.primary),
     );
   }
 
   /// 危险按钮 - 红色背景 + 霓虹发光
-  Widget _buildDangerButton() {
+  Widget _buildDangerButton(colors) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppTheme.accentRed,
+        color: colors.accentRed,
         borderRadius: BorderRadius.circular(5),
-        boxShadow: AppTheme.glowShadow(AppTheme.accentRed, blur: 10),
+        boxShadow: AppTheme.glowShadow(colors.accentRed, blur: 10),
       ),
       child: _buildContent(Colors.white),
     );
   }
 
   /// 成功按钮 - 绿色背景 + 霓虹发光
-  Widget _buildSuccessButton() {
+  Widget _buildSuccessButton(colors) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppTheme.accentGreen,
+        color: colors.accentGreen,
         borderRadius: BorderRadius.circular(5),
-        boxShadow: AppTheme.glowShadow(AppTheme.accentGreen, blur: 10),
+        boxShadow: AppTheme.glowShadow(colors.accentGreen, blur: 10),
       ),
       child: _buildContent(Colors.white),
     );

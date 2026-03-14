@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/bluetooth_device.dart';
-import '../theme/app_theme.dart';
+import '../models/theme_colors.dart';
+import '../providers/theme_provider.dart';
 import 'cyber_button.dart';
 
 /// 蓝牙设备列表组件
@@ -18,32 +20,39 @@ class BluetoothDeviceList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 扫描状态进度条
-        _ScanProgressBar(isScanning: isScanning),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
 
-        const SizedBox(height: 16),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 扫描状态进度条
+            _ScanProgressBar(isScanning: isScanning, colors: colors),
 
-        // 设备列表或空状态
-        Expanded(
-          child: devices.isEmpty
-              ? _EmptyState(isScanning: isScanning)
-              : ListView.builder(
-                  itemCount: devices.length,
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: _DeviceListItem(
-                        device: devices[index],
-                        onConnect: () => onConnect(devices[index]),
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
+            const SizedBox(height: 16),
+
+            // 设备列表或空状态
+            Expanded(
+              child: devices.isEmpty
+                  ? _EmptyState(isScanning: isScanning, colors: colors)
+                  : ListView.builder(
+                      itemCount: devices.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _DeviceListItem(
+                            device: devices[index],
+                            onConnect: () => onConnect(devices[index]),
+                            colors: colors,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -51,8 +60,9 @@ class BluetoothDeviceList extends StatelessWidget {
 /// 扫描进度条
 class _ScanProgressBar extends StatefulWidget {
   final bool isScanning;
+  final ThemeColors colors;
 
-  const _ScanProgressBar({required this.isScanning});
+  const _ScanProgressBar({required this.isScanning, required this.colors});
 
   @override
   State<_ScanProgressBar> createState() => _ScanProgressBarState();
@@ -105,7 +115,7 @@ class _ScanProgressBarState extends State<_ScanProgressBar>
           height: 4,
           width: double.infinity,
           decoration: BoxDecoration(
-            color: AppTheme.surface,
+            color: widget.colors.surface,
             borderRadius: BorderRadius.circular(2),
           ),
           child: AnimatedBuilder(
@@ -125,12 +135,17 @@ class _ScanProgressBarState extends State<_ScanProgressBar>
                           gradient: LinearGradient(
                             colors: [
                               Colors.transparent,
-                              AppTheme.primary,
+                              widget.colors.primary,
                               Colors.transparent,
                             ],
                           ),
                           borderRadius: BorderRadius.circular(2),
-                          boxShadow: AppTheme.glowShadow(AppTheme.primary, blur: 10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: widget.colors.primary.withValues(alpha: 0.5),
+                              blurRadius: 10,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -143,8 +158,13 @@ class _ScanProgressBarState extends State<_ScanProgressBar>
                       child: Container(
                         width: 2,
                         decoration: BoxDecoration(
-                          color: AppTheme.primary,
-                          boxShadow: AppTheme.glowShadow(AppTheme.primary, blur: 8),
+                          color: widget.colors.primary,
+                          boxShadow: [
+                            BoxShadow(
+                              color: widget.colors.primary.withValues(alpha: 0.5),
+                              blurRadius: 8,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -161,8 +181,9 @@ class _ScanProgressBarState extends State<_ScanProgressBar>
 /// 空状态
 class _EmptyState extends StatelessWidget {
   final bool isScanning;
+  final ThemeColors colors;
 
-  const _EmptyState({required this.isScanning});
+  const _EmptyState({required this.isScanning, required this.colors});
 
   @override
   Widget build(BuildContext context) {
@@ -173,20 +194,22 @@ class _EmptyState extends StatelessWidget {
           Icon(
             isScanning ? Icons.bluetooth_searching : Icons.bluetooth_disabled,
             size: 48,
-            color: AppTheme.textMuted,
+            color: colors.textMuted,
           ),
           const SizedBox(height: 16),
           Text(
             isScanning ? '正在扫描设备...' : '未找到蓝牙设备',
-            style: AppTheme.labelMedium.copyWith(
-              color: AppTheme.textSecondary,
+            style: TextStyle(
+              color: colors.textSecondary,
+              fontSize: 12,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '请确保摩托车点火开关已打开',
-            style: AppTheme.labelSmall.copyWith(
-              color: AppTheme.textMuted,
+            style: TextStyle(
+              color: colors.textMuted,
+              fontSize: 10,
             ),
           ),
         ],
@@ -199,10 +222,12 @@ class _EmptyState extends StatelessWidget {
 class _DeviceListItem extends StatelessWidget {
   final BluetoothDeviceModel device;
   final VoidCallback onConnect;
+  final ThemeColors colors;
 
   const _DeviceListItem({
     required this.device,
     required this.onConnect,
+    required this.colors,
   });
 
   @override
@@ -213,12 +238,12 @@ class _DeviceListItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: isConnected ? AppTheme.primary10 : AppTheme.surface.withOpacity(0.5),
+        color: isConnected ? colors.primary.withValues(alpha: 0.1) : colors.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isConnected
-              ? AppTheme.primary.withOpacity(0.6)
-              : AppTheme.primary20,
+              ? colors.primary.withValues(alpha: 0.6)
+              : colors.primary.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -229,15 +254,15 @@ class _DeviceListItem extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: AppTheme.surface,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isConnected ? AppTheme.primary : AppTheme.primary20,
+                color: isConnected ? colors.primary : colors.primary.withValues(alpha: 0.2),
               ),
             ),
             child: Icon(
               Icons.bluetooth,
-              color: isConnected ? AppTheme.primary : AppTheme.textSecondary,
+              color: isConnected ? colors.primary : colors.textSecondary,
               size: 24,
             ),
           ),
@@ -251,15 +276,18 @@ class _DeviceListItem extends StatelessWidget {
               children: [
                 Text(
                   device.name,
-                  style: AppTheme.titleMedium.copyWith(
-                    color: isConnected ? AppTheme.primary : AppTheme.textPrimary,
+                  style: TextStyle(
+                    color: isConnected ? colors.primary : colors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   device.macAddress,
-                  style: AppTheme.labelSmall.copyWith(
-                    color: AppTheme.textMuted,
+                  style: TextStyle(
+                    color: colors.textMuted,
+                    fontSize: 10,
                     fontFamily: 'monospace',
                   ),
                 ),
@@ -268,13 +296,13 @@ class _DeviceListItem extends StatelessWidget {
           ),
 
           // 信号强度
-          _SignalStrengthIndicator(rssi: device.rssi),
+          _SignalStrengthIndicator(rssi: device.rssi, colors: colors),
 
           const SizedBox(width: 16),
 
           // 连接按钮
           if (isConnecting)
-            const SizedBox(
+            SizedBox(
               width: 80,
               height: 32,
               child: Center(
@@ -283,7 +311,7 @@ class _DeviceListItem extends StatelessWidget {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
                   ),
                 ),
               ),
@@ -315,8 +343,9 @@ class _DeviceListItem extends StatelessWidget {
 /// 信号强度指示器 (4格)
 class _SignalStrengthIndicator extends StatelessWidget {
   final int rssi;
+  final ThemeColors colors;
 
-  const _SignalStrengthIndicator({required this.rssi});
+  const _SignalStrengthIndicator({required this.rssi, required this.colors});
 
   @override
   Widget build(BuildContext context) {
@@ -348,7 +377,7 @@ class _SignalStrengthIndicator extends StatelessWidget {
               height: 6 + (index * 3).toDouble(),
               margin: const EdgeInsets.only(left: 2),
               decoration: BoxDecoration(
-                color: isActive ? AppTheme.primary : AppTheme.textMuted.withOpacity(0.3),
+                color: isActive ? colors.primary : colors.textMuted.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(1),
               ),
             );
@@ -357,8 +386,8 @@ class _SignalStrengthIndicator extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           '$rssi dBm',
-          style: AppTheme.labelSmall.copyWith(
-            color: AppTheme.textMuted,
+          style: TextStyle(
+            color: colors.textMuted,
             fontFamily: 'monospace',
             fontSize: 8,
           ),

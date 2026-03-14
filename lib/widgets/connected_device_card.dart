@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/bluetooth_device.dart';
+import '../models/theme_colors.dart';
+import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
-import 'cyber_button.dart';
 
 /// 已连接设备详情卡片
 class ConnectedDeviceCard extends StatelessWidget {
@@ -20,19 +22,27 @@ class ConnectedDeviceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (connectedDevice != null) {
-      return _ConnectedState(
-        device: connectedDevice!,
-        onDisconnect: onDisconnect,
-      );
-    } else if (lastConnectedDevice != null) {
-      return _LastConnectedState(
-        device: lastConnectedDevice!,
-        onClear: onClear,
-      );
-    } else {
-      return const _EmptyState();
-    }
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
+
+        if (connectedDevice != null) {
+          return _ConnectedState(
+            device: connectedDevice!,
+            onDisconnect: onDisconnect,
+            colors: colors,
+          );
+        } else if (lastConnectedDevice != null) {
+          return _LastConnectedState(
+            device: lastConnectedDevice!,
+            onClear: onClear,
+            colors: colors,
+          );
+        } else {
+          return _EmptyState(colors: colors);
+        }
+      },
+    );
   }
 }
 
@@ -40,10 +50,12 @@ class ConnectedDeviceCard extends StatelessWidget {
 class _ConnectedState extends StatelessWidget {
   final BluetoothDeviceModel device;
   final VoidCallback? onDisconnect;
+  final ThemeColors colors;
 
   const _ConnectedState({
     required this.device,
     this.onDisconnect,
+    required this.colors,
   });
 
   @override
@@ -55,13 +67,13 @@ class _ConnectedState extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppTheme.primary20,
-            AppTheme.primary10,
+            colors.primary.withValues(alpha: 0.2),
+            colors.primary.withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppTheme.primary.withOpacity(0.4),
+          color: colors.primary.withValues(alpha: 0.4),
           width: 1,
         ),
       ),
@@ -75,12 +87,12 @@ class _ConnectedState extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Connected Device',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: colors.textPrimary,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -91,16 +103,19 @@ class _ConnectedState extends StatelessWidget {
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: AppTheme.accentGreen,
+                          color: colors.accentGreen,
                           shape: BoxShape.circle,
-                          boxShadow: AppTheme.glowShadow(AppTheme.accentGreen, blur: 8),
+                          boxShadow: AppTheme.glowShadow(colors.accentGreen, blur: 8),
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
                         'SYNC ESTABLISHED',
-                        style: AppTheme.labelTinyPrimary.copyWith(
-                          color: AppTheme.accentGreen,
+                        style: TextStyle(
+                          color: colors.accentGreen,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 1,
                         ),
                       ),
                     ],
@@ -109,9 +124,9 @@ class _ConnectedState extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onDisconnect,
-                icon: const Icon(
+                icon: Icon(
                   Icons.link_off,
-                  color: AppTheme.textMuted,
+                  color: colors.textMuted,
                 ),
                 tooltip: '断开连接',
               ),
@@ -124,10 +139,10 @@ class _ConnectedState extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.backgroundDark.withOpacity(0.6),
+              color: colors.backgroundDark.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: AppTheme.primary20,
+                color: colors.primary.withValues(alpha: 0.2),
               ),
             ),
             child: Row(
@@ -136,13 +151,13 @@ class _ConnectedState extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: AppTheme.primary20,
+                    color: colors.primary.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
-                    boxShadow: AppTheme.glowShadow(AppTheme.primary, blur: 15, opacity: 0.3),
+                    boxShadow: AppTheme.glowShadow(colors.primary, blur: 15, opacity: 0.3),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.memory,
-                    color: AppTheme.primary,
+                    color: colors.primary,
                     size: 28,
                   ),
                 ),
@@ -153,16 +168,17 @@ class _ConnectedState extends StatelessWidget {
                     children: [
                       Text(
                         'Model',
-                        style: AppTheme.labelSmall.copyWith(
-                          color: AppTheme.textMuted,
+                        style: TextStyle(
+                          color: colors.textMuted,
+                          fontSize: 10,
                         ),
                       ),
                       Text(
                         device.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
+                          color: colors.textPrimary,
                         ),
                       ),
                     ],
@@ -182,6 +198,7 @@ class _ConnectedState extends StatelessWidget {
                   label: 'MAC Address',
                   value: device.macAddress,
                   isPrimary: true,
+                  colors: colors,
                 ),
               ),
               const SizedBox(width: 12),
@@ -190,6 +207,7 @@ class _ConnectedState extends StatelessWidget {
                   label: 'Protocol',
                   value: 'ISO 15765-4 CAN',
                   isPrimary: true,
+                  colors: colors,
                 ),
               ),
             ],
@@ -198,7 +216,7 @@ class _ConnectedState extends StatelessWidget {
           const SizedBox(height: 12),
 
           // 连接稳定性
-          _StabilityIndicator(stability: device.connectionStability),
+          _StabilityIndicator(stability: device.connectionStability, colors: colors),
         ],
       ),
     );
@@ -209,10 +227,12 @@ class _ConnectedState extends StatelessWidget {
 class _LastConnectedState extends StatelessWidget {
   final BluetoothDeviceModel device;
   final VoidCallback? onClear;
+  final ThemeColors colors;
 
   const _LastConnectedState({
     required this.device,
     this.onClear,
+    required this.colors,
   });
 
   @override
@@ -220,10 +240,10 @@ class _LastConnectedState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.5),
+        color: colors.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppTheme.primary20,
+          color: colors.primary.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -236,20 +256,21 @@ class _LastConnectedState extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Last Connected',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: colors.textPrimary,
                       letterSpacing: 1,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Tap to reconnect',
-                    style: AppTheme.labelSmall.copyWith(
-                      color: AppTheme.textMuted,
+                    style: TextStyle(
+                      color: colors.textMuted,
+                      fontSize: 10,
                     ),
                   ),
                 ],
@@ -260,11 +281,11 @@ class _LastConnectedState extends StatelessWidget {
                   if (onClear != null)
                     GestureDetector(
                       onTap: onClear,
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
                         child: Icon(
                           Icons.delete_outline,
-                          color: AppTheme.textMuted,
+                          color: colors.textMuted,
                           size: 22,
                         ),
                       ),
@@ -280,10 +301,10 @@ class _LastConnectedState extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.backgroundDark.withOpacity(0.6),
+              color: colors.backgroundDark.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: AppTheme.primary20,
+                color: colors.primary.withValues(alpha: 0.2),
               ),
             ),
             child: Row(
@@ -292,15 +313,15 @@ class _LastConnectedState extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    color: colors.surface,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: AppTheme.primary20,
+                      color: colors.primary.withValues(alpha: 0.2),
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.bluetooth_disabled,
-                    color: AppTheme.textMuted,
+                    color: colors.textMuted,
                     size: 28,
                   ),
                 ),
@@ -311,16 +332,17 @@ class _LastConnectedState extends StatelessWidget {
                     children: [
                       Text(
                         'Model',
-                        style: AppTheme.labelSmall.copyWith(
-                          color: AppTheme.textMuted,
+                        style: TextStyle(
+                          color: colors.textMuted,
+                          fontSize: 10,
                         ),
                       ),
                       Text(
                         device.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
+                          color: colors.textPrimary,
                         ),
                       ),
                     ],
@@ -337,6 +359,7 @@ class _LastConnectedState extends StatelessWidget {
             label: 'MAC Address',
             value: device.macAddress,
             isPrimary: false,
+            colors: colors,
           ),
         ],
       ),
@@ -346,39 +369,44 @@ class _LastConnectedState extends StatelessWidget {
 
 /// 空状态
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final ThemeColors colors;
+
+  const _EmptyState({required this.colors});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.3),
+        color: colors.surface.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppTheme.primary20,
+          color: colors.primary.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.bluetooth_searching,
             size: 48,
-            color: AppTheme.textMuted,
+            color: colors.textMuted,
           ),
           const SizedBox(height: 6),
           Text(
             'No Device Connected',
-            style: AppTheme.titleMedium.copyWith(
-              color: AppTheme.textSecondary,
+            style: TextStyle(
+              color: colors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Scan and connect to an OBD device',
-            style: AppTheme.labelSmall.copyWith(
-              color: AppTheme.textMuted,
+            style: TextStyle(
+              color: colors.textMuted,
+              fontSize: 10,
             ),
             textAlign: TextAlign.center,
           ),
@@ -393,11 +421,13 @@ class _InfoBox extends StatelessWidget {
   final String label;
   final String value;
   final bool isPrimary;
+  final ThemeColors colors;
 
   const _InfoBox({
     required this.label,
     required this.value,
     required this.isPrimary,
+    required this.colors,
   });
 
   @override
@@ -405,10 +435,10 @@ class _InfoBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundDark.withOpacity(0.6),
+        color: colors.backgroundDark.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isPrimary ? AppTheme.primary20 : AppTheme.primary10,
+          color: isPrimary ? colors.primary.withValues(alpha: 0.2) : colors.primary.withValues(alpha: 0.1),
         ),
       ),
       child: Column(
@@ -416,8 +446,9 @@ class _InfoBox extends StatelessWidget {
         children: [
           Text(
             label.toUpperCase(),
-            style: AppTheme.labelSmall.copyWith(
-              color: AppTheme.textMuted,
+            style: TextStyle(
+              color: colors.textMuted,
+              fontSize: 10,
               letterSpacing: 1,
             ),
           ),
@@ -427,7 +458,7 @@ class _InfoBox extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontFamily: 'monospace',
-              color: isPrimary ? AppTheme.primary : AppTheme.textSecondary,
+              color: isPrimary ? colors.primary : colors.textSecondary,
             ),
           ),
         ],
@@ -439,17 +470,18 @@ class _InfoBox extends StatelessWidget {
 /// 连接稳定性指示器
 class _StabilityIndicator extends StatelessWidget {
   final double stability;
+  final ThemeColors colors;
 
-  const _StabilityIndicator({required this.stability});
+  const _StabilityIndicator({required this.stability, required this.colors});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundDark.withOpacity(0.6),
+        color: colors.backgroundDark.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.primary10),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
@@ -458,15 +490,17 @@ class _StabilityIndicator extends StatelessWidget {
             children: [
               Text(
                 'CONNECTION STABILITY',
-                style: AppTheme.labelSmall.copyWith(
-                  color: AppTheme.textMuted,
+                style: TextStyle(
+                  color: colors.textMuted,
+                  fontSize: 10,
                   letterSpacing: 1,
                 ),
               ),
               Text(
                 '${stability.toStringAsFixed(1)}% Reliable',
-                style: AppTheme.labelSmall.copyWith(
-                  color: AppTheme.primary,
+                style: TextStyle(
+                  color: colors.primary,
+                  fontSize: 10,
                   fontFamily: 'monospace',
                 ),
               ),
@@ -483,7 +517,7 @@ class _StabilityIndicator extends StatelessWidget {
                   child: Container(
                     margin: EdgeInsets.only(right: index < 6 ? 2 : 0),
                     decoration: BoxDecoration(
-                      color: isActive ? AppTheme.primary : AppTheme.primary30,
+                      color: isActive ? colors.primary : colors.primary.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),

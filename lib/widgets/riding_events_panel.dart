@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/riding_event.dart';
+import '../models/theme_colors.dart';
 import '../providers/riding_stats_provider.dart';
-import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 import 'cyber_dialog.dart';
 
 /// 骑行事件面板
@@ -11,45 +12,68 @@ class RidingEventsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<RidingStatsProvider>(
-      builder: (context, provider, child) {
-        final events = provider.eventHistory;
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
 
-        return Container(
-          padding: const EdgeInsets.all(8),
-          decoration: AppTheme.surfaceBorder(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 标题
-              const Text('骑行事件', style: AppTheme.labelTinyPrimary),
+        return Consumer<RidingStatsProvider>(
+          builder: (context, provider, child) {
+            final events = provider.eventHistory;
 
-              const SizedBox(height: 6),
-
-              // 事件列表
-              Expanded(
-                child: events.isEmpty
-                    ? const Center(
-                        child: Text(
-                          '暂无事件',
-                          style: TextStyle(color: AppTheme.textMuted, fontSize: 10),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: EdgeInsets.zero,
-                        itemCount: events.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 4),
-                        itemBuilder: (context, index) {
-                          final event = events[index];
-                          return _EventItem(
-                            key: ValueKey(event.timestamp),
-                            event: event,
-                          );
-                        },
-                      ),
+            return Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: colors.primary.withValues(alpha: 0.3),
+                ),
               ),
-            ],
-          ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 标题
+                  Text(
+                    '骑行事件',
+                    style: TextStyle(
+                      color: colors.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  // 事件列表
+                  Expanded(
+                    child: events.isEmpty
+                        ? Center(
+                            child: Text(
+                              '暂无事件',
+                              style: TextStyle(
+                                color: colors.textMuted,
+                                fontSize: 10,
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: EdgeInsets.zero,
+                            itemCount: events.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 4),
+                            itemBuilder: (context, index) {
+                              final event = events[index];
+                              return _EventItem(
+                                key: ValueKey(event.timestamp),
+                                event: event,
+                                colors: colors,
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -58,27 +82,28 @@ class RidingEventsPanel extends StatelessWidget {
 
 class _EventItem extends StatelessWidget {
   final RidingEvent event;
+  final ThemeColors colors;
 
-  const _EventItem({required this.event, super.key});
+  const _EventItem({required this.event, required this.colors, super.key});
 
   Color get _color {
     switch (event.type) {
       case RidingEventType.performanceBurst:
-        return AppTheme.accentRed;
+        return colors.accentRed;
       case RidingEventType.efficientCruising:
-        return AppTheme.accentGreen;
+        return colors.accentGreen;
       case RidingEventType.engineOverheating:
-        return AppTheme.accentRed;
+        return colors.accentRed;
       case RidingEventType.voltageAnomaly:
         return Colors.amber;
       case RidingEventType.longRiding:
-        return AppTheme.primary;
+        return colors.primary;
       case RidingEventType.highEngineLoad:
         return Colors.orange;
       case RidingEventType.engineWarmup:
         return Colors.amber;
       case RidingEventType.coldEnvironmentRisk:
-        return AppTheme.accentCyan;
+        return colors.accentCyan;
       case RidingEventType.extremeLean:
         return Colors.purple;
     }
@@ -129,8 +154,11 @@ class _EventItem extends StatelessWidget {
               value: '${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}:${event.timestamp.second.toString().padLeft(2, '0')}',
             ),
             if (event.additionalData.isNotEmpty) ...[
-              const Divider(color: AppTheme.textMuted),
-              const Text('扩展信息', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+              Divider(color: colors.textMuted),
+              Text(
+                '扩展信息',
+                style: TextStyle(color: colors.textMuted, fontSize: 12),
+              ),
               const SizedBox(height: 4),
               ...event.additionalData.entries.map(
                 (e) => _DetailRow(label: e.key, value: e.value.toString()),
@@ -149,7 +177,7 @@ class _EventItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: _color.withOpacity(0.08),
+          color: _color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(6),
           border: Border(
             left: BorderSide(color: _color, width: 3),
@@ -165,12 +193,19 @@ class _EventItem extends StatelessWidget {
                 children: [
                   Text(
                     event.title,
-                    style: AppTheme.labelTiny.copyWith(color: _color),
+                    style: TextStyle(
+                      color: _color,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}',
-                    style: AppTheme.valueSmall.copyWith(fontSize: 9),
+                    style: TextStyle(
+                      color: colors.textSecondary,
+                      fontSize: 9,
+                    ),
                   ),
                 ],
               ),
@@ -199,7 +234,10 @@ class _DetailRow extends StatelessWidget {
             width: 80,
             child: Text(
               label,
-              style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+              ),
             ),
           ),
           Expanded(

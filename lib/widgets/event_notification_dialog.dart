@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/riding_event.dart';
-import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 
 /// 骑行事件通知弹窗
 /// 带抖动动画显示
@@ -23,7 +24,7 @@ class EventNotificationDialog extends StatefulWidget {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.7),
+      barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (context) => EventNotificationDialog(
         event: event,
       ),
@@ -89,26 +90,26 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
   }
 
   /// 获取事件对应的颜色
-  Color _getEventColor() {
+  Color _getEventColor(colors) {
     switch (widget.event.type) {
       case RidingEventType.performanceBurst:
-        return AppTheme.accentOrange;
+        return colors.accentOrange;
       case RidingEventType.efficientCruising:
-        return AppTheme.accentGreen;
+        return colors.accentGreen;
       case RidingEventType.engineOverheating:
-        return AppTheme.accentRed;
+        return colors.accentRed;
       case RidingEventType.voltageAnomaly:
-        return AppTheme.accentOrange;
+        return colors.accentOrange;
       case RidingEventType.longRiding:
-        return AppTheme.primary;
+        return colors.primary;
       case RidingEventType.highEngineLoad:
-        return AppTheme.accentOrange;
+        return colors.accentOrange;
       case RidingEventType.engineWarmup:
-        return AppTheme.accentCyan;
+        return colors.accentCyan;
       case RidingEventType.coldEnvironmentRisk:
-        return AppTheme.accentCyan;
+        return colors.accentCyan;
       case RidingEventType.extremeLean:
-        return AppTheme.accentRed;
+        return colors.accentRed;
     }
   }
 
@@ -157,7 +158,7 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
         return Text(
           '${entry.key}: $value',
           style: TextStyle(
-            color: eventColor.withOpacity(0.8),
+            color: eventColor.withValues(alpha: 0.8),
             fontSize: 10,
           ),
         );
@@ -167,87 +168,92 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
 
   @override
   Widget build(BuildContext context) {
-    final eventColor = _getEventColor();
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
+        final eventColor = _getEventColor(colors);
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: AnimatedBuilder(
-        animation: _animController,
-        builder: (context, child) {
-          // 霓虹闪烁：边框颜色在 0.3-1.0 透明度之间变化
-          final neonOpacity = _neonAnimation.value;
-          final neonColor = eventColor.withOpacity(neonOpacity);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: AnimatedBuilder(
+            animation: _animController,
+            builder: (context, child) {
+              // 霓虹闪烁：边框颜色在 0.3-1.0 透明度之间变化
+              final neonOpacity = _neonAnimation.value;
+              final neonColor = eventColor.withValues(alpha: neonOpacity);
 
-          return Container(
-            width: 320,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: neonColor,
-                width: 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: eventColor.withOpacity(neonOpacity * 0.5),
-                  blurRadius: 20 * neonOpacity,
-                  spreadRadius: 0,
+              return Container(
+                width: 320,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: neonColor,
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: eventColor.withValues(alpha: neonOpacity * 0.5),
+                      blurRadius: 20 * neonOpacity,
+                      spreadRadius: 0,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 标题行
-                  Row(
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: eventColor.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _getEventIcon(),
-                          color: eventColor,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          widget.event.title,
-                          style: TextStyle(
-                            color: eventColor,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
+                      // 标题行
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: eventColor.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              _getEventIcon(),
+                              color: eventColor,
+                              size: 20,
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              widget.event.title,
+                              style: TextStyle(
+                                color: eventColor,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 10),
+                      // 事件描述
+                      Text(
+                        widget.event.description,
+                        style: TextStyle(
+                          color: colors.textSecondary,
+                          fontSize: 11,
+                          height: 1.4,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 10),
+                      // 扩展信息显示
+                      _buildAdditionalInfo(eventColor),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  // 事件描述
-                  Text(
-                    widget.event.description,
-                    style: const TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 11,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 10),
-                  // 扩展信息显示
-                  _buildAdditionalInfo(eventColor),
-                ],
-              ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

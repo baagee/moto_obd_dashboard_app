@@ -1,8 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/theme_colors.dart';
 import '../providers/obd_data_provider.dart';
-import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 
 /// 组合仪表盘卡片（转速+时速）
 class CombinedGaugeCard extends StatelessWidget {
@@ -10,25 +11,32 @@ class CombinedGaugeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<OBDDataProvider>(
-      builder: (context, provider, child) {
-        final data = provider.data;
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
 
-        return Container(
-          padding: const EdgeInsets.all(8),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // 占满整个可用空间
-              return CustomPaint(
-                size: Size(constraints.maxWidth, constraints.maxHeight),
-                painter: CombinedGaugePainter(
-                  rpm: data.rpm,
-                  speed: data.speed,
-                  gear: 0,// 获取不到档位，设置为0
-                ),
-              );
-            },
-          ),
+        return Consumer<OBDDataProvider>(
+          builder: (context, provider, child) {
+            final data = provider.data;
+
+            return Container(
+              padding: const EdgeInsets.all(8),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // 占满整个可用空间
+                  return CustomPaint(
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    painter: CombinedGaugePainter(
+                      rpm: data.rpm,
+                      speed: data.speed,
+                      gear: 0, // 获取不到档位，设置为0
+                      colors: colors,
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         );
       },
     );
@@ -40,6 +48,7 @@ class CombinedGaugePainter extends CustomPainter {
   final int rpm;
   final int speed;
   final int gear;
+  final ThemeColors colors;
 
   // RPM 参数
   static const int maxRpm = 12000;
@@ -83,6 +92,7 @@ class CombinedGaugePainter extends CustomPainter {
     required this.rpm,
     required this.speed,
     required this.gear,
+    required this.colors,
   });
 
   @override
@@ -158,14 +168,14 @@ class CombinedGaugePainter extends CustomPainter {
   void _drawRPMProgress(Canvas canvas, Offset center, double radius) {
     final sweepAngle = _rpmToAngle(rpm.toDouble());
 
-    // 阶段颜色 - 使用 AppTheme 颜色
+    // 阶段颜色 - 使用动态主题颜色
     Color color;
     if (rpm <= warnRpm) {
-      color = AppTheme.primary; // 蓝色
+      color = colors.primary; // 蓝色
     } else if (rpm <= dangerRpm) {
-      color = AppTheme.accentCyan; // 青色
+      color = colors.accentCyan; // 青色
     } else {
-      color = const Color(0xFFF44336); // 红色
+      color = colors.accentRed; // 红色
     }
 
     final paint = Paint()
@@ -202,14 +212,14 @@ class CombinedGaugePainter extends CustomPainter {
   void _drawSpeedProgress(Canvas canvas, Offset center, double radius) {
     final sweepAngle = _speedToAngle(speed.toDouble());
 
-    // 阶段颜色 - 使用 AppTheme 颜色
+    // 阶段颜色 - 使用动态主题颜色
     Color color;
     if (speed <= warnSpeed) {
-      color = AppTheme.accentCyan; // 青色
+      color = colors.accentCyan; // 青色
     } else if (speed <= dangerSpeed) {
-      color = AppTheme.primary; // 蓝色
+      color = colors.primary; // 蓝色
     } else {
-      color = const Color(0xFFF44336); // 红色
+      color = colors.accentRed; // 红色
     }
 
     final paint = Paint()
@@ -373,12 +383,12 @@ class CombinedGaugePainter extends CustomPainter {
 
   void _drawTicks(Canvas canvas, Offset center, double radius) {
     final tickPaint = Paint()
-      ..color = AppTheme.accentCyan
+      ..color = colors.accentCyan
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4;  // 加粗 (原3)
 
     final textStyle = TextStyle(
-      color: AppTheme.textMuted,
+      color: colors.textMuted,
       fontSize: radius * 0.07,
       fontWeight: FontWeight.w500,
     );
@@ -450,7 +460,7 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 细粒度刻度 (RPM) - 只在常用区域0-8000显示，每1000一个
     final fineTickPaint = Paint()
-      ..color = AppTheme.primary60
+      ..color = colors.primary.withValues(alpha: 0.6)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
 
@@ -534,7 +544,7 @@ class CombinedGaugePainter extends CustomPainter {
       // text: rpm >= 1000 ? '${(rpm / 1000).toStringAsFixed(1)}k' : rpm.toString(),
       text: rpm.toString(),
       style: TextStyle(
-        color: AppTheme.primary,
+        color: colors.primary,
         fontSize: fontSize,
         fontWeight: FontWeight.bold,
         letterSpacing: -1,
@@ -554,7 +564,7 @@ class CombinedGaugePainter extends CustomPainter {
     final rpmUnitSpan = TextSpan(
       text: 'RPM',
       style: TextStyle(
-        color: AppTheme.primary60,
+        color: colors.primary.withValues(alpha: 0.6),
         fontSize: fontSize * 0.33,
         fontWeight: FontWeight.w500,
       ),
@@ -583,7 +593,7 @@ class CombinedGaugePainter extends CustomPainter {
     final speedTextSpan = TextSpan(
       text: '$speed',
       style: TextStyle(
-        color: AppTheme.accentCyan,
+        color: colors.accentCyan,
         fontSize: fontSize,
         fontWeight: FontWeight.bold,
         letterSpacing: -1,
@@ -603,7 +613,7 @@ class CombinedGaugePainter extends CustomPainter {
     final speedUnitSpan = TextSpan(
       text: 'km/h',
       style: TextStyle(
-        color: AppTheme.accentCyan.withValues(alpha: 0.7),
+        color: colors.accentCyan.withValues(alpha: 0.7),
         fontSize: fontSize * 0.33,
         fontWeight: FontWeight.w500,
       ),
@@ -622,6 +632,7 @@ class CombinedGaugePainter extends CustomPainter {
   bool shouldRepaint(covariant CombinedGaugePainter oldDelegate) {
     return oldDelegate.rpm != rpm ||
         oldDelegate.speed != speed ||
-        oldDelegate.gear != gear;
+        oldDelegate.gear != gear ||
+        oldDelegate.colors != colors;
   }
 }

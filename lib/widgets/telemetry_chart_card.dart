@@ -1,8 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/theme_colors.dart';
 import '../providers/obd_data_provider.dart';
-import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 
 /// 实时遥测图表卡片
 class TelemetryChartCard extends StatelessWidget {
@@ -10,67 +11,81 @@ class TelemetryChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<OBDDataProvider>(
-      builder: (context, provider, child) {
-        final data = provider.data;
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
 
-        return Container(
-          padding: const EdgeInsets.all(9),
-          decoration: BoxDecoration(
-            color: AppTheme.surface40,
-            border: Border.all(color: AppTheme.primary10),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 标题行
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return Consumer<OBDDataProvider>(
+          builder: (context, provider, child) {
+            final data = provider.data;
+
+            return Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: colors.surface.withValues(alpha: 0.4),
+                border: Border.all(color: colors.primary.withValues(alpha: 0.1)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('近期趋势', style: AppTheme.labelTinyPrimary),
+                  // 标题行
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const _LegendDot(color: AppTheme.primary, label: '转速'),
-                      const SizedBox(width: 10),
-                      const _LegendDot(color: AppTheme.accentCyan, label: '速度 (km/h)'),
+                      Text(
+                        '近期趋势',
+                        style: TextStyle(
+                          color: colors.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          _LegendDot(color: colors.primary, label: '转速'),
+                          const SizedBox(width: 10),
+                          _LegendDot(color: colors.accentCyan, label: '速度 (km/h)'),
+                        ],
+                      ),
                     ],
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  // 图表区域（带左右Y轴）
+                  Expanded(
+                    child: Row(
+                      children: [
+                        // 左侧Y轴（转速）
+                        _YAxisLabels(
+                          labels: ['12k', '9k', '6k', '3k', '0'],
+                          color: colors.primary,
+                          isLeft: true,
+                        ),
+
+                        // 中间图表 - 使用 RepaintBoundary 隔离重绘
+                        Expanded(
+                          child: _ChartArea(
+                            rpmHistory: data.rpmHistory,
+                            velocityHistory: data.velocityHistory,
+                            colors: colors,
+                          ),
+                        ),
+
+                        // 右侧Y轴（时速）
+                        _YAxisLabels(
+                          labels: ['250', '187', '125', '62', '0'],
+                          color: colors.accentCyan,
+                          isLeft: false,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-
-              const SizedBox(height: 6),
-
-              // 图表区域（带左右Y轴）
-              Expanded(
-                child: Row(
-                  children: [
-                    // 左侧Y轴（转速）
-                    const _YAxisLabels(
-                      labels: ['12k', '9k', '6k', '3k', '0'],
-                      color: AppTheme.primary,
-                      isLeft: true,
-                    ),
-
-                    // 中间图表 - 使用 RepaintBoundary 隔离重绘
-                    Expanded(
-                      child: _ChartArea(
-                        rpmHistory: data.rpmHistory,
-                        velocityHistory: data.velocityHistory,
-                      ),
-                    ),
-
-                    // 右侧Y轴（时速）
-                    const _YAxisLabels(
-                      labels: ['250', '187', '125', '62', '0'],
-                      color: AppTheme.accentCyan,
-                      isLeft: false,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -96,7 +111,14 @@ class _LegendDot extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Text(label.toUpperCase(), style: AppTheme.labelTiny),
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: color,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }
@@ -122,7 +144,11 @@ class _YAxisLabels extends StatelessWidget {
         children: labels.map((label) {
           return Text(
             label,
-            style: AppTheme.labelTiny.copyWith(color: color),
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
             textAlign: isLeft ? TextAlign.right : TextAlign.left,
           );
         }).toList(),
@@ -135,10 +161,12 @@ class _YAxisLabels extends StatelessWidget {
 class _ChartArea extends StatelessWidget {
   final List<int> rpmHistory;
   final List<int> velocityHistory;
+  final ThemeColors colors;
 
   const _ChartArea({
     required this.rpmHistory,
     required this.velocityHistory,
+    required this.colors,
   });
 
   @override
@@ -149,6 +177,7 @@ class _ChartArea extends StatelessWidget {
         painter: TelemetryChartPainter(
           rpmHistory: rpmHistory,
           velocityHistory: velocityHistory,
+          colors: colors,
         ),
       ),
     );
@@ -159,10 +188,12 @@ class _ChartArea extends StatelessWidget {
 class TelemetryChartPainter extends CustomPainter {
   final List<int> rpmHistory;
   final List<int> velocityHistory;
+  final ThemeColors colors;
 
   TelemetryChartPainter({
     required this.rpmHistory,
     required this.velocityHistory,
+    required this.colors,
   });
 
   @override
@@ -183,7 +214,7 @@ class TelemetryChartPainter extends CustomPainter {
         padding,
         rpmHistory,
         12000,
-        AppTheme.primary,
+        colors.primary,
       );
     }
 
@@ -196,14 +227,14 @@ class TelemetryChartPainter extends CustomPainter {
         padding,
         velocityHistory,
         250,
-        AppTheme.accentCyan,
+        colors.accentCyan,
       );
     }
   }
 
   void _drawGridLines(Canvas canvas, double width, double height) {
     final gridPaint = Paint()
-      ..color = AppTheme.primary10
+      ..color = colors.primary.withValues(alpha: 0.1)
       ..strokeWidth = 1;
 
     // 水平网格线
@@ -248,8 +279,8 @@ class TelemetryChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          color.withOpacity(0.2),
-          color.withOpacity(0),
+          color.withValues(alpha: 0.2),
+          color.withValues(alpha: 0),
         ],
       ).createShader(Rect.fromLTWH(0, 0, width, height));
 
