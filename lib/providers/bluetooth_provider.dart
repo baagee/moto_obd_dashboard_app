@@ -531,9 +531,10 @@ class BluetoothProvider extends ChangeNotifier {
         await _startObdSession(device, index);
         break;
       case fb.BluetoothConnectionState.disconnected:
-        _logCallback.call('Bluetooth', LogType.warning, '设备已断开: ${device.name}');
-        _cleanupConnection(caller: "_handleConnectionStateChanged.disconnected");
         _logCallback.call('Bluetooth', LogType.warning, 'disconnected callback ${device.name}');
+        if (isDeviceConnected) {
+          _cleanupConnection(caller: "_handleConnectionStateChanged.disconnected");
+        }
         break;
       default:
         break;
