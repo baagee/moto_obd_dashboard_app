@@ -99,8 +99,72 @@ void main() {
   );
 }
 
-class OBDDashboardApp extends StatelessWidget {
+class OBDDashboardApp extends StatefulWidget {
   const OBDDashboardApp({super.key});
+
+  @override
+  State<OBDDashboardApp> createState() => _OBDDashboardAppState();
+}
+
+class _OBDDashboardAppState extends State<OBDDashboardApp> {
+  ThemeProvider? _themeProvider;
+  bool _hasInitializedStatusBar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 延迟初始化状态栏同步，确保 ThemeProvider 已初始化
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeStatusBar();
+    });
+  }
+
+  void _initializeStatusBar() {
+    final themeProvider = context.read<ThemeProvider>();
+    _themeProvider = themeProvider;
+
+    // 初始设置状态栏
+    _updateStatusBar();
+
+    // 监听主题变化
+    themeProvider.addListener(_onThemeChanged);
+    _hasInitializedStatusBar = true;
+  }
+
+  void _onThemeChanged() {
+    _updateStatusBar();
+  }
+
+  void _updateStatusBar() {
+    final themeProvider = _themeProvider;
+    if (themeProvider == null) return;
+
+    final isDark = themeProvider.isDarkMode;
+
+    // 根据主题设置状态栏亮度
+    // 深色主题：状态栏使用深色背景 + 浅色图标
+    // 浅色主题：状态栏使用浅色背景 + 深色图标
+    SystemChrome.setSystemUIOverlayStyle(
+      isDark
+          ? SystemUiOverlayStyle(
+              statusBarBrightness: Brightness.dark,
+              statusBarIconBrightness: Brightness.light,
+            )
+          : SystemUiOverlayStyle(
+              statusBarBrightness: Brightness.light,
+              statusBarIconBrightness: Brightness.dark,
+            ),
+    );
+  }
+
+  @override
+  void dispose() {
+    // 清理监听器，防止内存泄漏
+    if (_hasInitializedStatusBar) {
+      _themeProvider?.removeListener(_onThemeChanged);
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +172,13 @@ class OBDDashboardApp extends StatelessWidget {
       builder: (context, themeProvider, _) {
         final colors = themeProvider.currentColors;
         final isDark = themeProvider.isDarkMode;
+
+        // 首次渲染时设置状态栏
+        if (!_hasInitializedStatusBar && themeProvider.isInitialized) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _initializeStatusBar();
+          });
+        }
 
         return MaterialApp(
           title: 'CYBER-CYCLE OBD',
