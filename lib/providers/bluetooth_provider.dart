@@ -41,9 +41,6 @@ class BluetoothProvider extends ChangeNotifier {
   Timer? _scanTimer;
   Timer? _rssiMonitorTimer;
 
-  // 用户是否正在主动断开连接（避免在 disconnectDevice 中重复触发清理）
-  // bool _isManuallyDisconnecting = false;
-
   // 日志回调
   late final void Function(String source, LogType type, String message) _logCallback;
 
@@ -51,13 +48,10 @@ class BluetoothProvider extends ChangeNotifier {
   static const int minRssi = -90; // 过滤弱信号设备
 
   // Getter
-  app_bluetooth.BluetoothPermissionStatus get permissionStatus => _permissionStatus;
   bool get isBluetoothOn => _isBluetoothOn;
-  bool get isInitialized => _isInitialized;
   bool get hasPermission => _permissionStatus == app_bluetooth.BluetoothPermissionStatus.granted;
   bool get isDeviceConnected => _connectedDevice != null;
   bool get isScanning => _isScanning;
-  // bool get hasScanned => _hasScanned;
   List<BluetoothDeviceModel> get scannedDevices => _scannedDevices;
   BluetoothDeviceModel? get connectedDevice => _connectedDevice;
   BluetoothDeviceModel? get lastConnectedDevice => _lastConnectedDevice;
@@ -426,16 +420,17 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 连接蓝牙设备
   Future<void> _connectBluetoothDevice(BluetoothDeviceModel device) async {
-    // 监听连接状态变化
     _connectionSubscription?.cancel();
-    _connectionSubscription = device.flutterDevice!.connectionState.listen((state) {
-      _handleConnectionStateChanged(state, device);
-    });
+    _connectionSubscription = null;
 
     await device.flutterDevice!.connect(
       timeout: BluetoothConstants.connectionTimeout,
       autoConnect: true,
     );
+    // todo 换下 监听位置
+    _connectionSubscription = device.flutterDevice!.connectionState.listen((state) {
+      _handleConnectionStateChanged(state, device);
+    });
   }
 
   /// 发现服务并匹配特征
@@ -482,7 +477,7 @@ class BluetoothProvider extends ChangeNotifier {
     }
 
     // 调用清理方法，确保资源完全释放
-    _cleanupConnection(shouldReconnect: false);
+    _cleanupConnection(caller: "_handleConnectionError");
   }
 
   Future<bool> _trySmartMatching(List<fb.BluetoothCharacteristic> characteristics) async {
@@ -536,9 +531,9 @@ class BluetoothProvider extends ChangeNotifier {
         await _startObdSession(device, index);
         break;
       case fb.BluetoothConnectionState.disconnected:
-        _logCallback?.call('Bluetooth', LogType.warning, '设备已断开: ${device.name}');
-        _cleanupConnection(shouldReconnect: true);
-        _logCallback?.call('Bluetooth', LogType.warning, 'disconnected callback ${device.name}');
+        _logCallback.call('Bluetooth', LogType.warning, '设备已断开: ${device.name}');
+        _cleanupConnection(caller: "_handleConnectionStateChanged.disconnected");
+        _logCallback.call('Bluetooth', LogType.warning, 'disconnected callback ${device.name}');
         break;
       default:
         break;
@@ -548,7 +543,7 @@ class BluetoothProvider extends ChangeNotifier {
   /// 清理连接资源（供内部使用）
   ///
   /// [shouldReconnect] - 清理后是否尝试自动重连
-  void _cleanupConnection({required bool shouldReconnect}) {
+  void _cleanupConnection({required String caller}) {
     // 停止 OBD 轮询
     _obdService?.stopPolling();
 
@@ -574,7 +569,7 @@ class BluetoothProvider extends ChangeNotifier {
       _scannedDevices[i] = _scannedDevices[i].copyWith(
         status: DeviceConnectionStatus.disconnected,);
     }
-    _logCallback?.call('Bluetooth', LogType.warning, '所有设备重置为未连接end');
+    _logCallback.call('Bluetooth', LogType.warning, '_cleanupConnection caller:$caller');
 
     // 重置状态
     _connectedDevice = null;
@@ -584,13 +579,6 @@ class BluetoothProvider extends ChangeNotifier {
     _obdDataProvider.resetData();
 
     notifyListeners();
-
-    // 如果是异常断开且不是自动重连中，尝试自动重连
-    // 只有在非主动断开 且 之前已连接 且 有之前设备 时才重连
-    // if (shouldReconnect && wasConnected && previousDevice != null && !_isAutoReconnecting) {
-    //   _logCallback?.call('Bluetooth', LogType.warning, '检测到异常断开，尝试自动重连...');
-    //   _attemptReconnect(previousDevice);
-    // }
   }
 
   /// 内部断开连接（不设置用户主动断开标志）
@@ -602,7 +590,7 @@ class BluetoothProvider extends ChangeNotifier {
     _logCallback?.call('Bluetooth', LogType.info, '正在断开旧设备: $deviceName...');
 
     // 使用 shouldReconnect = false 进行清理
-    _cleanupConnection(shouldReconnect: false);
+    _cleanupConnection(caller: "_disconnectInternal");
 
     // 断开蓝牙设备
     if (deviceToDisconnect?.flutterDevice != null) {
@@ -621,12 +609,6 @@ class BluetoothProvider extends ChangeNotifier {
     final deviceName = deviceToDisconnect?.name ?? 'Unknown';
 
     _logCallback?.call('Bluetooth', LogType.info, '开始断开连接...');
-
-    // 设置标志，防止状态回调重复处理
-    // _isManuallyDisconnecting = true;
-
-    // 清理所有资源（不自动重连） todo 这块等回调处理
-    // _cleanupConnection(shouldReconnect: false);
 
     // 主动断开蓝牙设备（此时状态已清理，即使触发回调也无害）
     if (deviceToDisconnect?.flutterDevice != null) {
@@ -665,6 +647,10 @@ class BluetoothProvider extends ChangeNotifier {
   void _startRssiMonitoring() {
     _rssiMonitorTimer?.cancel();
     _rssiMonitorTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_rssiMonitorTimer == null) {
+        _logCallback.call('Bluetooth', LogType.warning, '_rssiMonitorTimer is null');
+        return;
+      }
       _updateRssiAndStability();
     });
     // 立即更新一次
@@ -697,7 +683,7 @@ class BluetoothProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       final errorMsg = e.toString();
-      _logCallback?.call('Bluetooth', LogType.warning, '更新 RSSI 和稳定性异常:$errorMsg');
+      _logCallback.call('Bluetooth', LogType.warning, '更新 RSSI 和稳定性异常:$errorMsg');
       // RSSI 读取失败时静默处理
       if (errorMsg.contains('device is disconnected') || errorMsg.contains('disconnected')) {
         _logCallback?.call('Bluetooth', LogType.warning, '设备断开，停止更新 RSSI');

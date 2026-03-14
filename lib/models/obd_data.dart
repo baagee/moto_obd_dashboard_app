@@ -66,18 +66,20 @@ class OBDData {
   }
 }
 
-/// 骑行事件类型
-enum EventType {
-  warning,
-  info,
-  success,
-}
-
 /// 诊断日志类型
 enum LogType {
   success,
   error,
   warning,
+  info,
+}
+
+/// 日志过滤类型
+enum LogFilterType {
+  all,
+  success,
+  warning,
+  error,
   info,
 }
 

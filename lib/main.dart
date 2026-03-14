@@ -7,6 +7,7 @@ import 'providers/bluetooth_provider.dart';
 import 'providers/log_provider.dart';
 import 'providers/sensor_provider.dart';
 import 'providers/riding_stats_provider.dart';
+import 'providers/navigation_provider.dart';
 import 'services/audio_service.dart';
 import 'screens/main_container.dart';
 
@@ -33,6 +34,9 @@ void main() {
         ),
         ChangeNotifierProvider<LogProvider>(
           create: (_) => LogProvider(),
+        ),
+        ChangeNotifierProvider<NavigationProvider>(
+          create: (_) => NavigationProvider(),
         ),
         // 音频服务 Provider
         ChangeNotifierProvider<AudioService>(

@@ -216,7 +216,7 @@ class OBDService {
         stopPolling();
         // logCallback?.call('OBD', LogType.warning, '检测到设备断开，已停止轮询');
       } else {
-        logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $e');
+        logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $errorMsg');
       }
     }
   }
@@ -235,8 +235,16 @@ class OBDService {
     int lowFreqIndex = 0;
     int tickCount = 0;
 
-    _pollingTimer = Timer.periodic(const Duration(milliseconds: pollingBaseInterval),
+    _pollingTimer = Timer.periodic(
+      const Duration(milliseconds: pollingBaseInterval),
       (timer) {
+        logCallback?.call('OBD', LogType.warning,
+            "Check: ${identityHashCode(this)} | Timer is null: ${_pollingTimer == null}");
+
+        if (_pollingTimer == null) {
+          logCallback?.call('OBD', LogType.warning, '_pollingTimer is null');
+          return;
+        }
         if (_writeCharacteristic == null || _isPollingActive == false) {
           logCallback?.call('OBD', LogType.warning, '写入特征为空，isPollingActive=false');
           timer.cancel();

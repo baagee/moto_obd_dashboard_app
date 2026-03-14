@@ -7,6 +7,7 @@ import '../providers/bluetooth_provider.dart';
 import '../providers/log_provider.dart';
 import '../providers/sensor_provider.dart';
 import '../providers/riding_stats_provider.dart';
+import '../providers/navigation_provider.dart';
 import '../services/audio_service.dart';
 import '../models/riding_event.dart';
 import '../models/event_voice_config.dart';
@@ -26,7 +27,6 @@ class MainContainer extends StatefulWidget {
 }
 
 class _MainContainerState extends State<MainContainer> {
-  int _currentIndex = 0;
   bool _hasCheckedBluetooth = false;
   bool _hasStartedRide = false;
   bool _hasShownEventNotification = false;
@@ -122,9 +122,7 @@ class _MainContainerState extends State<MainContainer> {
   }
 
   void _navigateTo(int index) {
-    setState(() {
-      _currentIndex = index;
-    });
+    context.read<NavigationProvider>().setIndex(index);
   }
 
   void _navigateToBluetoothScan() {
@@ -166,64 +164,68 @@ class _MainContainerState extends State<MainContainer> {
           await intent.launch();
         }
       },
-      child: Consumer<BluetoothProvider>(
-      builder: (context, bluetoothProvider, child) {
-        // 监听骑行事件
-        return Consumer<RidingStatsProvider>(
-          builder: (context, statsProvider, child) {
-            final latestEvent = statsProvider.latestEvent;
-            if (latestEvent != null && !_hasShownEventNotification) {
-              _hasShownEventNotification = true;
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _showEventNotification(latestEvent);
-                // 清除最新事件，避免重复显示
-                statsProvider.clearLatestEvent();
-                // 重置标志，允许显示下一个事件（3.5秒确保弹窗3秒关闭后再解锁）
-                Future.delayed(const Duration(milliseconds: 3500), () {
-                  _hasShownEventNotification = false;
-                });
-              });
-            }
+      child: Consumer<NavigationProvider>(
+        builder: (context, navProvider, child) {
+          return Consumer<BluetoothProvider>(
+            builder: (context, bluetoothProvider, child) {
+              // 监听骑行事件
+              return Consumer<RidingStatsProvider>(
+                builder: (context, statsProvider, child) {
+                  final latestEvent = statsProvider.latestEvent;
+                  if (latestEvent != null && !_hasShownEventNotification) {
+                    _hasShownEventNotification = true;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _showEventNotification(latestEvent);
+                      // 清除最新事件，避免重复显示
+                      statsProvider.clearLatestEvent();
+                      // 重置标志，允许显示下一个事件（3.5秒确保弹窗3秒关闭后再解锁）
+                      Future.delayed(const Duration(milliseconds: 3500), () {
+                        _hasShownEventNotification = false;
+                      });
+                    });
+                  }
 
-            // 检测连接成功瞬间，启动骑行统计
-            final isConnected = bluetoothProvider.isDeviceConnected;
-            // 连接状态从 connected 变为 disconnected 时重置
-            if (!isConnected && _hasStartedRide) {
-              _hasStartedRide = false;
-              context.read<RidingStatsProvider>().endRide();
-            }
-            if (isConnected && !_hasStartedRide) {
-              _hasStartedRide = true;
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                context.read<RidingStatsProvider>().startRide();
-              });
-            }
+                  // 检测连接成功瞬间，启动骑行统计
+                  final isConnected = bluetoothProvider.isDeviceConnected;
+                  // 连接状态从 connected 变为 disconnected 时重置
+                  if (!isConnected && _hasStartedRide) {
+                    _hasStartedRide = false;
+                    context.read<RidingStatsProvider>().endRide();
+                  }
+                  if (isConnected && !_hasStartedRide) {
+                    _hasStartedRide = true;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      context.read<RidingStatsProvider>().startRide();
+                    });
+                  }
 
-            return Scaffold(
-              body: Column(
-                children: [
-                  // 顶部导航栏
-                  _TopNavigationBar(
-                    currentIndex: _currentIndex,
-                    onNavigate: _navigateTo,
-                    onLinkVehiclePressed: _navigateToBluetoothScan,
-                    isConnected: isConnected,
-                    deviceName: bluetoothProvider.connectedDevice?.name,
-                  ),
+                  return Scaffold(
+                    body: Column(
+                      children: [
+                        // 顶部导航栏
+                        _TopNavigationBar(
+                          currentIndex: navProvider.currentIndex,
+                          onNavigate: _navigateTo,
+                          onLinkVehiclePressed: _navigateToBluetoothScan,
+                          isConnected: isConnected,
+                          deviceName: bluetoothProvider.connectedDevice?.name,
+                        ),
 
-                  // 页面内容
-                  Expanded(
-                    child: IndexedStack(
-                      index: _currentIndex,
-                      children: _pages,
+                        // 页面内容
+                        Expanded(
+                          child: IndexedStack(
+                            index: navProvider.currentIndex,
+                            children: _pages,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                  );
+                },
+              );
+            },
+          );
+        },
       ),
     );
   }

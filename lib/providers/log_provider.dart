@@ -8,10 +8,12 @@ class LogProvider extends ChangeNotifier {
   bool _isInitialized = false;
 
   final List<DiagnosticLog> _logs = [];
+  LogFilterType _currentFilter = LogFilterType.all;
 
   // Getter
   List<DiagnosticLog> get logs => List.unmodifiable(_logs);
   bool get isInitialized => _isInitialized;
+  LogFilterType get currentFilter => _currentFilter;
 
   List<DiagnosticLog> get successLogs =>
       _logs.where((log) => log.type == LogType.success).toList();
@@ -30,6 +32,44 @@ class LogProvider extends ChangeNotifier {
   int get warningCount => warningLogs.length;
   int get errorCount => errorLogs.length;
   int get infoCount => infoLogs.length;
+
+  /// 设置过滤类型
+  void setFilter(LogFilterType filter) {
+    if (_currentFilter != filter) {
+      _currentFilter = filter;
+      notifyListeners();
+    }
+  }
+
+  /// 获取过滤后的日志
+  List<DiagnosticLog> get filteredLogs {
+    if (_currentFilter == LogFilterType.all) {
+      return logs;
+    }
+    return _logs.where((log) {
+      switch (_currentFilter) {
+        case LogFilterType.success:
+          return log.type == LogType.success;
+        case LogFilterType.warning:
+          return log.type == LogType.warning;
+        case LogFilterType.error:
+          return log.type == LogType.error;
+        case LogFilterType.info:
+          return log.type == LogType.info;
+        case LogFilterType.all:
+          return true;
+      }
+    }).toList();
+  }
+
+  /// 获取过滤后各类型的数量
+  Map<LogFilterType, int> get filterCounts => {
+        LogFilterType.all: totalCount,
+        LogFilterType.success: successCount,
+        LogFilterType.warning: warningCount,
+        LogFilterType.error: errorCount,
+        LogFilterType.info: infoCount,
+      };
 
   /// 初始化日志系统（应用启动时调用）
   Future<void> initialize() async {

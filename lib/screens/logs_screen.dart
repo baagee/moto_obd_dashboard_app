@@ -6,25 +6,9 @@ import '../models/obd_data.dart';
 import '../widgets/cyber_button.dart';
 import '../widgets/cyber_dialog.dart';
 
-/// 日志过滤类型
-enum LogFilterType {
-  all,
-  success,
-  warning,
-  error,
-  info,
-}
-
 /// 日志页面
-class LogsScreen extends StatefulWidget {
+class LogsScreen extends StatelessWidget {
   const LogsScreen({super.key});
-
-  @override
-  State<LogsScreen> createState() => _LogsScreenState();
-}
-
-class _LogsScreenState extends State<LogsScreen> {
-  LogFilterType _currentFilter = LogFilterType.all;
 
   /// 显示清空日志确认对话框
   void _showClearConfirmDialog(BuildContext context, LogProvider provider) {
@@ -58,38 +42,6 @@ class _LogsScreenState extends State<LogsScreen> {
     );
   }
 
-  /// 根据过滤类型获取过滤后的日志
-  List<DiagnosticLog> _getFilteredLogs(LogProvider provider) {
-    if (_currentFilter == LogFilterType.all) {
-      return provider.logs;
-    }
-    return provider.logs.where((log) {
-      switch (_currentFilter) {
-        case LogFilterType.success:
-          return log.type == LogType.success;
-        case LogFilterType.warning:
-          return log.type == LogType.warning;
-        case LogFilterType.error:
-          return log.type == LogType.error;
-        case LogFilterType.info:
-          return log.type == LogType.info;
-        case LogFilterType.all:
-          return true;
-      }
-    }).toList();
-  }
-
-  /// 获取各类型日志数量
-  Map<LogFilterType, int> _getLogCounts(LogProvider provider) {
-    return {
-      LogFilterType.all: provider.totalCount,
-      LogFilterType.success: provider.successCount,
-      LogFilterType.warning: provider.warningCount,
-      LogFilterType.error: provider.errorCount,
-      LogFilterType.info: provider.infoCount,
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -101,15 +53,10 @@ class _LogsScreenState extends State<LogsScreen> {
           // 合并后的顶部区域
           Consumer<LogProvider>(
             builder: (context, provider, child) {
-              final counts = _getLogCounts(provider);
               return _CompactHeader(
-                counts: counts,
-                currentFilter: _currentFilter,
-                onFilterChanged: (filter) {
-                  setState(() {
-                    _currentFilter = filter;
-                  });
-                },
+                counts: provider.filterCounts,
+                currentFilter: provider.currentFilter,
+                onFilterChanged: (filter) => provider.setFilter(filter),
                 onExport: () => provider.shareLogs(),
                 onClear: () => _showClearConfirmDialog(context, provider),
               );
@@ -120,7 +67,7 @@ class _LogsScreenState extends State<LogsScreen> {
           Expanded(
             child: Consumer<LogProvider>(
               builder: (context, provider, child) {
-                final filteredLogs = _getFilteredLogs(provider);
+                final filteredLogs = provider.filteredLogs;
 
                 if (filteredLogs.isEmpty) {
                   return const Center(
