@@ -51,7 +51,7 @@ Plans:
 4. SettingsScreen displays correctly in all 4 themes (Note: SettingsScreen is Phase 3)
 5. Gauge widgets (speed, RPM, combined) accept theme colors and display correctly
 
-**Plans:** 2/2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 02-01-PLAN.md — Migrate screen files (main_container, dashboard, logs, bluetooth_scan)
@@ -81,8 +81,7 @@ Plans:
 
 | Phase | Requirements | Coverage |
 |-------|--------------|----------|
-| 1 - Theme Infrastructure | THME-01 to THME-08 | Complete    | 2026-03-14 | 2 - Widget Migration | THME-15 to THME-20 | 6/22 |
-| 3 - Settings & Auto-Switch | THME-09 to THME-14, THME-21, THME-22 | 8/22 |
+| 1 - Theme Infrastructure | THME-01 to THME-08 | Complete    | 2026-03-14 | 2 - Widget Migration | THME-15 to THME-20 | Complete    | 2026-03-14 | 3 - Settings & Auto-Switch | THME-09 to THME-14, THME-21, THME-22 | 8/22 |
 
 **Total:** 22/22 requirements mapped ✓
 
