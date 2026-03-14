@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/log_provider.dart';
+import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
 import '../models/obd_data.dart';
 import '../widgets/cyber_button.dart';
@@ -44,10 +45,13 @@ class LogsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0A1114),
-      ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
+        return Container(
+          decoration: BoxDecoration(
+            color: colors.backgroundDark,
+          ),
       child: Column(
         children: [
           // 合并后的顶部区域
@@ -115,6 +119,8 @@ class LogsScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+      },
     );
   }
 }

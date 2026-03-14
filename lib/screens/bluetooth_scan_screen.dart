@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/bluetooth_device.dart';
 import '../providers/bluetooth_provider.dart';
+import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bluetooth_device_list.dart';
 import '../widgets/connected_device_card.dart';
@@ -42,9 +43,12 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: AppTheme.backgroundDark,
-      child: Padding(
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final colors = themeProvider.currentColors;
+        return Container(
+          color: colors.backgroundDark,
+          child: Padding(
         padding: const EdgeInsets.all(8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,6 +69,8 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> {
           ],
         ),
       ),
+    );
+      },
     );
   }
 
