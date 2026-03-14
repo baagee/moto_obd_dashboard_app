@@ -8,6 +8,7 @@ import 'providers/log_provider.dart';
 import 'providers/sensor_provider.dart';
 import 'providers/riding_stats_provider.dart';
 import 'providers/navigation_provider.dart';
+import 'providers/theme_provider.dart';
 import 'services/audio_service.dart';
 import 'screens/main_container.dart';
 
@@ -28,6 +29,11 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
+        // 主题 Provider - 必须在其他依赖它的 Provider 之前初始化
+        ChangeNotifierProvider<ThemeProvider>(
+          create: (_) => ThemeProvider()..initialize(),
+        ),
+
         // 基础 Providers（无依赖）
         ChangeNotifierProvider<OBDDataProvider>(
           create: (_) => OBDDataProvider(),
@@ -98,21 +104,34 @@ class OBDDashboardApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CYBER-CYCLE OBD',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF0DA6F2),
-          surface: Color(0xFF162229),
-          error: Color(0xFFFF4D4D),
-        ),
-        scaffoldBackgroundColor: const Color(0xFF0A1114),
-      ),
-      home: const MainContainer(),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        final colors = themeProvider.currentColors;
+        final isDark = themeProvider.isDarkMode;
+
+        return MaterialApp(
+          title: 'CYBER-CYCLE OBD',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: isDark ? Brightness.dark : Brightness.light,
+            fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
+            colorScheme: isDark
+                ? ColorScheme.dark(
+                    primary: colors.primary,
+                    surface: colors.surface,
+                    error: colors.accentRed,
+                  )
+                : ColorScheme.light(
+                    primary: colors.primary,
+                    surface: colors.surface,
+                    error: colors.accentRed,
+                  ),
+            scaffoldBackgroundColor: colors.backgroundDark,
+          ),
+          home: const MainContainer(),
+        );
+      },
     );
   }
 }
