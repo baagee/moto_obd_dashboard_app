@@ -214,7 +214,6 @@ class OBDService {
       if (errorMsg.contains('device is disconnected') ||
           errorMsg.contains('disconnected')) {
         stopPolling();
-        // logCallback?.call('OBD', LogType.warning, '检测到设备断开，已停止轮询');
       } else {
         logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $errorMsg');
       }
@@ -276,7 +275,6 @@ class OBDService {
     _isPollingActive = false;
     _pollingTimer?.cancel();
     _pollingTimer = null;
-    logCallback?.call('OBD', LogType.info, 'OBD 轮询已停止');
   }
 
   /// 释放资源
