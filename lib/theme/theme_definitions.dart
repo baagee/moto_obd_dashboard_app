@@ -50,19 +50,19 @@ class ThemeDefinitions {
     accent: Color(0xFFFFAB40),
   );
 
-  /// 浅色主题 - 白色背景 + 黑色文字
+  /// 浅色主题 - 白色背景 + 黑色文字 + 协调配色
   static const ThemeColors light = ThemeColors(
-    primary: Color(0xFF0DA6F2),
+    primary: Color(0xFF2563EB),    // 协调的蓝色
     backgroundDark: Color(0xFFFFFFFF),
     surface: Color(0xFFF3F4F6),
-    accentCyan: Color(0xFF00A0CC),
+    accentCyan: Color(0xFF0891B2),  // 更深的青色
     accentRed: Color(0xFFDC2626),
     accentOrange: Color(0xFFF59E0B),
     accentGreen: Color(0xFF10B981),
-    textPrimary: Color(0xFF000000),
+    textPrimary: Color(0xFF111827),
     textSecondary: Color(0xFF4B5563),
     textMuted: Color(0xFF9CA3AF),
-    accent: Color(0xFF0DA6F2),
+    accent: Color(0xFF2563EB),
   );
 
   /// 根据主题类型获取对应的 ThemeColors
