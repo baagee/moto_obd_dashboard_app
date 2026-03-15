@@ -125,11 +125,11 @@ class CombinedGaugePainter extends CustomPainter {
   }
 
   void _drawBackground(Canvas canvas, Offset center, double radius) {
-    // 背景渐变
+    // 背景渐变 - 使用主题色
     final gradient = RadialGradient(
       colors: [
-        const Color(0xFF0A1114),
-        const Color(0xFF1E293B).withValues(alpha: 0.5),
+        colors.backgroundDark,
+        colors.surface,
       ],
     );
 
@@ -141,7 +141,7 @@ class CombinedGaugePainter extends CustomPainter {
 
   void _drawTickBackground(Canvas canvas, Offset center, double radius) {
     final paint = Paint()
-      ..color = const Color(0xFF1E293B)
+      ..color = colors.surface  // 使用主题色
       ..style = PaintingStyle.stroke
       ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
       ..strokeCap = StrokeCap.round;
@@ -256,8 +256,8 @@ class CombinedGaugePainter extends CustomPainter {
   void _drawRPMPointer(Canvas canvas, Offset center, double radius) {
     if (rpm <= 0) return;
 
-    // 固定颜色 - 橙色，与数字蓝色区分
-    const color = Color(0xFFFF9800);
+    // 使用主题强调色
+    final color = colors.accentOrange;
 
     // 使用非线性映射计算角度
     final sweepAngle = _rpmToAngle(rpm.toDouble());
@@ -320,8 +320,8 @@ class CombinedGaugePainter extends CustomPainter {
   void _drawSpeedPointer(Canvas canvas, Offset center, double radius) {
     if (speed <= 0) return;
 
-    // 固定颜色 - 品红色，与数字青色区分
-    const color = Color(0xFFE91E63);
+    // 使用主题强调色
+    final color = colors.accentRed;
 
     // 使用非线性映射计算角度（逆时针）
     final sweepAngle = _speedToAngle(speed.toDouble());

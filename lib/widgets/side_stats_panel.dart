@@ -232,7 +232,7 @@ class _ProgressBar extends StatelessWidget {
               Container(
                 height: 6,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
+                  color: colors.surface,
                   borderRadius: BorderRadius.all(Radius.circular(3)),
                 ),
               ),
@@ -322,7 +322,7 @@ class _LeanAngleIndicator extends StatelessWidget {
                   Container(
                     height: 7,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
+                      color: colors.surface,
                       borderRadius: BorderRadius.all(Radius.circular(6)),
                     ),
                   ),
