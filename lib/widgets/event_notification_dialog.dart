@@ -55,8 +55,8 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
       vsync: this,
     );
 
-    // 霓虹闪烁动画：透明度 0.3 到 1.0（更明显）
-    _neonAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+    // 霓虹闪烁动画：透明度 0.2 到 1.0（更明显）
+    _neonAnimation = Tween<double>(begin: 0.2, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
   }
@@ -144,8 +144,8 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
     }
 
     return Wrap(
-      spacing: 8,
-      runSpacing: 4,
+      spacing: 12,
+      runSpacing: 8,
       children: data.entries.map((entry) {
         String value = entry.value?.toString() ?? '';
         // 格式化数值
@@ -158,7 +158,7 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
           '${entry.key}: $value',
           style: TextStyle(
             color: eventColor.withOpacity(0.8),
-            fontSize: 10,
+            fontSize: 14,
           ),
         );
       }).toList(),
@@ -179,19 +179,19 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
           final neonColor = eventColor.withOpacity(neonOpacity);
 
           return Container(
-            width: 320,
-            padding: const EdgeInsets.all(16),
+            width: 420,
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: neonColor,
-                width: 2,
+                width: 3,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: eventColor.withOpacity(neonOpacity * 0.5),
-                  blurRadius: 20 * neonOpacity,
+                  color: eventColor.withOpacity(neonOpacity * 0.7),
+                  blurRadius: 30 * neonOpacity,
                   spreadRadius: 0,
                 ),
               ],
@@ -204,43 +204,43 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: eventColor.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
                           _getEventIcon(),
                           color: eventColor,
-                          size: 20,
+                          size: 36,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Text(
                           widget.event.title,
                           style: TextStyle(
                             color: eventColor,
-                            fontSize: 15,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   // 事件描述
                   Text(
                     widget.event.description,
                     style: const TextStyle(
                       color: AppTheme.textSecondary,
-                      fontSize: 11,
+                      fontSize: 16,
                       height: 1.4,
                     ),
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   // 扩展信息显示
                   _buildAdditionalInfo(eventColor),
                 ],
