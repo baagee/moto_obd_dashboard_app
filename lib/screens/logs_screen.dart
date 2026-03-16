@@ -361,8 +361,11 @@ class _CompactFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      splashColor: _color.withOpacity(0.2),
+      highlightColor: _color.withOpacity(0.1),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(

@@ -10,28 +10,22 @@ class LogProvider extends ChangeNotifier {
   final List<DiagnosticLog> _logs = [];
   LogFilterType _currentFilter = LogFilterType.all;
 
+  // 缓存各类型日志数量
+  int _successCount = 0;
+  int _warningCount = 0;
+  int _errorCount = 0;
+  int _infoCount = 0;
+
   // Getter
   List<DiagnosticLog> get logs => List.unmodifiable(_logs);
   bool get isInitialized => _isInitialized;
   LogFilterType get currentFilter => _currentFilter;
 
-  List<DiagnosticLog> get successLogs =>
-      _logs.where((log) => log.type == LogType.success).toList();
-
-  List<DiagnosticLog> get warningLogs =>
-      _logs.where((log) => log.type == LogType.warning).toList();
-
-  List<DiagnosticLog> get errorLogs =>
-      _logs.where((log) => log.type == LogType.error).toList();
-
-  List<DiagnosticLog> get infoLogs =>
-      _logs.where((log) => log.type == LogType.info).toList();
-
+  int get successCount => _successCount;
+  int get warningCount => _warningCount;
+  int get errorCount => _errorCount;
+  int get infoCount => _infoCount;
   int get totalCount => _logs.length;
-  int get successCount => successLogs.length;
-  int get warningCount => warningLogs.length;
-  int get errorCount => errorLogs.length;
-  int get infoCount => infoLogs.length;
 
   /// 设置过滤类型
   void setFilter(LogFilterType filter) {
@@ -65,10 +59,10 @@ class LogProvider extends ChangeNotifier {
   /// 获取过滤后各类型的数量
   Map<LogFilterType, int> get filterCounts => {
         LogFilterType.all: totalCount,
-        LogFilterType.success: successCount,
-        LogFilterType.warning: warningCount,
-        LogFilterType.error: errorCount,
-        LogFilterType.info: infoCount,
+        LogFilterType.success: _successCount,
+        LogFilterType.warning: _warningCount,
+        LogFilterType.error: _errorCount,
+        LogFilterType.info: _infoCount,
       };
 
   /// 初始化日志系统（应用启动时调用）
@@ -95,18 +89,61 @@ class LogProvider extends ChangeNotifier {
 
     // 超过最大数量时移除最旧的日志
     if (_logs.length > _maxLogs) {
-      _logs.removeLast();
+      final removed = _logs.removeLast();
+      // 更新计数
+      _decrementCount(removed.type);
     }
 
-    // 2. 实时写入文件
+    // 2. 更新计数
+    _incrementCount(type);
+
+    // 3. 实时写入文件
     LogService.appendLog(log);
 
     notifyListeners();
   }
 
+  void _incrementCount(LogType type) {
+    switch (type) {
+      case LogType.success:
+        _successCount++;
+        break;
+      case LogType.warning:
+        _warningCount++;
+        break;
+      case LogType.error:
+        _errorCount++;
+        break;
+      case LogType.info:
+        _infoCount++;
+        break;
+    }
+  }
+
+  void _decrementCount(LogType type) {
+    switch (type) {
+      case LogType.success:
+        _successCount--;
+        break;
+      case LogType.warning:
+        _warningCount--;
+        break;
+      case LogType.error:
+        _errorCount--;
+        break;
+      case LogType.info:
+        _infoCount--;
+        break;
+    }
+  }
+
   /// 清空日志（同时清空内存和文件）
   Future<void> clearLogs() async {
     _logs.clear();
+    _successCount = 0;
+    _warningCount = 0;
+    _errorCount = 0;
+    _infoCount = 0;
     await LogService.clearLogFile();
     notifyListeners();
   }
