@@ -133,7 +133,7 @@ class SensorService {
 
     // 确定方向并输出，限制最大角度为60度
     final int outputAngle = averagedAngle.abs().clamp(0, 60).round();
-    final String direction = averagedAngle > 0 ? 'RIGHT' : 'LEFT';
+    final String direction = averagedAngle == 0 ? 'NONE' : (averagedAngle > 0 ? 'RIGHT' : 'LEFT');
     // logCallback?.call('Sensor', LogType.info, '倾角传感器当前值 $direction：$outputAngle');
 
     _obdDataProvider.updateLeanAngle(outputAngle, direction);

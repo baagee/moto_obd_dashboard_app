@@ -62,7 +62,7 @@ class TelemetryChartCard extends StatelessWidget {
 
                     // 右侧Y轴（时速）
                     const _YAxisLabels(
-                      labels: ['250', '187', '125', '62', '0'],
+                      labels: ['230', '173', '115', '58', '0'],
                       color: AppTheme.accentCyan,
                       isLeft: false,
                     ),
@@ -169,7 +169,7 @@ class TelemetryChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final width = size.width;
     final height = size.height;
-    const padding = 10.0;
+    const padding = 5.0;
 
     // 绘制网格线
     _drawGridLines(canvas, width, height);
@@ -195,7 +195,7 @@ class TelemetryChartPainter extends CustomPainter {
         height,
         padding,
         velocityHistory,
-        250,
+        230,
         AppTheme.accentCyan,
       );
     }

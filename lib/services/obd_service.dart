@@ -120,7 +120,9 @@ class OBDService {
         break;
       case "0D": // 车速
         if (parts.length >= 3) {
-          return ObdParseResult(speed: int.tryParse(parts[2], radix: 16) ?? 0);
+          var speed = int.tryParse(parts[2], radix: 16) ?? 0;
+          speed = (speed * 1.08) as int;
+          return ObdParseResult(speed: speed);
         }
         break;
       case "05": // 冷却液温度 = A-40

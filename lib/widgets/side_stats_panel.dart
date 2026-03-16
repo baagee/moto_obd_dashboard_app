@@ -14,7 +14,7 @@ class SideStatsPanel extends StatelessWidget {
         final data = provider.data;
 
         return Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(6),
           decoration: AppTheme.surfaceBorder(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,7 +117,7 @@ class _TempCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
         borderRadius: BorderRadius.all(Radius.circular(6)),
@@ -155,7 +155,7 @@ class _ProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
         borderRadius: BorderRadius.all(Radius.circular(6)),
@@ -214,7 +214,7 @@ class _LeanAngleIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
         borderRadius: BorderRadius.all(Radius.circular(6)),
@@ -231,7 +231,7 @@ class _LeanAngleIndicator extends StatelessWidget {
                   Text('$angle°', style: AppTheme.valueSmall),
                   const SizedBox(width: 4),
                   Text(
-                    direction == 'LEFT' ? '左' : '右',
+                    angle == 0 ? '无' : (direction == 'LEFT' ? '左' : '右'),
                     style: AppTheme.valueSmall.copyWith(color: AppTheme.primary),
                   ),
                 ],
@@ -241,8 +241,8 @@ class _LeanAngleIndicator extends StatelessWidget {
           const SizedBox(height: 4),
           LayoutBuilder(
             builder: (context, constraints) {
-              // 计算指示器位置：50%为中间，最大60度
-              final leanPercent = 50 + (direction == 'LEFT' ? -angle : angle) * (50 / 60);
+              // 计算指示器位置：50%为中间，最大60度，角度为0时居中
+              final leanPercent = angle == 0 ? 50 : 50 + (direction == 'LEFT' ? -angle : angle) * (50 / 60);
               return Stack(
                 children: [
                   // 背景条
@@ -311,7 +311,7 @@ class _PressureChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(5),
+      padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
         borderRadius: BorderRadius.all(Radius.circular(6)),

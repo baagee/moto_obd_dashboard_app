@@ -130,162 +130,117 @@ class CombinedGaugePainter extends CustomPainter {
   }
 
   void _drawTickBackground(Canvas canvas, Offset center, double radius) {
-    // 背景刻度段参数 - 与进度条保持一致
-    const int segmentCount = 30;
-    const double segmentWidth = pi / 30 * 0.7;
-    const double gapWidth = pi / 30 * 0.3;
-
-    final bgPaint = Paint()
-      ..color = const Color(0xFF0A1114)  // 更暗的底色
+    final paint = Paint()
+      ..color = const Color(0xFF1E293B)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 22
+      ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
       ..strokeCap = StrokeCap.round;
 
-    // 上半圆背景（RPM）
-    for (int i = 0; i < segmentCount; i++) {
-      final startAngle = pi + i * (segmentWidth + gapWidth);
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        segmentWidth,
-        false,
-        bgPaint,
-      );
-    }
+    // 上半圆背景
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      pi,
+      pi,
+      false,
+      paint,
+    );
 
-    // 下半圆背景（Speed）
-    for (int i = 0; i < segmentCount; i++) {
-      final startAngle = pi - i * (segmentWidth + gapWidth);
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        -segmentWidth,
-        false,
-        bgPaint,
-      );
-    }
+    // 下半圆背景
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      0,
+      pi,
+      false,
+      paint,
+    );
   }
 
   void _drawRPMProgress(Canvas canvas, Offset center, double radius) {
-    // 刻度段参数 - 增加到30段以填满整个半圆
-    const int segmentCount = 30;
-    const double segmentWidth = pi / 30 * 0.7;
-    const double gapWidth = pi / 30 * 0.3;
+    final sweepAngle = _rpmToAngle(rpm.toDouble());
 
-    // 计算当前值对应的段数
-    final currentSegment = (rpm / (maxRpm / segmentCount)).floor().clamp(0, segmentCount);
-
-    for (int i = 0; i < segmentCount; i++) {
-      // 计算每段的起始角度（从π开始，顺时针）
-      final startAngle = pi + i * (segmentWidth + gapWidth);
-      final isActive = i < currentSegment;
-      final segmentValue = i * (maxRpm / segmentCount);
-
-      // 确定颜色 - 始终显示刻度，未激活用暗色
-      Color color;
-      if (!isActive) {
-        color = const Color(0xFF2A3441);  // 未激活为暗灰色（比背景稍亮）
-      } else if (segmentValue <= warnRpm) {
-        color = AppTheme.primary;  // 蓝色
-      } else if (segmentValue <= dangerRpm) {
-        color = AppTheme.accentCyan;  // 青色
-      } else {
-        color = const Color(0xFFF44336);  // 红色
-      }
-
-      final paint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 22
-        ..strokeCap = StrokeCap.round;
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        segmentWidth,
-        false,
-        paint,
-      );
-
-      // 发光效果（仅对激活的段）
-      if (isActive) {
-        final glowPaint = Paint()
-          ..color = color.withValues(alpha: 0.4)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 30
-          ..strokeCap = StrokeCap.round
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius),
-          startAngle,
-          segmentWidth,
-          false,
-          glowPaint,
-        );
-      }
+    // 阶段颜色 - 使用 AppTheme 颜色
+    Color color;
+    if (rpm <= warnRpm) {
+      color = AppTheme.primary; // 蓝色
+    } else if (rpm <= dangerRpm) {
+      color = AppTheme.accentCyan; // 青色
+    } else {
+      color = const Color(0xFFF44336); // 红色
     }
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
+      ..strokeCap = StrokeCap.butt;  // 平头样式，避免与对向弧冲突
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      pi,
+      sweepAngle,  // 顺时针，经过上方
+      false,
+      paint,
+    );
+
+    // 发光效果
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 36  // 加粗0.5倍 (24 * 1.5)
+      ..strokeCap = StrokeCap.butt  // 平头样式
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      pi,
+      sweepAngle,  // 顺时针，经过上方
+      false,
+      glowPaint,
+    );
   }
 
   void _drawSpeedProgress(Canvas canvas, Offset center, double radius) {
-    // 刻度段参数 - 增加到30段以填满整个半圆
-    const int segmentCount = 30;
-    const double segmentWidth = pi / 30 * 0.7;
-    const double gapWidth = pi / 30 * 0.3;
+    final sweepAngle = _speedToAngle(speed.toDouble());
 
-    // 计算当前值对应的段数
-    final currentSegment = (speed / (maxSpeed / segmentCount)).floor().clamp(0, segmentCount);
-
-    for (int i = 0; i < segmentCount; i++) {
-      // 计算每段的起始角度（从π开始，逆时针）
-      final startAngle = pi - i * (segmentWidth + gapWidth);
-      final isActive = i < currentSegment;
-      final segmentValue = i * (maxSpeed / segmentCount);
-
-      // 确定颜色 - 始终显示刻度，未激活用暗色
-      Color color;
-      if (!isActive) {
-        color = const Color(0xFF2A3441);  // 未激活为暗灰色（比背景稍亮）
-      } else if (segmentValue <= warnSpeed) {
-        color = AppTheme.accentCyan;  // 青色
-      } else if (segmentValue <= dangerSpeed) {
-        color = AppTheme.primary;  // 蓝色
-      } else {
-        color = const Color(0xFFF44336);  // 红色
-      }
-
-      final paint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 22
-        ..strokeCap = StrokeCap.round;
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        -segmentWidth,  // 逆时针
-        false,
-        paint,
-      );
-
-      // 发光效果（仅对激活的段）
-      if (isActive) {
-        final glowPaint = Paint()
-          ..color = color.withValues(alpha: 0.4)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 30
-          ..strokeCap = StrokeCap.round
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius),
-          startAngle,
-          -segmentWidth,  // 逆时针
-          false,
-          glowPaint,
-        );
-      }
+    // 阶段颜色 - 使用 AppTheme 颜色
+    Color color;
+    if (speed <= warnSpeed) {
+      color = AppTheme.accentCyan; // 青色
+    } else if (speed <= dangerSpeed) {
+      color = AppTheme.primary; // 蓝色
+    } else {
+      color = const Color(0xFFF44336); // 红色
     }
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
+      ..strokeCap = StrokeCap.butt;  // 平头样式，避免与对向弧冲突
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      pi,
+      -sweepAngle,  // 逆时针
+      false,
+      paint,
+    );
+
+    // 发光效果
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 36  // 加粗0.5倍 (24 * 1.5)
+      ..strokeCap = StrokeCap.butt  // 平头样式
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      pi,
+      -sweepAngle,  // 逆时针
+      false,
+      glowPaint,
+    );
   }
 
   void _drawRPMPointer(Canvas canvas, Offset center, double radius) {
@@ -316,16 +271,16 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 水滴形状：从尖端到圆心处的圆润头部
     final pointerPath = Path()
-      // 从尖端开始
+    // 从尖端开始
       ..moveTo(tipX, tipY)
-      // 左侧曲线延伸到头部
+    // 左侧曲线延伸到头部
       ..quadraticBezierTo(
         center.dx + headRadius * cos(angle - pi / 2) * 0.5,
         center.dy + headRadius * sin(angle - pi / 2) * 0.5,
         center.dx + headRadius * cos(angle - pi / 2),
         center.dy + headRadius * sin(angle - pi / 2),
       )
-      // 头部半圆
+    // 头部半圆
       ..arcToPoint(
         Offset(
           center.dx + headRadius * cos(angle + pi / 2),
@@ -334,7 +289,7 @@ class CombinedGaugePainter extends CustomPainter {
         radius: Radius.circular(headRadius),
         clockwise: true,
       )
-      // 右侧曲线延伸到尖端
+    // 右侧曲线延伸到尖端
       ..quadraticBezierTo(
         center.dx + headRadius * cos(angle + pi / 2) * 0.5,
         center.dy + headRadius * sin(angle + pi / 2) * 0.5,
@@ -380,16 +335,16 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 水滴形状：从尖端到圆心处的圆润头部
     final pointerPath = Path()
-      // 从尖端开始
+    // 从尖端开始
       ..moveTo(tipX, tipY)
-      // 左侧曲线延伸到头部
+    // 左侧曲线延伸到头部
       ..quadraticBezierTo(
         center.dx + headRadius * cos(angle - pi / 2) * 0.5,
         center.dy + headRadius * sin(angle - pi / 2) * 0.5,
         center.dx + headRadius * cos(angle - pi / 2),
         center.dy + headRadius * sin(angle - pi / 2),
       )
-      // 头部半圆
+    // 头部半圆
       ..arcToPoint(
         Offset(
           center.dx + headRadius * cos(angle + pi / 2),
@@ -398,7 +353,7 @@ class CombinedGaugePainter extends CustomPainter {
         radius: Radius.circular(headRadius),
         clockwise: true,
       )
-      // 右侧曲线延伸到尖端
+    // 右侧曲线延伸到尖端
       ..quadraticBezierTo(
         center.dx + headRadius * cos(angle + pi / 2) * 0.5,
         center.dy + headRadius * sin(angle + pi / 2) * 0.5,
@@ -429,7 +384,7 @@ class CombinedGaugePainter extends CustomPainter {
     );
 
     // 公共0刻度 - 在正下方（π角度）绘制一个共用的0刻度线和标签
-    {
+        {
       const zeroAngle = pi;
       final innerRadius = radius - 32;
       final outerRadius = radius - 22;
