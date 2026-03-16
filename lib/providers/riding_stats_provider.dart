@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/obd_data.dart';
 import '../models/riding_event.dart' as stats;
-import '../models/event_voice_config.dart';
 import '../services/audio_service.dart';
 import 'log_provider.dart';
 import 'loggable.dart';
@@ -51,8 +50,6 @@ class RidingStatsProvider extends ChangeNotifier {
   // 事件冷却时间记录
   final Map<stats.RidingEventType, DateTime> _lastEventTime = {};
 
-  // 统计数据
-  // stats.EventStatistics _statistics = stats.EventStatistics.empty();
 
   // 事件历史列表
   final List<stats.RidingEvent> _eventHistory = [];
@@ -61,8 +58,6 @@ class RidingStatsProvider extends ChangeNotifier {
   bool _isRiding = false;
   DateTime? _rideStartTime;
 
-  // Getter
-  // stats.EventStatistics get statistics => _statistics;
   List<stats.RidingEvent> get eventHistory => _eventHistory;
   bool get isRiding => _isRiding;
 
@@ -75,28 +70,6 @@ class RidingStatsProvider extends ChangeNotifier {
     _logCallback = createLogger(logProvider);
   }
 
-  /// 播放事件语音
-  /// 返回进度更新回调（用于进度条显示）
-  // void Function(double)? playEventVoice(stats.RidingEvent event) {
-  //   final config = EventVoiceConfigManager.getConfig(event.type);
-  //   if (config == null || _audioService == null) return null;
-  //
-  //   // 设置进度更新回调
-  //   void onProgressUpdate(double progress) {
-  //     // 回调由外部传入
-  //   }
-  //
-  //   // 设置播放完成回调
-  //   _audioService!.onComplete = () {
-  //     // 播放完成
-  //   };
-  //
-  //   // 播放音频
-  //   _audioService!.playAsset(config.audioAssetPath);
-  //
-  //   // 返回进度更新回调
-  //   return _audioService!.onProgressUpdate;
-  // }
 
   /// 开始骑行
   void startRide() {
@@ -345,13 +318,6 @@ class RidingStatsProvider extends ChangeNotifier {
 
     // 设置最新事件（供外部监听显示弹窗）
     _latestEvent = event;
-
-    // _statistics = _statistics.copyWith(
-    //   eventCounts: Map.from(_statistics.eventCounts),
-    //   lastUpdateTime: DateTime.now(),
-    //   lastEvent: event,
-    // );
-    // _statistics.addEvent(event);
     _logCallback?.call('Stats', LogType.warning, '事件触发: ${event.title}');
     notifyListeners();
   }

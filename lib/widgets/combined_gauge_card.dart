@@ -50,6 +50,7 @@ class CombinedGaugePainter extends CustomPainter {
   static const int maxSpeed = 250;
   static const int warnSpeed = 150;
   static const int dangerSpeed = 200;
+  static const int flashThreshold = 100; // 闪烁阈值
 
   /// 车速到角度的非线性映射
   /// 0-180km/h 占据前 85% 角度，180-250 占据后 15%
@@ -127,6 +128,28 @@ class CombinedGaugePainter extends CustomPainter {
       ..shader = gradient.createShader(Rect.fromCircle(center: center, radius: radius + 20));
 
     canvas.drawCircle(center, radius + 20, paint);
+
+    // 超速红色闪烁效果
+    if (speed > flashThreshold) {
+      _drawSpeedWarningGlow(canvas, center, radius);
+    }
+  }
+
+  /// 绘制超速警告红色闪烁光环
+  void _drawSpeedWarningGlow(Canvas canvas, Offset center, double radius) {
+    // 计算闪烁透明度 (0.2 - 0.7 之间脉冲)
+    final time = DateTime.now().millisecondsSinceEpoch;
+    final pulse = 0.2 + 0.5 * ((time ~/ 200) % 2 == 0 ? 1 : 0);
+
+    final glowPaint = Paint()
+      // F13326FF
+      ..color = const Color(0xFFF12111).withValues(alpha: pulse)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+
+    // 绘制全圈红色光环
+    canvas.drawCircle(center, radius + 30, glowPaint);
   }
 
   void _drawTickBackground(Canvas canvas, Offset center, double radius) {
