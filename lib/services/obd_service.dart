@@ -121,7 +121,7 @@ class OBDService {
       case "0D": // 车速
         if (parts.length >= 3) {
           var speed = int.tryParse(parts[2], radix: 16) ?? 0;
-          speed = (speed * 1.08) as int;
+          speed = (speed * 1.08).toInt();
           return ObdParseResult(speed: speed);
         }
         break;

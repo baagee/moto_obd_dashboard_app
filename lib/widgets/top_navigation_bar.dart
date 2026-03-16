@@ -1,9 +1,25 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'bluetooth_status_icon.dart';
 
 /// 顶部导航栏
 class TopNavigationBar extends StatelessWidget {
-  const TopNavigationBar({super.key});
+  final int currentIndex;
+  final Function(int) onNavigate;
+  final VoidCallback? onLinkVehiclePressed;
+  final bool isConnected;
+  final String? deviceName;
+  final List<String> navItems;
+
+  const TopNavigationBar({
+    super.key,
+    required this.currentIndex,
+    required this.onNavigate,
+    this.onLinkVehiclePressed,
+    required this.isConnected,
+    this.deviceName,
+    this.navItems = const ['DASHBOARD', 'LOGS', 'DEVICES'],
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -73,11 +89,7 @@ class TopNavigationBar extends StatelessWidget {
 
           // 导航菜单
           Row(
-            children: [
-              _NavItem('DASHBOARD', isActive: true),
-              const SizedBox(width: 12),
-              _NavItem('SETTINGS'),
-            ],
+            children: _buildNavItems(),
           ),
 
           const SizedBox(width: 12),
@@ -91,23 +103,30 @@ class TopNavigationBar extends StatelessWidget {
 
           const SizedBox(width: 10),
 
-          // Link Vehicle按钮
-          Container(
-            height: 21,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.primary,
-              borderRadius: BorderRadius.circular(5),
-              boxShadow: AppTheme.glowShadow(AppTheme.primary),
-            ),
-            child: const Center(
-              child: Text(
-                'LINK VEHICLE',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 7,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
+          // Link Vehicle按钮 - 根据连接状态显示不同文案
+          GestureDetector(
+            onTap: onLinkVehiclePressed,
+            child: Container(
+              height: 21,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              constraints: const BoxConstraints(maxWidth: 80),
+              decoration: BoxDecoration(
+                color: isConnected ? AppTheme.accentGreen : AppTheme.primary,
+                borderRadius: BorderRadius.circular(5),
+                boxShadow: AppTheme.glowShadow(
+                  isConnected ? AppTheme.accentGreen : AppTheme.primary,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  isConnected && deviceName != null ? deviceName! : (isConnected ? 'LINKED' : 'LINK VEHICLE'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 7,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
@@ -115,65 +134,66 @@ class TopNavigationBar extends StatelessWidget {
 
           const SizedBox(width: 6),
 
-          // 状态图标
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(5),
-              border: Border.all(
-                color: AppTheme.primary.withOpacity(0.1),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.bluetooth_connected,
-                  color: AppTheme.accentGreen,
-                  size: 12,
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.signal_cellular_alt,
-                  color: AppTheme.primary,
-                  size: 12,
-                ),
-              ],
-            ),
-          ),
+          // 蓝牙和信号状态图标
+          const BluetoothStatusIcon(),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildNavItems() {
+    final items = <Widget>[];
+    for (int i = 0; i < navItems.length; i++) {
+      if (i > 0) {
+        items.add(const SizedBox(width: 12));
+      }
+      items.add(
+        _NavItem(
+          navItems[i],
+          isActive: currentIndex == i,
+          onTap: () => onNavigate(i),
+        ),
+      );
+    }
+    return items;
   }
 }
 
 class _NavItem extends StatelessWidget {
   final String label;
   final bool isActive;
+  final VoidCallback? onTap;
 
-  const _NavItem(this.label, {this.isActive = false});
+  const _NavItem(this.label, {this.isActive = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: isActive ? AppTheme.primary : AppTheme.textSecondary,
-            fontSize: 8,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-          ),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? AppTheme.primary : AppTheme.textSecondary,
+                fontSize: 8,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+            if (isActive)
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                height: 1,
+                width: 40,
+                color: AppTheme.primary,
+              ),
+          ],
         ),
-        if (isActive)
-          Container(
-            margin: const EdgeInsets.only(top: 2),
-            height: 1,
-            width: 40,
-            color: AppTheme.primary,
-          ),
-      ],
+      ),
     );
   }
 }
