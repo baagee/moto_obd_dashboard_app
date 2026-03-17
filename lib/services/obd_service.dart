@@ -68,23 +68,23 @@ class OBDService {
     logCallback?.call('ELM327', LogType.info, '开始初始化 ELM327...');
 
     // ATZ 复位
-    await sendCommand("ATZ");
+    sendCommand("ATZ");
     await Future.delayed(BluetoothConstants.elm327InitWait);
 
     // ATE0 关闭回显
-    await sendCommand("ATE0");
+    sendCommand("ATE0");
     await Future.delayed(BluetoothConstants.obdCommandInterval);
 
     // ATL0 关闭行尾
-    await sendCommand("ATL0");
+    sendCommand("ATL0");
     await Future.delayed(BluetoothConstants.obdCommandInterval);
 
     // ATH0 关闭头信息
-    await sendCommand("ATH0");
+    sendCommand("ATH0");
     await Future.delayed(BluetoothConstants.obdCommandInterval);
 
     // ATSP0 自动协议
-    await sendCommand("ATSP0");
+    sendCommand("ATSP0");
     await Future.delayed(BluetoothConstants.obdCommandInterval);
 
     logCallback?.call('ELM327', LogType.success, 'ELM327 初始化完成');
@@ -202,7 +202,7 @@ class OBDService {
   }
 
   /// 发送 OBD 命令
-  Future<void> sendCommand(String command) async {
+  void sendCommand(String command) {
     // 如果轮询未启动或写入特征为空，跳过发送
     if (_writeCharacteristic == null) {
       logCallback?.call('OBD', LogType.warning, 'sendCommand 跳过: _writeCharacteristic=${_writeCharacteristic != null}');
@@ -210,14 +210,14 @@ class OBDService {
     }
     try {
       final bytes = utf8.encode("$command\r");
-      await _writeCharacteristic!.write(bytes, withoutResponse: false);
+       _writeCharacteristic!.write(bytes, withoutResponse: false);
     } catch (e) {
       final errorMsg = e.toString();
+      logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $errorMsg');
       if (errorMsg.contains('device is disconnected') ||
           errorMsg.contains('disconnected')) {
         stopPolling();
       } else {
-        logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $errorMsg');
       }
     }
   }

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:provider/provider.dart';
-import '../theme/app_theme.dart';
 import '../providers/bluetooth_provider.dart';
 import '../providers/log_provider.dart';
 import '../providers/sensor_provider.dart';
@@ -11,7 +9,6 @@ import '../providers/navigation_provider.dart';
 import '../services/audio_service.dart';
 import '../models/riding_event.dart';
 import '../models/event_voice_config.dart';
-import '../widgets/bluetooth_status_icon.dart';
 import '../widgets/bluetooth_alert_dialog.dart';
 import '../widgets/event_notification_dialog.dart';
 import '../widgets/top_navigation_bar.dart';
@@ -131,6 +128,31 @@ class _MainContainerState extends State<MainContainer> {
     _navigateTo(2);
   }
 
+  /// 构建IndexedStack并监听骑行事件
+  Widget _buildIndexedStack(BuildContext context, int currentIndex) {
+    return Selector<RidingStatsProvider, RidingEvent?>(
+      selector: (_, stats) => stats.latestEvent,
+      builder: (context, latestEvent, _) {
+        if (latestEvent != null && !_hasShownEventNotification) {
+          _hasShownEventNotification = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showEventNotification(latestEvent);
+            // 清除最新事件，避免重复显示
+            context.read<RidingStatsProvider>().clearLatestEvent();
+            // 重置标志，允许显示下一个事件（3.5秒确保弹窗3秒关闭后再解锁）
+            Future.delayed(const Duration(milliseconds: 3500), () {
+              _hasShownEventNotification = false;
+            });
+          });
+        }
+        return IndexedStack(
+          index: currentIndex,
+          children: _pages,
+        );
+      },
+    );
+  }
+
   /// 显示事件通知弹窗并播放语音
   void _showEventNotification(RidingEvent event) {
     if (!mounted) return;
@@ -165,68 +187,59 @@ class _MainContainerState extends State<MainContainer> {
           await intent.launch();
         }
       },
-      child: Consumer<NavigationProvider>(
-        builder: (context, navProvider, child) {
-          return Consumer<BluetoothProvider>(
-            builder: (context, bluetoothProvider, child) {
-              // 监听骑行事件
-              return Consumer<RidingStatsProvider>(
-                builder: (context, statsProvider, child) {
-                  final latestEvent = statsProvider.latestEvent;
-                  if (latestEvent != null && !_hasShownEventNotification) {
-                    _hasShownEventNotification = true;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _showEventNotification(latestEvent);
-                      // 清除最新事件，避免重复显示
-                      statsProvider.clearLatestEvent();
-                      // 重置标志，允许显示下一个事件（3.5秒确保弹窗3秒关闭后再解锁）
-                      Future.delayed(const Duration(milliseconds: 3500), () {
-                        _hasShownEventNotification = false;
+      child: Scaffold(
+        body: Column(
+          children: [
+            // 顶部导航栏 - 使用 Selector 精确监听
+            Selector<NavigationProvider, int>(
+              selector: (_, nav) => nav.currentIndex,
+              builder: (context, currentIndex, _) {
+                // 监听蓝牙连接状态
+                return Selector<BluetoothProvider, bool>(
+                  selector: (_, bt) => bt.isDeviceConnected,
+                  builder: (context, isConnected, _) {
+                    // 连接状态变化时管理骑行统计
+                    if (!isConnected && _hasStartedRide) {
+                      _hasStartedRide = false;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        context.read<RidingStatsProvider>().endRide();
                       });
-                    });
-                  }
+                    }
+                    if (isConnected && !_hasStartedRide) {
+                      _hasStartedRide = true;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        context.read<RidingStatsProvider>().startRide();
+                      });
+                    }
 
-                  // 检测连接成功瞬间，启动骑行统计
-                  final isConnected = bluetoothProvider.isDeviceConnected;
-                  // 连接状态从 connected 变为 disconnected 时重置
-                  if (!isConnected && _hasStartedRide) {
-                    _hasStartedRide = false;
-                    context.read<RidingStatsProvider>().endRide();
-                  }
-                  if (isConnected && !_hasStartedRide) {
-                    _hasStartedRide = true;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      context.read<RidingStatsProvider>().startRide();
-                    });
-                  }
-
-                  return Scaffold(
-                    body: Column(
-                      children: [
-                        // 顶部导航栏
-                        TopNavigationBar(
-                          currentIndex: navProvider.currentIndex,
+                    return Selector<BluetoothProvider, String?>(
+                      selector: (_, bt) => bt.connectedDevice?.name,
+                      builder: (context, deviceName, _) {
+                        return TopNavigationBar(
+                          currentIndex: currentIndex,
                           onNavigate: _navigateTo,
                           onLinkVehiclePressed: _navigateToBluetoothScan,
                           isConnected: isConnected,
-                          deviceName: bluetoothProvider.connectedDevice?.name,
-                        ),
+                          deviceName: deviceName,
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
 
-                        // 页面内容
-                        Expanded(
-                          child: IndexedStack(
-                            index: navProvider.currentIndex,
-                            children: _pages,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+            // 页面内容 - 使用 Selector 精确监听 currentIndex
+            Expanded(
+              child: Selector<NavigationProvider, int>(
+                selector: (_, nav) => nav.currentIndex,
+                builder: (context, currentIndex, _) {
+                  return _buildIndexedStack(context, currentIndex);
                 },
-              );
-            },
-          );
-        },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

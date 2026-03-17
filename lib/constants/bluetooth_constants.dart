@@ -18,7 +18,8 @@ class BluetoothConstants {
 
   /// 蓝牙设备连接超时时间
   /// 发起连接请求后超过此时间未成功建立连接则视为连接失败
-  static const Duration connectionTimeout = Duration(seconds: 3);
+  static const Duration connectionTimeout = Duration(seconds: 2);
+  static const Duration connectWaitCallbackTimeout = Duration(seconds: 1);
 
   /// ELM327 初始化命令发送间隔（毫秒）
   /// 初始化过程中发送 AT 命令之间的间隔时间，间隔过短可能导致响应错乱
@@ -36,7 +37,7 @@ class BluetoothConstants {
 
   /// 自动重连重试间隔
   /// 每次重连尝试失败后等待再重试的时间间隔
-  static const Duration reconnectRetryInterval = Duration(seconds: 1);
+  static const Duration reconnectRetryInterval = Duration(milliseconds: 500);
 
   // ==================== OBD 数据轮询相关 ====================
 

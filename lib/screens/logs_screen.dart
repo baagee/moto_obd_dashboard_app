@@ -7,8 +7,16 @@ import '../widgets/cyber_button.dart';
 import '../widgets/cyber_dialog.dart';
 
 /// 日志页面
-class LogsScreen extends StatelessWidget {
+class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
+
+  @override
+  State<LogsScreen> createState() => _LogsScreenState();
+}
+
+class _LogsScreenState extends State<LogsScreen> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
 
   /// 显示清空日志确认对话框
   void _showClearConfirmDialog(BuildContext context, LogProvider provider) {
@@ -44,6 +52,7 @@ class LogsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF0A1114),

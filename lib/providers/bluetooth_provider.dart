@@ -175,6 +175,8 @@ class BluetoothProvider extends ChangeNotifier {
 
       try {
         await connectToDevice(device);
+        // 等待结果回调
+        await Future.delayed(BluetoothConstants.connectWaitCallbackTimeout);
         if (_connectedDevice != null) {
           _logCallback?.call('Bluetooth', LogType.success, '自动重连成功');
           break;
@@ -531,7 +533,6 @@ class BluetoothProvider extends ChangeNotifier {
         await _startObdSession(device, index);
         break;
       case fb.BluetoothConnectionState.disconnected:
-        _logCallback.call('Bluetooth', LogType.warning, 'disconnected callback ${device.name}');
         if (isDeviceConnected) {
           _cleanupConnection(caller: "_handleConnectionStateChanged.disconnected");
         }
@@ -665,7 +666,7 @@ class BluetoothProvider extends ChangeNotifier {
   }
 
   /// 更新 RSSI 和稳定性
-  Future<void> _updateRssiAndStability() async {
+  void _updateRssiAndStability() async {
     if (_connectedDevice?.flutterDevice == null) return;
     try {
       final rssi = await _connectedDevice!.flutterDevice!.readRssi();
