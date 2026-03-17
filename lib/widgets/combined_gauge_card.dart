@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/obd_data_provider.dart';
 import '../theme/app_theme.dart';
+import 'mini_temp_gauge.dart';
 
 /// 组合仪表盘卡片（转速+时速）
 class CombinedGaugeCard extends StatelessWidget {
@@ -19,13 +20,51 @@ class CombinedGaugeCard extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               // 占满整个可用空间
-              return CustomPaint(
-                size: Size(constraints.maxWidth, constraints.maxHeight),
-                painter: CombinedGaugePainter(
-                  rpm: data.rpm,
-                  speed: data.speed,
-                  gear: 0,// 获取不到档位，设置为0
-                ),
+              return Stack(
+                children: [
+                  CustomPaint(
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    painter: CombinedGaugePainter(
+                      rpm: data.rpm,
+                      speed: data.speed,
+                      gear: 0, // 获取不到档位，设置为0
+                    ),
+                  ),
+                  // 左下角 - 冷却水温
+                  Positioned(
+                    left: 0,
+                    bottom: 0,
+                    child: MiniTempGauge(
+                      temperature: data.coolantTemp,
+                      minTemp: 0,
+                      maxTemp: 120,
+                      label: '水温',
+                      normalColor: AppTheme.accentCyan,
+                      warnColor: AppTheme.accentOrange,
+                      dangerColor: AppTheme.accentRed,
+                      size: 64,
+                      warnThreshold: 100,
+                      dangerThreshold: 110,
+                    ),
+                  ),
+                  // 右下角 - 进气温度
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: MiniTempGauge(
+                      temperature: data.intakeTemp,
+                      minTemp: -20,
+                      maxTemp: 60,
+                      label: '气温',
+                      normalColor: AppTheme.accentGreen,
+                      warnColor: AppTheme.accentOrange,
+                      dangerColor: AppTheme.accentRed,
+                      size: 64,
+                      warnThreshold: 45,
+                      dangerThreshold: 60,
+                    ),
+                  ),
+                ],
               );
             },
           ),
