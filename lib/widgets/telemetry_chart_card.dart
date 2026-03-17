@@ -12,8 +12,6 @@ class TelemetryChartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<OBDDataProvider>(
       builder: (context, provider, child) {
-        final data = provider.data;
-
         return Container(
           padding: const EdgeInsets.all(9),
           decoration: BoxDecoration(
@@ -28,7 +26,7 @@ class TelemetryChartCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('近期趋势', style: AppTheme.labelTinyPrimary),
+                  const Text('近期趋势', style: AppTheme.labelMedium),
                   Row(
                     children: [
                       const _LegendDot(color: AppTheme.primary, label: '转速'),
@@ -55,8 +53,8 @@ class TelemetryChartCard extends StatelessWidget {
                     // 中间图表 - 使用 RepaintBoundary 隔离重绘
                     Expanded(
                       child: _ChartArea(
-                        rpmHistory: data.rpmHistory,
-                        velocityHistory: data.velocityHistory,
+                        rpmHistory: provider.rpmHistory,
+                        velocityHistory: provider.velocityHistory,
                       ),
                     ),
 

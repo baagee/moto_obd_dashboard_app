@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/obd_data.dart';
+import '../utils/advanced_calc.dart';
 
 /// OBD数据提供者 - 管理真实 OBD 数据（无 Mock）
 /// 设备未连接时显示默认值（全为 0）
@@ -37,9 +38,8 @@ class OBDDataProvider extends ChangeNotifier {
   static const int defaultCoolantTemp = 0;
   static const int defaultIntakeTemp = 0;
 
-  // 最大数据点数
-  static const int maxDataPoints = 30;
-  static const int maxPressurePoints = 15;
+  // 最大数据点数（统一为60点）
+  static const int maxDataPoints = 60;
 
   // OBD数据
   OBDData _data = OBDData(
@@ -56,6 +56,8 @@ class OBDDataProvider extends ChangeNotifier {
     intakeTemp: defaultIntakeTemp,
     rpmHistory: List.filled(maxDataPoints, 0),
     velocityHistory: List.filled(maxDataPoints, 0),
+    instantFuel: 0.0,
+    fuelHistory: List.filled(maxDataPoints, 0.0),
   );
 
   // 骑行事件列表
@@ -66,6 +68,7 @@ class OBDDataProvider extends ChangeNotifier {
   final List<int> _velocityHistory = [];
   final List<int> _pressureHistory = [];
   final List<int> _timestampHistory = [];
+  final List<double> _fuelHistory = [];
 
   // 连接状态
   bool _isDeviceConnected = false;
@@ -73,8 +76,11 @@ class OBDDataProvider extends ChangeNotifier {
   // Getter
   OBDData get data => _data;
   // List<RidingEvent> get events => _events;
+  List<int> get rpmHistory => _rpmHistory;
+  List<int> get velocityHistory => _velocityHistory;
   List<int> get pressureHistory => _pressureHistory;
   List<int> get timestampHistory => _timestampHistory;
+  List<double> get fuelHistory => _fuelHistory;
   bool get isDeviceConnected => _isDeviceConnected;
 
   OBDDataProvider() {
@@ -109,11 +115,34 @@ class OBDDataProvider extends ChangeNotifier {
     }
     if (pressure != null) {
       _pressureHistory.add(pressure);
-      if (_pressureHistory.length > maxPressurePoints) _pressureHistory.removeAt(0);
+      if (_pressureHistory.length > maxDataPoints) _pressureHistory.removeAt(0);
+    }
+
+    // 计算油耗
+    double instantFuel = 0.0;
+    final currentRpm = rpm ?? _data.rpm;
+    final currentSpeed = speed ?? _data.speed;
+    final currentPressure = pressure ?? _data.pressure;
+    final currentIntakeTemp = intakeTemp ?? _data.intakeTemp;
+
+    if (currentRpm >= 500) {
+      final fuelResult = GSX8SAdvancedCalculator.calculateFuel(
+        rpm: currentRpm,
+        speed: currentSpeed,
+        map: currentPressure,
+        iat: currentIntakeTemp,
+      );
+      // 使用百公里油耗 L/100km
+      instantFuel = fuelResult['L_100km'] ?? 0.0;
+    }
+
+    // 每次 OBD 数据到达都添加油耗记录（统一采样频率）
+    _fuelHistory.add(instantFuel);
+    if (_fuelHistory.length > maxDataPoints) {
+      _fuelHistory.removeAt(0);
     }
 
     // 计算档位
-    final currentSpeed = speed ?? _data.speed;
     // final gear = _calculateGear(currentSpeed);
 
     _data = _data.copyWith(
@@ -128,6 +157,8 @@ class OBDDataProvider extends ChangeNotifier {
       voltage: voltage ?? _data.voltage,
       rpmHistory: List.from(_rpmHistory),
       velocityHistory: List.from(_velocityHistory),
+      instantFuel: instantFuel,
+      fuelHistory: List.from(_fuelHistory),
     );
 
     notifyListeners();
@@ -141,6 +172,7 @@ class OBDDataProvider extends ChangeNotifier {
     _velocityHistory.clear();
     _pressureHistory.clear();
     _timestampHistory.clear();
+    _fuelHistory.clear();
 
     _data = OBDData(
       rpm: defaultRpm,
@@ -156,6 +188,8 @@ class OBDDataProvider extends ChangeNotifier {
       intakeTemp: defaultIntakeTemp,
       rpmHistory: List.filled(maxDataPoints, 0),
       velocityHistory: List.filled(maxDataPoints, 0),
+      instantFuel: 0.0,
+      fuelHistory: List.filled(maxDataPoints, 0.0),
     );
 
     notifyListeners();

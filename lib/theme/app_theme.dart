@@ -53,11 +53,11 @@ class AppTheme {
     color: textMuted,
   );
 
-  /// 标签样式 - 中号 (fontSize: 11)
+  /// 标签样式 - 中号 (fontSize: 12)
   static const TextStyle labelMedium = TextStyle(
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: FontWeight.w500,
-    color: textSecondary,
+    color: primary,
   );
 
   /// 数值样式 - 小号 (fontSize: 11)

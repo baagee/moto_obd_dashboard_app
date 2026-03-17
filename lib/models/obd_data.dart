@@ -12,6 +12,8 @@ class OBDData {
 
   final List<int> rpmHistory;
   final List<int> velocityHistory;
+  final double instantFuel; // 瞬时油耗 (L/h)
+  final List<double> fuelHistory; // 油耗历史
   final int leanAngle; // 压弯倾角
 
   // final int gear;// 档位
@@ -31,6 +33,8 @@ class OBDData {
     required this.intakeTemp,
     required this.rpmHistory,
     required this.velocityHistory,
+    required this.instantFuel,
+    required this.fuelHistory,
   });
 
   OBDData copyWith({
@@ -47,6 +51,8 @@ class OBDData {
     int? intakeTemp,
     List<int>? rpmHistory,
     List<int>? velocityHistory,
+    double? instantFuel,
+    List<double>? fuelHistory,
   }) {
     return OBDData(
       rpm: rpm ?? this.rpm,
@@ -62,6 +68,8 @@ class OBDData {
       intakeTemp: intakeTemp ?? this.intakeTemp,
       rpmHistory: rpmHistory ?? this.rpmHistory,
       velocityHistory: velocityHistory ?? this.velocityHistory,
+      instantFuel: instantFuel ?? this.instantFuel,
+      fuelHistory: fuelHistory ?? this.fuelHistory,
     );
   }
 }

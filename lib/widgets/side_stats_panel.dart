@@ -20,35 +20,18 @@ class SideStatsPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 标题
-              const Text('车辆状态', style: AppTheme.labelTinyPrimary),
-
-              const SizedBox(height: 2),
+              // const Text('车辆状态', style: AppTheme.labelTinyPrimary),
+              //
+              // const SizedBox(height: 2),
 
               // 内容区域 - 不滚动
               Expanded(
                 child: Column(
                   children: [
-                    // 温度区域
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _TempCard(
-                            icon: Icons.device_thermostat,
-                            iconColor: AppTheme.accentOrange,
-                            label: '冷却水温',
-                            value: '${data.coolantTemp}°C',
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: _TempCard(
-                            icon: Icons.ac_unit,
-                            iconColor: AppTheme.accentCyan,
-                            label: '进气温度',
-                            value: '${data.intakeTemp}°C',
-                          ),
-                        ),
-                      ],
+                    // 油耗趋势图
+                    _FuelChart(
+                      instantFuel: data.instantFuel,
+                      fuelHistory: provider.fuelHistory,
                     ),
 
                     const SizedBox(height: 3),
@@ -96,46 +79,6 @@ class SideStatsPanel extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-/// 温度卡片
-class _TempCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-
-  const _TempCard({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(6)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: iconColor, size: 14),
-              const SizedBox(width: 4),
-              Text(label, style: AppTheme.labelMedium),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Text(value, style: AppTheme.valueMedium),
-        ],
-      ),
     );
   }
 }
@@ -417,6 +360,161 @@ class PressureChartPainter extends CustomPainter {
     if (oldDelegate.pressureHistory.length != pressureHistory.length) return true;
     if (pressureHistory.isEmpty) return false;
     return oldDelegate.pressureHistory.last != pressureHistory.last;
+  }
+}
+
+/// 油耗图表
+class _FuelChart extends StatelessWidget {
+  final double instantFuel;
+  final List<double> fuelHistory;
+
+  const _FuelChart({
+    required this.instantFuel,
+    required this.fuelHistory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: const BoxDecoration(
+        color: AppTheme.backgroundDark30,
+        borderRadius: BorderRadius.all(Radius.circular(6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('瞬时油耗', style: AppTheme.labelMedium),
+              Text('${instantFuel.toStringAsFixed(1)} L/100km', style: AppTheme.valueSmall),
+            ],
+          ),
+          const SizedBox(height: 2),
+          SizedBox(
+            height: 40,
+            child: Row(
+              children: [
+                // Y轴刻度标签
+                SizedBox(
+                  width: 14,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('8', style: AppTheme.labelTiny.copyWith(fontSize: 9, color: AppTheme.accentCyan)),
+                      Text('4', style: AppTheme.labelTiny.copyWith(fontSize: 9, color: AppTheme.accentCyan)),
+                      Text('0', style: AppTheme.labelTiny.copyWith(fontSize: 9, color: AppTheme.accentCyan)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 1),
+                // 图表
+                Expanded(
+                  child: CustomPaint(
+                    painter: FuelChartPainter(
+                      fuelHistory: fuelHistory,
+                      minFuel: 0,
+                      maxFuel: 9,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 油耗图表绘制器
+class FuelChartPainter extends CustomPainter {
+  final List<double> fuelHistory;
+  final double minFuel;
+  final double maxFuel;
+
+  FuelChartPainter({
+    required this.fuelHistory,
+    required this.minFuel,
+    required this.maxFuel,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final width = size.width;
+    final height = size.height;
+    const padding = 2.0;
+
+    // 绘制横向刻度线（在0、3、6处划线）
+    final gridPaint = Paint()
+      ..color = AppTheme.primary10
+      ..strokeWidth = 1;
+
+    // Y轴标签是9、6、3、0，在0、3、6处画网格线
+    final labels = [6, 3, 0];
+    for (final label in labels) {
+      final y = height * (maxFuel - label) / maxFuel;
+      canvas.drawLine(Offset(0, y), Offset(width, y), gridPaint);
+    }
+
+    // 没有足够数据时不绘制曲线
+    if (fuelHistory.length < 2) return;
+
+    // 计算点位置
+    final points = <Offset>[];
+    final step = width / (fuelHistory.length - 1);
+
+    for (int i = 0; i < fuelHistory.length; i++) {
+      final x = i * step;
+      final y = height - padding - ((fuelHistory[i] - minFuel) / (maxFuel - minFuel)) * (height - 2 * padding);
+      points.add(Offset(x, y.clamp(padding, height - padding)));
+    }
+
+    // 绘制面积
+    final areaPath = Path();
+    areaPath.moveTo(points.first.dx, height);
+    areaPath.lineTo(points.first.dx, points.first.dy);
+
+    for (int i = 1; i < points.length; i++) {
+      areaPath.lineTo(points[i].dx, points[i].dy);
+    }
+
+    areaPath.lineTo(points.last.dx, height);
+    areaPath.close();
+
+    final areaPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [AppTheme.accentCyan.withAlpha(77), Colors.transparent],
+      ).createShader(Rect.fromLTWH(0, 0, width, height));
+
+    canvas.drawPath(areaPath, areaPaint);
+
+    // 绘制线条
+    final linePath = Path();
+    linePath.moveTo(points.first.dx, points.first.dy);
+
+    for (int i = 1; i < points.length; i++) {
+      linePath.lineTo(points[i].dx, points[i].dy);
+    }
+
+    final linePaint = Paint()
+      ..color = AppTheme.accentCyan
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPath(linePath, linePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant FuelChartPainter oldDelegate) {
+    if (oldDelegate.fuelHistory.length != fuelHistory.length) return true;
+    if (fuelHistory.isEmpty) return false;
+    return oldDelegate.fuelHistory.last != fuelHistory.last;
   }
 }
 

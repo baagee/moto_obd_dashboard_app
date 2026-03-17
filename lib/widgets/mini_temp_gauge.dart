@@ -121,11 +121,11 @@ class MiniTempGaugePainter extends CustomPainter {
       ..strokeWidth = 8
       ..strokeCap = StrokeCap.butt;
 
-    // 从 π 到 2π（半圆，从左到右）
+    // 从 π*0.9 到 π*2.1（超过半圆）
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      pi,
-      pi,
+      pi * 0.9,
+      pi * 1.2,
       false,
       paint,
     );
@@ -145,7 +145,7 @@ class MiniTempGaugePainter extends CustomPainter {
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      pi,
+      pi * 0.9,
       tempAngle,
       false,
       paint,
@@ -155,8 +155,8 @@ class MiniTempGaugePainter extends CustomPainter {
   /// 绘制指针
   void _drawPointer(Canvas canvas, Offset center, double radius) {
     final double tempAngle = _tempToAngle(temperature.toDouble());
-    // 指针角度从 pi 开始（左侧）到 2π（右侧）
-    final double pointerAngle = pi + tempAngle;
+    // 指针角度从 π*0.9 到 π*2.1
+    final double pointerAngle = pi * 0.9 + tempAngle;
 
     // 指针长度
     final double pointerLength = radius - 12;
@@ -213,7 +213,7 @@ class MiniTempGaugePainter extends CustomPainter {
       text: TextSpan(
         text: label,
         style: const TextStyle(
-          color: AppTheme.textMuted,
+          color: AppTheme.primary,
           fontSize: 10,
           fontWeight: FontWeight.normal,
           letterSpacing: 1,
@@ -234,7 +234,7 @@ class MiniTempGaugePainter extends CustomPainter {
   /// 温度到角度的映射
   double _tempToAngle(double temp) {
     final double ratio = ((temp - minTemp) / (maxTemp - minTemp)).clamp(0.0, 1.0).toDouble();
-    return ratio * pi;
+    return ratio * pi * 1.2;
   }
 
   /// 根据温度获取颜色
