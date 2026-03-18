@@ -20,7 +20,7 @@ class SideStatsPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 标题
-              const Text('车辆状态', style: AppTheme.labelTinyPrimary),
+              const Text('车辆状态', style: AppTheme.labelMediumPrimary),
 
               const SizedBox(height: 2),
 
@@ -55,6 +55,8 @@ class SideStatsPanel extends StatelessWidget {
 
                     // 油门进度条
                     _ProgressBar(
+                      icon: Icons.speed,
+                      iconColor: AppTheme.accentCyan,
                       label: '油门开度',
                       value: data.throttle,
                       color: AppTheme.accentCyan,
@@ -64,6 +66,8 @@ class SideStatsPanel extends StatelessWidget {
 
                     // 负载进度条
                     _ProgressBar(
+                      icon: Icons.settings,
+                      iconColor: AppTheme.accentOrange,
                       label: '发动机负载',
                       value: data.load,
                       color: AppTheme.accentOrange,
@@ -129,7 +133,7 @@ class _TempCard extends StatelessWidget {
             children: [
               Icon(icon, color: iconColor, size: 14),
               const SizedBox(width: 4),
-              Text(label, style: AppTheme.labelMedium),
+              Text(label, style: AppTheme.labelMediumPrimary),
             ],
           ),
           const SizedBox(height: 3),
@@ -142,11 +146,15 @@ class _TempCard extends StatelessWidget {
 
 /// 进度条
 class _ProgressBar extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
   final String label;
   final int value;
   final Color color;
 
   const _ProgressBar({
+    required this.icon,
+    required this.iconColor,
     required this.label,
     required this.value,
     required this.color,
@@ -164,9 +172,11 @@ class _ProgressBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: AppTheme.labelMedium),
+              Icon(icon, color: iconColor, size: 14),
+              const SizedBox(width: 4),
+              Text(label, style: AppTheme.labelMediumPrimary),
+              const Spacer(),
               Text('$value%', style: AppTheme.valueSmall.copyWith(color: color)),
             ],
           ),
@@ -223,9 +233,11 @@ class _LeanAngleIndicator extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('车辆倾角', style: AppTheme.labelMedium),
+              const Icon(Icons.rotate_right, color: AppTheme.primary, size: 14),
+              const SizedBox(width: 4),
+              const Text('车辆倾角', style: AppTheme.labelMediumPrimary),
+              const Spacer(),
               Row(
                 children: [
                   Text('$angle°', style: AppTheme.valueSmall),
@@ -320,9 +332,11 @@ class _PressureChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('进气歧管压力', style: AppTheme.labelMedium),
+              const Icon(Icons.compress, color: AppTheme.primary, size: 14),
+              const SizedBox(width: 4),
+              const Text('进气歧管压力', style: AppTheme.labelMediumPrimary),
+              const Spacer(),
               Text('$pressure kPa', style: AppTheme.valueSmall),
             ],
           ),
@@ -441,7 +455,7 @@ class _VoltageDisplay extends StatelessWidget {
             children: [
               Icon(Icons.battery_charging_full, color: AppTheme.accentGreen, size: 14),
               SizedBox(width: 4),
-              Text('控制模块电压', style: AppTheme.labelMedium),
+              Text('控制模块电压', style: AppTheme.labelMediumPrimary),
             ],
           ),
           Text(

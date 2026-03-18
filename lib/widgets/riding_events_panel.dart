@@ -22,7 +22,7 @@ class RidingEventsPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 标题
-              const Text('骑行事件', style: AppTheme.labelTinyPrimary),
+              const Text('骑行事件', style: AppTheme.labelMediumPrimary),
 
               const SizedBox(height: 6),
 

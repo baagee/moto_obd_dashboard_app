@@ -28,7 +28,7 @@ class TelemetryChartCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('近期趋势', style: AppTheme.labelTinyPrimary),
+                  const Text('近期趋势', style: AppTheme.labelMediumPrimary),
                   Row(
                     children: [
                       const _LegendDot(color: AppTheme.primary, label: '转速'),

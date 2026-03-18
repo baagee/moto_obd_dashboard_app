@@ -44,12 +44,12 @@ class CombinedGaugePainter extends CustomPainter {
   // RPM 参数
   static const int maxRpm = 12000;
   static const int warnRpm = 6000;
-  static const int dangerRpm = 9000;
+  static const int dangerRpm = 8000;
 
   // Speed 参数
   static const int maxSpeed = 250;
-  static const int warnSpeed = 150;
-  static const int dangerSpeed = 200;
+  static const int warnSpeed = 120;
+  static const int dangerSpeed = 150;
   static const int flashThreshold = 100; // 闪烁阈值
 
   /// 车速到角度的非线性映射
@@ -130,26 +130,32 @@ class CombinedGaugePainter extends CustomPainter {
     canvas.drawCircle(center, radius + 20, paint);
 
     // 超速红色闪烁效果
-    if (speed > flashThreshold) {
+    if (speed >= flashThreshold) {
       _drawSpeedWarningGlow(canvas, center, radius);
     }
   }
 
   /// 绘制超速警告红色闪烁光环
   void _drawSpeedWarningGlow(Canvas canvas, Offset center, double radius) {
-    // 计算闪烁透明度 (0.2 - 0.7 之间脉冲)
+    // 计算闪烁透明度 (0.5 - 1.0 之间脉冲，更深更明显)
     final time = DateTime.now().millisecondsSinceEpoch;
-    final pulse = 0.2 + 0.5 * ((time ~/ 200) % 2 == 0 ? 1 : 0);
+    final pulse = 0.5 + 0.5 * ((time ~/ 150) % 2 == 0 ? 1 : 0);
 
-    final glowPaint = Paint()
-      // F13326FF
-      ..color = const Color(0xFFF12111).withValues(alpha: pulse)
+    // 外层 - 宽模糊
+    final outerPaint = Paint()
+      ..color = const Color(0xFFFF0000).withValues(alpha: pulse * 0.6) // 纯红色
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+      ..strokeWidth = 16
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 25);
+    canvas.drawCircle(center, radius + 35, outerPaint);
 
-    // 绘制全圈红色光环
-    canvas.drawCircle(center, radius + 30, glowPaint);
+    // 内层 - 窄模糊
+    final innerPaint = Paint()
+      ..color = const Color(0xFFFF0000).withValues(alpha: pulse)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 10
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15);
+    canvas.drawCircle(center, radius + 30, innerPaint);
   }
 
   void _drawTickBackground(Canvas canvas, Offset center, double radius) {
@@ -590,16 +596,6 @@ class CombinedGaugePainter extends CustomPainter {
       canvas,
       Offset(center.dx - rpmUnitPainter.width / 2, center.dy - radius * 0.55),
     );
-
-    // 分隔线
-    // final dividerPaint = Paint()
-    //   ..color = AppTheme.primary30
-    //   ..strokeWidth = 1;
-    // canvas.drawLine(
-    //   Offset(center.dx - radius * 0.08, center.dy),
-    //   Offset(center.dx + radius * 0.08, center.dy),
-    //   dividerPaint,
-    // );
 
     // Speed 在下半圆视觉中心：数值在 center 下方， 单位在数值更下方
     // Speed 值
