@@ -145,7 +145,7 @@ class CombinedGaugePainter extends CustomPainter {
     final outerPaint = Paint()
       ..color = const Color(0xFFFF0000).withValues(alpha: pulse * 0.6) // 纯红色
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 16
+      ..strokeWidth = 14
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 25);
     canvas.drawCircle(center, radius + 35, outerPaint);
 
@@ -153,7 +153,7 @@ class CombinedGaugePainter extends CustomPainter {
     final innerPaint = Paint()
       ..color = const Color(0xFFFF0000).withValues(alpha: pulse)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
+      ..strokeWidth = 8
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15);
     canvas.drawCircle(center, radius + 30, innerPaint);
   }
@@ -187,14 +187,14 @@ class CombinedGaugePainter extends CustomPainter {
   void _drawRPMProgress(Canvas canvas, Offset center, double radius) {
     final sweepAngle = _rpmToAngle(rpm.toDouble());
 
-    // 阶段颜色 - 使用 AppTheme 颜色
+    // 阶段颜色 - 青色(正常) → 橙色(警告) → 红色(危险)
     Color color;
     if (rpm <= warnRpm) {
-      color = AppTheme.primary; // 蓝色
+      color = AppTheme.accentCyan; // 青色 - 正常
     } else if (rpm <= dangerRpm) {
-      color = AppTheme.accentCyan; // 青色
+      color = const Color(0xFFFF9800); // 橙色 - 警告
     } else {
-      color = const Color(0xFFF44336); // 红色
+      color = const Color(0xFFFF0000); // 红色 - 危险
     }
 
     final paint = Paint()
@@ -231,14 +231,14 @@ class CombinedGaugePainter extends CustomPainter {
   void _drawSpeedProgress(Canvas canvas, Offset center, double radius) {
     final sweepAngle = _speedToAngle(speed.toDouble());
 
-    // 阶段颜色 - 使用 AppTheme 颜色
+    // 阶段颜色 - 蓝色(正常) → 紫色(警告) → 红色(危险)
     Color color;
     if (speed <= warnSpeed) {
-      color = AppTheme.accentCyan; // 青色
+      color = AppTheme.primary; // 蓝色 - 正常
     } else if (speed <= dangerSpeed) {
-      color = AppTheme.primary; // 蓝色
+      color = const Color(0xFF9C27B0); // 紫色 - 警告
     } else {
-      color = const Color(0xFFF44336); // 红色
+      color = const Color(0xFFFF0000); // 红色 - 危险
     }
 
     final paint = Paint()
