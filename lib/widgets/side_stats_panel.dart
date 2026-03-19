@@ -29,29 +29,29 @@ class SideStatsPanel extends StatelessWidget {
                 child: Column(
                   children: [
                     // 温度区域
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _TempCard(
-                            icon: Icons.device_thermostat,
-                            iconColor: AppTheme.accentOrange,
-                            label: '冷却水温',
-                            value: '${data.coolantTemp}°C',
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: _TempCard(
-                            icon: Icons.ac_unit,
-                            iconColor: AppTheme.accentCyan,
-                            label: '进气温度',
-                            value: '${data.intakeTemp}°C',
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 3),
+                    // Row(
+                    //   children: [
+                    //     Expanded(
+                    //       child: _TempCard(
+                    //         icon: Icons.device_thermostat,
+                    //         iconColor: AppTheme.accentOrange,
+                    //         label: '冷却水温',
+                    //         value: '${data.coolantTemp}°C',
+                    //       ),
+                    //     ),
+                    //     const SizedBox(width: 6),
+                    //     Expanded(
+                    //       child: _TempCard(
+                    //         icon: Icons.ac_unit,
+                    //         iconColor: AppTheme.accentCyan,
+                    //         label: '进气温度',
+                    //         value: '${data.intakeTemp}°C',
+                    //       ),
+                    //     ),
+                    //   ],
+                    // ),
+                    //
+                    // const SizedBox(height: 3),
 
                     // 油门进度条
                     _ProgressBar(

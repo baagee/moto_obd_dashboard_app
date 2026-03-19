@@ -772,15 +772,15 @@ class CombinedGaugePainter extends CustomPainter {
     // 每个分段的高度（包含间隙）
     final segmentHeight = (height - (tempSegmentCount - 1) * 2) / tempSegmentCount;
 
-    // 绘制背景槽（倒梯形 - 上宽下窄）
-    final bgPaint = Paint()
-      ..color = const Color(0xFF1E293B)
-      ..style = PaintingStyle.fill;
-
     // 根据对齐方式计算 x 坐标
     double getLeftX(double centerX, double width) {
       return alignRight ? centerX : centerX - width;
     }
+
+    // 背景槽：使用半透明填充，显示轮廓
+    final bgPaint = Paint()
+      ..color = const Color(0xFF1E293B).withValues(alpha: 0.15)
+      ..style = PaintingStyle.fill;
 
     final bgPath = Path()
       ..moveTo(getLeftX(trapezoidCenter.dx, topWidth), topY)           // 左上
@@ -812,7 +812,7 @@ class CombinedGaugePainter extends CustomPainter {
       // 确定颜色
       Color segmentColor;
       if (!isFilled) {
-        segmentColor = AppTheme.accentCyan.withValues(alpha: 0.08);
+        segmentColor = const Color(0xFF1E293B);
       } else {
         // 根据温度区间确定颜色
         final segmentRatio = (i + 1) / tempSegmentCount;
