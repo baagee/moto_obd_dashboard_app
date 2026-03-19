@@ -43,40 +43,32 @@ class CombinedGaugePainter extends CustomPainter {
 
   // RPM 参数
   static const int maxRpm = 12000;
-  static const int warnRpm = 6000;
-  static const int dangerRpm = 8000;
+  static const int warnRpm = 7000;
+  static const int dangerRpm = 9000;
 
   // Speed 参数
-  static const int maxSpeed = 250;
+  static const int maxSpeed = 240;
   static const int warnSpeed = 120;
-  static const int dangerSpeed = 150;
+  static const int dangerSpeed = 180;
   static const int flashThreshold = 100; // 闪烁阈值
 
-  /// 车速到角度的非线性映射
-  /// 0-180km/h 占据前 85% 角度，180-250 占据后 15%
+  /// 车速到角度的线性映射 (0-240 均匀划分)
   double _speedToAngle(double speed) {
-    const double normalMax = 180;
-    const double normalRatio = 0.85;
-
-    if (speed <= normalMax) {
-      return (speed / normalMax) * normalRatio * pi;
-    } else {
-      final extra = (speed - normalMax) / (maxSpeed - normalMax);
-      return (normalRatio + extra * (1 - normalRatio)) * pi;
-    }
+    const double maxSpeed = 240;
+    return (speed / maxSpeed) * pi;
   }
 
   /// RPM 到角度的非线性映射
-  /// 0-8000RPM 占据前 85% 角度，8000-12000 占据后 15%
+  /// 0-4000RPM 占据前 20% 角度，4000-12000 占据后 80%
   double _rpmToAngle(double rpm) {
-    const double normalMax = 8000;
-    const double normalRatio = 0.85;
+    const double normalMax = 4000;
+    const double normalRatio = 0.20;
 
     if (rpm <= normalMax) {
       return (rpm / normalMax) * normalRatio * pi;
     } else {
-      final extra = (rpm - normalMax) / (maxRpm - normalMax);
-      return (normalRatio + extra * (1 - normalRatio)) * pi;
+      const double extendedMax = 12000 - 4000;
+      return normalRatio * pi + ((rpm - normalMax) / extendedMax) * (1 - normalRatio) * pi;
     }
   }
 
@@ -408,8 +400,8 @@ class CombinedGaugePainter extends CustomPainter {
 
     final textStyle = TextStyle(
       color: AppTheme.textMuted,
-      fontSize: radius * 0.07,
-      fontWeight: FontWeight.w500,
+      fontSize: radius * 0.09, // 调大字体
+      fontWeight: FontWeight.w600,
     );
 
     // 公共0刻度 - 在正下方（π角度）绘制一个共用的0刻度线和标签
@@ -435,7 +427,7 @@ class CombinedGaugePainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      final textRadius = radius - 42;
+      final textRadius = radius - 52;
       final textX = center.dx + textRadius * cos(zeroAngle) - textPainter.width / 2;
       final textY = center.dy + textRadius * sin(zeroAngle) - textPainter.height / 2;
 
@@ -443,9 +435,9 @@ class CombinedGaugePainter extends CustomPainter {
     }
 
     // 上半圆刻度 (RPM) - 顺时针从π到2π，经过上方
-    // 使用非线性映射：0-8000占前85%角度，8000-12000占后15%
-    // 大刻度：1k, 2k, 3k, 4k, 5k, 6k, 7k, 8k, 10k, 12k
-    final rpmMajorTicks = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 10000, 12000];
+    // 使用非线性映射：0-4000占前20%角度，4000-12000占后80%
+    // 大刻度：0, 2, 4, 5k, 6k, 7k, 8k, 9k, 10k, 11k, 12k
+    final rpmMajorTicks = [0, 2000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000];
     for (final i in rpmMajorTicks) {
       // 顺时针：π → 3π/2 → 2π
       final sweepAngle = _rpmToAngle(i.toDouble());
@@ -453,14 +445,29 @@ class CombinedGaugePainter extends CustomPainter {
       final innerRadius = radius - 32;
       final outerRadius = radius - 22;
 
+      // 根据刻度值区间确定颜色
+      Color tickColor;
+      if (i < warnRpm) {
+        tickColor = AppTheme.accentCyan; // 青色 - 正常
+      } else if (i < dangerRpm) {
+        tickColor = const Color(0xFFFF9800); // 橙色 - 警告
+      } else {
+        tickColor = const Color(0xFFFF0000); // 红色 - 危险
+      }
+
+      final tickPaintColored = Paint()
+        ..color = tickColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4;
+
       final x1 = center.dx + innerRadius * cos(angle);
       final y1 = center.dy + innerRadius * sin(angle);
       final x2 = center.dx + outerRadius * cos(angle);
       final y2 = center.dy + outerRadius * sin(angle);
 
-      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), tickPaint);
+      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), tickPaintColored);
 
-      // 刻度值
+      // 刻度值 - 使用对应颜色
       final textSpan = TextSpan(
         text: i >= 1000 ? '${i ~/ 1000}k' : i.toString(),
         style: textStyle,
@@ -470,21 +477,16 @@ class CombinedGaugePainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      final textRadius = radius - 42;
+      final textRadius = radius - 52;
       final textX = center.dx + textRadius * cos(angle) - textPainter.width / 2;
       final textY = center.dy + textRadius * sin(angle) - textPainter.height / 2;
 
       textPainter.paint(canvas, Offset(textX, textY));
     }
 
-    // 细粒度刻度 (RPM) - 只在常用区域0-8000显示，每1000一个
-    final fineTickPaint = Paint()
-      ..color = AppTheme.primary60
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-
-    // 常用区域每1000一个细刻度（排除已显示的大刻度）
-    final rpmFineTicks = [500, 1500, 2500, 3500, 4500, 5500, 6500, 7500];
+    // 细粒度刻度 (RPM) - 根据区间变色
+    // 小刻度：0-4000区间每1000一个(1000,3000)，4000+区间每500一个
+    final rpmFineTicks = [1000, 3000, 4500, 5500, 6500, 7500, 8500, 9500, 10500, 11500];
     for (final i in rpmFineTicks) {
       final sweepAngle = _rpmToAngle(i.toDouble());
       final angle = pi + sweepAngle;
@@ -492,18 +494,33 @@ class CombinedGaugePainter extends CustomPainter {
       final innerRadius = radius - 40;
       final outerRadius = radius - 30;
 
+      // 根据刻度值区间确定颜色
+      Color tickColor;
+      if (i < warnRpm) {
+        tickColor = AppTheme.accentCyan.withValues(alpha: 0.6); // 青色 - 正常
+      } else if (i < dangerRpm) {
+        tickColor = const Color(0xFFFF9800).withValues(alpha: 0.6); // 橙色 - 警告
+      } else {
+        tickColor = const Color(0xFFFF0000).withValues(alpha: 0.6); // 红色 - 危险
+      }
+
+      final fineTickPaintColored = Paint()
+        ..color = tickColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+
       final x1 = center.dx + innerRadius * cos(angle);
       final y1 = center.dy + innerRadius * sin(angle);
       final x2 = center.dx + outerRadius * cos(angle);
       final y2 = center.dy + outerRadius * sin(angle);
 
-      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), fineTickPaint);
+      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), fineTickPaintColored);
     }
 
     // 下半圆刻度 (Speed) - 逆时针从π到0，经过下方
-    // 使用非线性映射：0-180占前85%角度，180-250占后15%
-    // 大刻度：30, 60, 90, 120, 150, 180, 210, 240
-    final speedMajorTicks = [30, 60, 90, 120, 150, 180, 210, 230];
+    // 线性映射：0-240 均匀分布
+    // 大刻度：每30 km/h - 0, 30, 60, 90, 120, 150, 180, 210 (不显示240)
+    final speedMajorTicks = [0, 30, 60, 90, 120, 150, 180, 210];
     for (final i in speedMajorTicks) {
       // 逆时针：π → π/2 → 0
       final sweepAngle = _speedToAngle(i.toDouble());
@@ -511,14 +528,29 @@ class CombinedGaugePainter extends CustomPainter {
       final innerRadius = radius - 32;
       final outerRadius = radius - 22;
 
+      // 根据刻度值区间确定颜色
+      Color tickColor;
+      if (i < warnSpeed) {
+        tickColor = AppTheme.primary; // 蓝色 - 正常
+      } else if (i < dangerSpeed) {
+        tickColor = const Color(0xFF9C27B0); // 紫色 - 警告
+      } else {
+        tickColor = const Color(0xFFFF0000); // 红色 - 危险
+      }
+
+      final tickPaintColored = Paint()
+        ..color = tickColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4;
+
       final x1 = center.dx + innerRadius * cos(angle);
       final y1 = center.dy + innerRadius * sin(angle);
       final x2 = center.dx + outerRadius * cos(angle);
       final y2 = center.dy + outerRadius * sin(angle);
 
-      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), tickPaint);
+      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), tickPaintColored);
 
-      // 刻度值
+      // 刻度值 - 使用对应颜色
       final textSpan = TextSpan(
         text: i.toString(),
         style: textStyle,
@@ -528,16 +560,15 @@ class CombinedGaugePainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      final textRadius = radius - 42;
+      final textRadius = radius - 52;
       final textX = center.dx + textRadius * cos(angle) - textPainter.width / 2;
       final textY = center.dy + textRadius * sin(angle) - textPainter.height / 2;
 
       textPainter.paint(canvas, Offset(textX, textY));
     }
 
-    // 细粒度刻度 (Speed) - 只在常用区域0-180显示
-    // 额外添加的细刻度（排除已显示的大刻度）
-    final speedFineTicks = [10, 20, 40, 50, 70, 80, 100, 110, 130, 140, 160, 170];
+    // 小刻度 (Speed) - 每 15 km/h（排除大刻度），根据区间变色
+    final speedFineTicks = [15, 45, 75, 105, 135, 165, 195, 225];
     for (final i in speedFineTicks) {
       final sweepAngle = _speedToAngle(i.toDouble());
       final angle = pi - sweepAngle;
@@ -545,12 +576,27 @@ class CombinedGaugePainter extends CustomPainter {
       final innerRadius = radius - 40;
       final outerRadius = radius - 30;
 
+      // 根据刻度值区间确定颜色
+      Color tickColor;
+      if (i < warnSpeed) {
+        tickColor = AppTheme.primary.withValues(alpha: 0.6); // 蓝色 - 正常
+      } else if (i < dangerSpeed) {
+        tickColor = const Color(0xFF9C27B0).withValues(alpha: 0.6); // 紫色 - 警告
+      } else {
+        tickColor = const Color(0xFFFF0000).withValues(alpha: 0.6); // 红色 - 危险
+      }
+
+      final speedFineTickPaint = Paint()
+        ..color = tickColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+
       final x1 = center.dx + innerRadius * cos(angle);
       final y1 = center.dy + innerRadius * sin(angle);
       final x2 = center.dx + outerRadius * cos(angle);
       final y2 = center.dy + outerRadius * sin(angle);
 
-      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), fineTickPaint);
+      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), speedFineTickPaint);
     }
   }
 
