@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/obd_data_provider.dart';
 import '../theme/app_theme.dart';
 
-/// 组合仪表盘卡片（转速+时速）
+/// 组合仪表盘卡片（转速+时速+温度）
 class CombinedGaugeCard extends StatelessWidget {
   const CombinedGaugeCard({super.key});
 
@@ -24,7 +24,9 @@ class CombinedGaugeCard extends StatelessWidget {
                 painter: CombinedGaugePainter(
                   rpm: data.rpm,
                   speed: data.speed,
-                  gear: 0,// 获取不到档位，设置为0
+                  gear: 0, // 获取不到档位，设置为0
+                  coolantTemp: data.coolantTemp,
+                  intakeTemp: data.intakeTemp,
                 ),
               );
             },
@@ -40,6 +42,8 @@ class CombinedGaugePainter extends CustomPainter {
   final int rpm;
   final int speed;
   final int gear;
+  final int coolantTemp;
+  final int intakeTemp;
 
   // RPM 参数
   static const int maxRpm = 12000;
@@ -51,6 +55,13 @@ class CombinedGaugePainter extends CustomPainter {
   static const int warnSpeed = 120;
   static const int dangerSpeed = 180;
   static const int flashThreshold = 100; // 闪烁阈值
+
+  // 温度参数
+  static const int maxCoolantTemp = 120; // 冷却水温最大 120°C
+  static const int maxIntakeTemp = 80; // 进气温度最大 80°C
+  static const int coolantWarnTemp = 100; // 冷却水警告温度
+  static const int intakeWarnTemp = 50; // 进气警告温度
+  static const int tempSegmentCount = 6; // 温度进度条分段数
 
   /// 车速到角度的线性映射 (0-240 均匀划分)
   double _speedToAngle(double speed) {
@@ -76,6 +87,8 @@ class CombinedGaugePainter extends CustomPainter {
     required this.rpm,
     required this.speed,
     required this.gear,
+    required this.coolantTemp,
+    required this.intakeTemp,
   });
 
   @override
@@ -105,6 +118,9 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 绘制中心数值
     _drawCenterValues(canvas, center, radius);
+
+    // 绘制温度进度条
+    _drawTemperatureGauges(canvas, size, radius);
   }
 
   void _drawBackground(Canvas canvas, Offset center, double radius) {
@@ -123,7 +139,7 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 超速红色闪烁效果
     if (speed >= flashThreshold) {
-      _drawSpeedWarningGlow(canvas, center, radius);
+      // _drawSpeedWarningGlow(canvas, center, radius);
     }
   }
 
@@ -687,6 +703,203 @@ class CombinedGaugePainter extends CustomPainter {
   bool shouldRepaint(covariant CombinedGaugePainter oldDelegate) {
     return oldDelegate.rpm != rpm ||
         oldDelegate.speed != speed ||
-        oldDelegate.gear != gear;
+        oldDelegate.gear != gear ||
+        oldDelegate.coolantTemp != coolantTemp ||
+        oldDelegate.intakeTemp != intakeTemp;
+  }
+
+  /// 绘制倒梯形温度进度条
+  void _drawTemperatureGauges(Canvas canvas, Size size, double radius) {
+    // 左上角 - 以父容器左上角为基准
+    _drawInvertedTrapezoidTempGauge(
+      canvas: canvas,
+      size: size,
+      x: 0,  // 距离左边界 8%
+      y: radius * 0.2,
+      radius: radius,
+      value: coolantTemp,
+      maxValue: maxCoolantTemp,
+      warnValue: coolantWarnTemp,
+      label: '冷却水温',
+      alignRight: true, // 靠右对齐
+    );
+
+    // 右上角 - 以父容器右上角为基准
+    _drawInvertedTrapezoidTempGauge(
+      canvas: canvas,
+      size: size,
+      x: size.width ,
+      y: radius * 0.2,
+      radius: radius,
+      value: intakeTemp,
+      maxValue: maxIntakeTemp,
+      warnValue: intakeWarnTemp,
+      label: '进气温度',
+      alignRight: false, // 靠左对齐
+    );
+  }
+
+  /// 绘制单个倒梯形温度进度条
+  /// 倒梯形：上宽下窄（顶部宽，底部窄）
+  void _drawInvertedTrapezoidTempGauge({
+    required Canvas canvas,
+    required Size size,
+    required double x,
+    required double y,
+    required double radius,
+    required int value,
+    required int maxValue,
+    required int warnValue,
+    required String label,
+    required bool alignRight, // true=靠右对齐, false=靠左对齐
+  }) {
+    // 倒梯形尺寸 - 上宽下窄
+    final topWidth = radius * 0.4;    // 顶部宽
+    final bottomWidth = radius * 0.1; // 底部窄
+    final height = radius * 0.30;
+
+    // 直接使用传入的 x, y 坐标作为中心点
+    final trapezoidCenter = Offset(x, y);
+
+    // 顶部和底部的Y坐标
+    final topY = trapezoidCenter.dy - height / 2;
+    final bottomY = trapezoidCenter.dy + height / 2;
+
+    // 计算填充比例
+    final fillRatio = (value / maxValue).clamp(0.0, 1.0);
+    final filledSegments = (fillRatio * tempSegmentCount).ceil();
+
+    // 每个分段的高度（包含间隙）
+    final segmentHeight = (height - (tempSegmentCount - 1) * 2) / tempSegmentCount;
+
+    // 绘制背景槽（倒梯形 - 上宽下窄）
+    final bgPaint = Paint()
+      ..color = const Color(0xFF1E293B)
+      ..style = PaintingStyle.fill;
+
+    // 根据对齐方式计算 x 坐标
+    double getLeftX(double centerX, double width) {
+      return alignRight ? centerX : centerX - width;
+    }
+
+    final bgPath = Path()
+      ..moveTo(getLeftX(trapezoidCenter.dx, topWidth), topY)           // 左上
+      ..lineTo(getLeftX(trapezoidCenter.dx, topWidth) + topWidth, topY) // 右上
+      ..lineTo(getLeftX(trapezoidCenter.dx, bottomWidth) + bottomWidth, bottomY) // 右下
+      ..lineTo(getLeftX(trapezoidCenter.dx, bottomWidth), bottomY)     // 左下
+      ..close();
+
+    canvas.drawPath(bgPath, bgPaint);
+
+    // 绘制分段进度（从底部向上，宽度递增 - 上宽下窄）
+    for (int i = 0; i < tempSegmentCount; i++) {
+      // 计算当前分段的位置（从底部开始，i=0 是最底部）
+      final segTopY = bottomY - (i + 1) * (segmentHeight + 2) + 2;
+      final segBottomY = bottomY - i * (segmentHeight + 2);
+
+      // 使用归一化坐标确保斜率完全一致
+      // i=0: 0/6 到 1/6, i=5: 5/6 到 6/6
+      final segmentStartRatio = i / tempSegmentCount;
+      final segmentEndRatio = (i + 1) / tempSegmentCount;
+
+      // 根据归一化位置计算宽度，确保与背景槽斜率一致
+      final segTopWidth = bottomWidth + (topWidth - bottomWidth) * segmentEndRatio;
+      final segBottomWidth = bottomWidth + (topWidth - bottomWidth) * segmentStartRatio;
+
+      // 判断当前分段是否应该填充（从底部向上填充）
+      final isFilled = i < filledSegments;
+
+      // 确定颜色
+      Color segmentColor;
+      if (!isFilled) {
+        segmentColor = AppTheme.accentCyan.withValues(alpha: 0.08);
+      } else {
+        // 根据温度区间确定颜色
+        final segmentRatio = (i + 1) / tempSegmentCount;
+        if (segmentRatio <= 0.5) {
+          segmentColor = AppTheme.accentCyan;
+        } else if (segmentRatio <= 0.83) {
+          segmentColor = AppTheme.accentOrange;
+        } else {
+          segmentColor = AppTheme.accentRed;
+        }
+      }
+
+      // 绘制分段
+      final segPaint = Paint()
+        ..color = segmentColor
+        ..style = PaintingStyle.fill;
+
+      // 根据对齐方式计算 x 坐标
+      double getLeftX(double centerX, double width) {
+        return alignRight ? centerX : centerX - width;
+      }
+
+      final segPath = Path()
+        ..moveTo(getLeftX(trapezoidCenter.dx, segTopWidth), segTopY)
+        ..lineTo(getLeftX(trapezoidCenter.dx, segTopWidth) + segTopWidth, segTopY)
+        ..lineTo(getLeftX(trapezoidCenter.dx, segBottomWidth) + segBottomWidth, segBottomY)
+        ..lineTo(getLeftX(trapezoidCenter.dx, segBottomWidth), segBottomY)
+        ..close();
+
+      canvas.drawPath(segPath, segPaint);
+
+      // 已填充分段添加发光效果
+      if (isFilled) {
+        final glowPaint = Paint()
+          ..color = segmentColor.withValues(alpha: 0.4)
+          ..style = PaintingStyle.fill
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+
+        canvas.drawPath(segPath, glowPaint);
+      }
+    }
+
+    // 绘制标签和数值
+    _drawTempLabel(canvas, trapezoidCenter, height, value, label, alignRight);
+  }
+
+  /// 绘制温度标签和数值
+  void _drawTempLabel(Canvas canvas, Offset center, double height, int value, String label, bool alignRight) {
+    final labelStyle = TextStyle(
+      color: AppTheme.accentCyan.withValues(alpha: 0.99),
+      fontSize: height * 0.25,
+      fontWeight: FontWeight.w500,
+    );
+
+    final valueStyle = TextStyle(
+      color: AppTheme.textPrimary,
+      fontSize: height * 0.28,
+      fontWeight: FontWeight.bold,
+    );
+
+    // 根据对齐方式计算 x 坐标
+    double getLeftX(double centerX, double width) {
+      return alignRight ? centerX : centerX - width;
+    }
+
+    // 绘制标签 - 放到进度条上方
+    final labelSpan = TextSpan(text: label, style: labelStyle);
+    final labelPainter = TextPainter(
+      text: labelSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    labelPainter.paint(
+      canvas,
+      Offset(getLeftX(center.dx, labelPainter.width), center.dy - height / 2 - labelPainter.height - 4),
+    );
+
+    // 绘制数值 - 维持在进度条下方
+    final valueSpan = TextSpan(text: '$value°', style: valueStyle);
+    final valuePainter = TextPainter(
+      text: valueSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    valuePainter.paint(
+      canvas,
+      Offset(getLeftX(center.dx, valuePainter.width), center.dy + height / 2 + 4),
+    );
   }
 }
