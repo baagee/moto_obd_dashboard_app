@@ -29,6 +29,8 @@ class _MainContainerState extends State<MainContainer> {
   bool _hasStartedRide = false;
   bool _hasShownEventNotification = false;
 
+  late final PageController _pageController;
+
   final List<Widget> _pages = const [
     DashboardScreen(),
     LogsScreen(),
@@ -38,6 +40,7 @@ class _MainContainerState extends State<MainContainer> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: context.read<NavigationProvider>().currentIndex);
     _initializeBluetooth();
     // ====== [测试代码] APP启动3秒后自动添加测试事件 ======
     // TODO: 测试完成后删除此代码
@@ -121,6 +124,11 @@ class _MainContainerState extends State<MainContainer> {
 
   void _navigateTo(int index) {
     context.read<NavigationProvider>().setIndex(index);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   void _navigateToBluetoothScan() {
@@ -128,8 +136,8 @@ class _MainContainerState extends State<MainContainer> {
     _navigateTo(2);
   }
 
-  /// 构建IndexedStack并监听骑行事件
-  Widget _buildIndexedStack(BuildContext context, int currentIndex) {
+  /// 构建PageView并监听骑行事件
+  Widget _buildPageView(BuildContext context) {
     return Selector<RidingStatsProvider, RidingEvent?>(
       selector: (_, stats) => stats.latestEvent,
       builder: (context, latestEvent, _) {
@@ -145,8 +153,11 @@ class _MainContainerState extends State<MainContainer> {
             });
           });
         }
-        return IndexedStack(
-          index: currentIndex,
+        return PageView(
+          controller: _pageController,
+          onPageChanged: (index) {
+            context.read<NavigationProvider>().setIndex(index);
+          },
           children: _pages,
         );
       },
@@ -170,6 +181,12 @@ class _MainContainerState extends State<MainContainer> {
       context: context,
       event: event,
     );
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   @override
@@ -229,14 +246,9 @@ class _MainContainerState extends State<MainContainer> {
               },
             ),
 
-            // 页面内容 - 使用 Selector 精确监听 currentIndex
+            // 页面内容 - 使用 PageView 实现滑动切换
             Expanded(
-              child: Selector<NavigationProvider, int>(
-                selector: (_, nav) => nav.currentIndex,
-                builder: (context, currentIndex, _) {
-                  return _buildIndexedStack(context, currentIndex);
-                },
-              ),
+              child: _buildPageView(context),
             ),
           ],
         ),

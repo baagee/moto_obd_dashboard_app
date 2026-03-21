@@ -869,7 +869,7 @@ class CombinedGaugePainter extends CustomPainter {
 
     final valueStyle = TextStyle(
       color: AppTheme.textPrimary,
-      fontSize: height * 0.28,
+      fontSize: height * 0.3,
       fontWeight: FontWeight.bold,
     );
 

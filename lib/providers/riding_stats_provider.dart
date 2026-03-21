@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:obd_dashboard/utils/gear_util.dart';
 import '../models/obd_data.dart';
 import '../models/riding_event.dart' as stats;
 import '../services/audio_service.dart';
@@ -91,6 +92,7 @@ class RidingStatsProvider extends ChangeNotifier {
   void endRide() {
     _isRiding = false;
     _stopSampling();
+    GSX8SCalculator.reset();
 
     final duration = _rideStartTime != null
         ? DateTime.now().difference(_rideStartTime!)

@@ -171,27 +171,31 @@ class _NavItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? AppTheme.primary : AppTheme.textSecondary,
-                fontSize: 8,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+      child: SizedBox(
+        width: 60,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isActive ? AppTheme.primary : AppTheme.textSecondary,
+                  fontSize: 8,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                ),
               ),
-            ),
-            if (isActive)
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                height: 1,
-                width: 40,
-                color: AppTheme.primary,
-              ),
-          ],
+              if (isActive)
+                Container(
+                  margin: const EdgeInsets.only(top: 2),
+                  height: 1,
+                  width: 50,
+                  color: AppTheme.primary,
+                ),
+            ],
+          ),
         ),
       ),
     );

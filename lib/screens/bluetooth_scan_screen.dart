@@ -14,7 +14,10 @@ class BluetoothScanScreen extends StatefulWidget {
   State<BluetoothScanScreen> createState() => _BluetoothScanScreenState();
 }
 
-class _BluetoothScanScreenState extends State<BluetoothScanScreen> {
+class _BluetoothScanScreenState extends State<BluetoothScanScreen> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +45,7 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Container(
       color: AppTheme.backgroundDark,
       child: Padding(

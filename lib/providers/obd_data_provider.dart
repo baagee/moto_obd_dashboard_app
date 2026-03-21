@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/obd_data.dart';
+import '../utils/gear_util.dart';
 
 /// OBD数据提供者 - 管理真实 OBD 数据（无 Mock）
 /// 设备未连接时显示默认值（全为 0）
@@ -45,7 +46,7 @@ class OBDDataProvider extends ChangeNotifier {
   OBDData _data = OBDData(
     rpm: defaultRpm,
     speed: defaultSpeed,
-    // gear: defaultGear,
+    gear: defaultGear,
     throttle: defaultThrottle,
     load: defaultLoad,
     leanAngle: defaultLeanAngle,
@@ -114,12 +115,19 @@ class OBDDataProvider extends ChangeNotifier {
 
     // 计算档位
     final currentSpeed = speed ?? _data.speed;
-    // final gear = _calculateGear(currentSpeed);
+    final currentThrottle = throttle ?? _data.throttle;
+    final currentLoad = load ?? _data.load;
+    final gear = GSX8SCalculator.calculateGear(
+      rpm ?? _data.rpm,
+      currentSpeed,
+      throttle: currentThrottle,
+      load: currentLoad,
+    );
 
     _data = _data.copyWith(
       rpm: rpm ?? _data.rpm,
       speed: currentSpeed,
-      // gear: gear,
+      gear: gear,
       throttle: throttle ?? _data.throttle,
       load: load ?? _data.load,
       coolantTemp: coolantTemp ?? _data.coolantTemp,
@@ -145,7 +153,7 @@ class OBDDataProvider extends ChangeNotifier {
     _data = OBDData(
       rpm: defaultRpm,
       speed: defaultSpeed,
-      // gear: defaultGear,
+      gear: defaultGear,
       throttle: defaultThrottle,
       load: defaultLoad,
       leanAngle: defaultLeanAngle,
