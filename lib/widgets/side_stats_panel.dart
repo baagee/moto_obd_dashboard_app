@@ -95,8 +95,6 @@ class SideStatsPanel extends StatelessWidget {
                     _VoltageDisplay(voltage: data.voltage),
 
                     const SizedBox(height: 3),
-                    // 档位显示
-                    _GearDisplay(gear: data.gear),
                   ],
                 ),
               ),
@@ -143,105 +141,6 @@ class _TempCard extends StatelessWidget {
           const SizedBox(height: 3),
           Text(value, style: AppTheme.valueMedium),
         ],
-      ),
-    );
-  }
-}
-
-/// 档位显示 - 两行布局
-/// 第一行：标题 "档位"
-/// 第二行：空档+1-6档分块显示，当前档位高亮
-class _GearDisplay extends StatelessWidget {
-  final int gear;
-
-  const _GearDisplay({required this.gear});
-
-  @override
-  Widget build(BuildContext context) {
-    // 档位列表：0=空档, 1-6=对应档位
-    const gears = [0, 1, 2, 3, 4, 5, 6];
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(6)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 第一行：标题
-          const Row(
-            children: [
-              Icon(Icons.speed, color: AppTheme.accentCyan, size: 12),
-              SizedBox(width: 4),
-              Text('档位', style: AppTheme.labelMediumPrimary),
-            ],
-          ),
-          const SizedBox(height: 4),
-          // 第二行：档位分块
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: gears.map((g) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1.5),
-              child: _GearBlock(gear: g, currentGear: gear),
-            )).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 单个档位块
-class _GearBlock extends StatelessWidget {
-  final int gear; // 档位值：0=空档, 1-6=对应档位
-  final int currentGear; // 当前实际档位
-
-  const _GearBlock({required this.gear, required this.currentGear});
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = gear == currentGear;
-    final isNeutral = gear == 0;
-    final displayText = isNeutral ? 'N' : '$gear';
-
-    // 激活状态：使用主题色+发光效果
-    // 非激活状态：使用暗淡颜色
-    final activeColor = isNeutral ? AppTheme.accentOrange : AppTheme.accentCyan;
-    final inactiveColor = AppTheme.textMuted.withValues(alpha: 0.85);
-
-    return Container(
-      width: 18,
-      height: 20,
-      decoration: BoxDecoration(
-        color: isActive ? activeColor.withValues(alpha: 0.2) : Colors.transparent,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: isActive ? activeColor : inactiveColor,
-          // width: isActive ? 1.5 : 1,
-          width: 1,
-        ),
-        // 激活状态添加发光效果
-        boxShadow: isActive
-            ? [
-                BoxShadow(
-                  color: activeColor.withValues(alpha: 0.4),
-                  blurRadius: 6,
-                  spreadRadius: -2,
-                ),
-              ]
-            : null,
-      ),
-      child: Center(
-        child: Text(
-          displayText,
-          style: TextStyle(
-            color: isActive ? activeColor : inactiveColor,
-            fontSize: 13,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
       ),
     );
   }

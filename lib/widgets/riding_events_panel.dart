@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/riding_event.dart';
-import '../providers/obd_data_provider.dart';
 import '../providers/riding_stats_provider.dart';
 import '../theme/app_theme.dart';
 import 'cyber_dialog.dart';
+import 'gear_display_panel.dart';
 
 /// 骑行事件面板
 class RidingEventsPanel extends StatelessWidget {
@@ -17,7 +17,7 @@ class RidingEventsPanel extends StatelessWidget {
         // 左侧：档位竖向展示（无背景卡片）
         const Expanded(
           flex: 2,
-          child: _VerticalGearDisplay(),
+          child: GearDisplayPanel(),
         ),
 
         const SizedBox(width: 8),
@@ -226,95 +226,6 @@ class _DetailRow extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// 竖向档位显示组件
-class _VerticalGearDisplay extends StatelessWidget {
-  const _VerticalGearDisplay();
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<OBDDataProvider>(
-      builder: (context, provider, child) {
-        final gear = provider.data.gear;
-
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // 顶部标签
-            const Text('档位', style: AppTheme.labelMediumPrimary),
-            const SizedBox(height: 2),
-            // 档位块
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _GearBlock(gear: 6, currentGear: gear),
-                  _GearBlock(gear: 5, currentGear: gear),
-                  _GearBlock(gear: 4, currentGear: gear),
-                  _GearBlock(gear: 3, currentGear: gear),
-                  _GearBlock(gear: 2, currentGear: gear),
-                  _GearBlock(gear: 0, currentGear: gear), // N
-                  _GearBlock(gear: 1, currentGear: gear),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// 单个档位块
-class _GearBlock extends StatelessWidget {
-  final int gear;
-  final int currentGear;
-
-  const _GearBlock({required this.gear, required this.currentGear});
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = gear == currentGear;
-    final isNeutral = gear == 0;
-    final displayText = isNeutral ? 'N' : '$gear';
-
-    final activeColor = isNeutral ? AppTheme.accentOrange : AppTheme.accentCyan;
-    final inactiveColor = AppTheme.textMuted.withValues(alpha: 0.85);
-
-    return Container(
-      width: 34,
-      height: 23,
-      margin: const EdgeInsets.symmetric(vertical: 1.5),
-      decoration: BoxDecoration(
-        color: isActive ? activeColor.withValues(alpha: 0.2) : Colors.transparent,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: isActive ? activeColor : inactiveColor,
-          width: 1,
-        ),
-        boxShadow: isActive
-            ? [
-                BoxShadow(
-                  color: activeColor.withValues(alpha: 0.4),
-                  blurRadius: 4,
-                  spreadRadius: -1,
-                ),
-              ]
-            : null,
-      ),
-      child: Center(
-        child: Text(
-          displayText,
-          style: TextStyle(
-            color: isActive ? activeColor : inactiveColor,
-            fontSize: 16,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
       ),
     );
   }

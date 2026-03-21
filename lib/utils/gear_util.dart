@@ -36,11 +36,11 @@ class GSX8SCalculator {
   /// 动态阈值基础值
   /// 公式: baseThreshold + k / theoryRatio
   /// 低档位（传动比大）→ 阈值严格，高档位（传动比小）→ 阈值宽松
-  static const double _thresholdBase = 0.08;
-  static const double _thresholdK = 0.8;
+  static const double _thresholdBase = 0.06;
+  static const double _thresholdK = 0.5;
 
   /// 稳定帧数阈值 - 必须连续多少帧匹配才确认档位
-  static const int _stableFramesRequired = 5;
+  static const int _stableFramesRequired = 8;
 
   // =========================================================================
   // ========== 边界判定参数 ==========================================
@@ -276,8 +276,6 @@ class GSX8SCalculator {
           _ratioScale = _accumulatedError / _calibrationFrames;
           _accumulatedError = 0;
           _calibrationFrames = 0;
-          // ignore: avoid_print
-          print('[Gear] 校准完成，scale = $_ratioScale');
         }
       }
     }
