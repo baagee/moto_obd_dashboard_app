@@ -209,7 +209,7 @@ class _GearBlock extends StatelessWidget {
     // 激活状态：使用主题色+发光效果
     // 非激活状态：使用暗淡颜色
     final activeColor = isNeutral ? AppTheme.accentOrange : AppTheme.accentCyan;
-    final inactiveColor = AppTheme.textMuted.withValues(alpha: 0.7);
+    final inactiveColor = AppTheme.textMuted.withValues(alpha: 0.85);
 
     return Container(
       width: 18,
