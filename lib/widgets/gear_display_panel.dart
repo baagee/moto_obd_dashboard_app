@@ -55,7 +55,7 @@ class GearBlock extends StatelessWidget {
     final displayText = isNeutral ? 'N' : '$gear';
 
     final activeColor = isNeutral ? AppTheme.accentOrange : AppTheme.accentCyan;
-    const inactiveColor = AppTheme.primary20;
+    const inactiveColor = AppTheme.primary50;
 
     return Container(
       width: 34,

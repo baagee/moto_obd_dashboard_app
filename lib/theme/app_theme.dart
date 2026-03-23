@@ -16,6 +16,8 @@ class AppTheme {
 
   // ========== 预定义透明度颜色 (避免 withOpacity 重复调用) ==========
   static const Color primary60 = Color(0x990DA6F2); // 0.6 opacity
+  static const Color primary50 = Color(0x800DA6F2); // 0.5 opacity
+  static const Color primary40 = Color(0x660DA6F2); // 0.4 opacity
   static const Color primary30 = Color(0x4D0DA6F2); // 0.3 opacity
   static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
   static const Color primary10 = Color(0x1A0DA6F2); // 0.1 opacity

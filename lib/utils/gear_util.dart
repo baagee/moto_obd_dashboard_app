@@ -1,318 +1,238 @@
-import 'dart:math';
-
-/// GSX-8S 档位计算器
-/// 通过转速和车速反推当前档位
 class GSX8SCalculator {
-  // =========================================================================
-  // ========== 固定参数区域（车辆固有参数）===============================
-  // =========================================================================
-
-  /// 初级减速比 - 发动机输出轴到变速箱输入轴的减速比
+  // ==================== 配置参数 ====================
   static const double primaryRatio = 1.675;
-
-  /// 最终减速比 - 变速箱输出轴到后轮的减速比
-  /// 计算：牙盘齿数 ÷ 链轮齿数 = 47 ÷ 17
   static const double finalRatio = 2.764;
-
-  /// 轮胎周长（米）- 对应规格 180/55ZR17
-  /// 计算：外径 ≈ 0.63m，周长 ≈ 1.98m
   static const double tireCircumference = 1.97857;
-
-  /// 各档内部齿轮比
-  /// 数值越大 = 传动越慢 = 扭矩大 = 速度慢
   static const List<double> internalGearRatios = [
-    3.071,  // 1档
-    2.200,  // 2档
-    1.700,  // 3档
-    1.416,  // 4档
-    1.230,  // 5档
-    1.107,  // 6档
+    3.071, 2.200, 1.700, 1.416, 1.230, 1.107
   ];
 
-  // =========================================================================
-  // ========== 算法阈值参数 ============================================
-  // =========================================================================
-
-  /// 动态阈值基础值
-  /// 公式: baseThreshold + k / theoryRatio
-  /// 低档位（传动比大）→ 阈值严格，高档位（传动比小）→ 阈值宽松
-  static const double _thresholdBase = 0.06;
-  static const double _thresholdK = 0.5;
-
-  /// 稳定帧数阈值 - 必须连续多少帧匹配才确认档位
-  static const int _stableFramesRequired = 8;
-
-  // =========================================================================
-  // ========== 边界判定参数 ==========================================
-  // =========================================================================
-
-  /// 空档判定 - 速度低于此值视为空档/停车
-  static const int _minSpeed = 3; // km/h
-
-  /// 空档判定 - 转速低于此值视为空档/怠速
-  static const int _minRpm = 800;
-
-  // =========================================================================
-  // ========== 半离合蠕动检测参数 ====================================
-  // =========================================================================
-
-  /// 半离合蠕动速度范围（km/h）
-  static const int _creepMinSpeed = 3;
-  static const int _creepMaxSpeed = 15;
-
-  /// 半离合判定 - 油门低于此值（%）
-  static const int _creepMaxThrottle = 20;
-
-  /// 半离合状态阈值放宽倍数
-  static const double _creepThresholdMultiplier = 1.5;
-
-  // =========================================================================
-  // ========== 换挡瞬态检测参数 ====================================
-  // =========================================================================
-
-  /// 换挡判定 - 转速下降到此比例以下
-  static const double _shiftRpmDropRatio = 0.7;
-
-  /// 换挡保持帧数 - 换挡后保持原档位多少帧（约 5 秒，2Hz）
-  static const int _shiftHoldFrames = 10;
-
-  // =========================================================================
-  // ========== Scale Factor 校准参数 ================================
-  // =========================================================================
-
-  /// 校准生效最低速度（km/h）- 高速行驶时校准
-  static const int _calibrationMinSpeed = 30;
-
-  /// 校准所需稳定帧数
-  static const int _calibrationStableFrames = 10;
-
-  /// 校准误差阈值 - 小于此误差才用于校准
-  static const double _calibrationErrorThreshold = 0.10;
-
-  /// 校准采样帧数 - 累计多少帧后更新 scale
-  static const int _calibrationSampleFrames = 50;
-
-  // =========================================================================
-  // ========== 内部状态变量 ==========================================
-  // =========================================================================
-
-  /// 缓存各档位的理论总传动比
-  /// 总传动比 = primaryRatio × 齿轮比 × finalRatio
   static final List<double> _theoreticalTotals =
-      internalGearRatios.map((g) => primaryRatio * g * finalRatio).toList();
+  internalGearRatios.map((g) => primaryRatio * g * finalRatio).toList();
 
-  /// 上次有效档位
+  // ==================== 阈值优化 ====================
+  // 采用非线性递减策略
+  static const List<double> _gearThresholds = [
+    0.18,  // 1档: 传动比差异大，可严格
+    0.15,  // 2档
+    0.12,  // 3档
+    0.10,  // 4档
+    0.09,  // 5档: 减小阈值提高准确性
+    0.10,  // 6档: 传动比接近需更严格
+  ];
+
+  // 半离合专用阈值（放宽）
+  static const double _creepThreshold = 0.25;
+
+  // ==================== 状态管理 ====================
   static int _lastValidGear = 0;
-
-  /// 稳定帧数计数
   static int _stableFrames = 0;
-
-  /// 待确认档位
   static int _pendingGear = 0;
-
-  /// 上次转速（用于换挡检测）
-  static int _lastRpm = 0;
-
-  /// 上次传动比（用于半离合波动检测）
   static double _lastRatio = 0;
+  static bool _isInCreepMode = false; // 新增：半离合模式标记
 
-  /// 是否正在换挡
-  static bool _isShifting = false;
+  // ==================== 边界检测优化 ====================
+  static const int _neutralSpeedThreshold = 3;   // 降低到 3 km/h
+  static const int _neutralRpmThreshold = 1200;  // 降低到 1200 rpm
+  static const int _minValidSpeed = 5;           // 最低有效速度
+  static const int _minValidRpm = 1300;          // 最低有效转速
 
-  /// 换挡保持帧数计数
-  static int _shiftHoldFramesCounter = 0;
+  // ==================== 半离合检测 ====================
+  static const int _creepMinSpeed = 3;
+  static const int _creepMaxSpeed = 20;
+  static const int _creepMaxThrottle = 35;
 
-  /// Scale Factor 轮胎误差补偿因子
-  static double _ratioScale = 1.0;
-
-  /// 校准采样帧数计数
-  static int _calibrationFrames = 0;
-
-  /// 校准误差累加值
-  static double _accumulatedError = 0;
-
-  /// 当前校准档位（用于检测档位变化）
-  static int _calibrationGear = 0;
-
-  // =========================================================================
-  // ========== 核心计算方法 ==========================================
-  // =========================================================================
-
-  /// 动态阈值计算函数
-  /// [theoryRatio] 理论传动比
-  /// 返回：该档位的误差阈值
-  static double _getThreshold(double theoryRatio) {
-    // 公式：基础阈值 + k / 理论传动比
-    // 低档（~14）→ 阈值 ~14%，高档（~4.4）→ 阈值 ~26%
-    return _thresholdBase + _thresholdK / theoryRatio;
-  }
-
-  /// 判断是否为半离合蠕动状态
-  /// [speed] 当前车速 [throttle] 当前油门 [rpm] 当前转速 [scaledRatio] 当前传动比
-  /// 多维度组合判断：ratio过高 + ratio不稳定 + 低油门
   static bool _isCreepingState(int speed, int? throttle, int rpm, double scaledRatio) {
-    // 1. 速度过滤（必须条件）
+    // 速度范围过滤
     if (speed < _creepMinSpeed || speed > _creepMaxSpeed) {
+      _lastRatio = scaledRatio;
+      return false;
+    }
+
+    // 转速过低（怠速以下）
+    if (rpm < 1200) {
       _lastRatio = scaledRatio;
       return false;
     }
 
     double maxTheoryRatio = _theoreticalTotals[0];
 
-    // 2. ratio 是否明显超过 1档
-    bool ratioTooHigh = scaledRatio > maxTheoryRatio * 1.15;
+    // 1. 传动比异常高（超过1档理论值 20%）
+    bool ratioTooHigh = scaledRatio > maxTheoryRatio * 1.20;
 
-    // 3. ratio 是否不稳定（核心特征：半离合打滑导致波动）
+    // 2. 传动比波动检测（半离合打滑特征）
     bool unstable = false;
     if (_lastRatio > 0) {
       double change = (scaledRatio - _lastRatio).abs() / _lastRatio;
-      unstable = change > 0.05; // 5% 波动
+      unstable = change > 0.08; // 提高到 8% 避免误判
     }
 
-    // 4. 油门辅助条件（不是单独触发）
+    // 3. 油门条件
     bool lowThrottle = throttle != null && throttle < _creepMaxThrottle;
 
     _lastRatio = scaledRatio;
 
-    // 5. 最终判定：必须组合条件
+    // 多条件组合判定
     return ratioTooHigh && unstable && lowThrottle;
   }
 
-  /// 计算当前档位
-  /// [rpm] 转速, [speed] 时速(km/h), [throttle] 油门开度(0-100), [load] 发动机负载(0-100)
+  // ==================== 核心计算逻辑 ====================
   static int calculateGear(int rpm, int speed, {int? throttle, int? load}) {
-    // ==== 1. 边界判定 ====
-    // 低于最低速度或转速，视为空档
-    if (speed < _minSpeed || rpm < _minRpm) {
+    // ===== 阶段1: 边界条件判定 =====
+    // 同时满足低速+低转才判定为空档
+    if (speed <= _neutralSpeedThreshold && rpm < _neutralRpmThreshold) {
       _resetFilter();
       return 0;
     }
 
-    // ==== 2. 换挡瞬态检测 ====
-    // 条件：rpm 大幅下降（<70%）且速度 > 0
-    if (_lastRpm > 0 && rpm < _lastRpm * _shiftRpmDropRatio && speed > 0) {
-      _isShifting = true;
-      _shiftHoldFramesCounter = 0;
+    // 单独低速但转速正常 → 可能是半离合蠕动
+    if (speed < _minValidSpeed) {
+      // 不直接返回0，交给后续判断
     }
 
-    // 如果正在换挡，保持原档位
-    if (_isShifting) {
-      _shiftHoldFramesCounter++;
-      if (_shiftHoldFramesCounter < _shiftHoldFrames && _lastValidGear > 0) {
-        _lastRpm = rpm;
-        return _lastValidGear;
-      }
-      _isShifting = false;
-    }
-    _lastRpm = rpm;
-
-    // ==== 3. 计算实时传动比 ====
-    // 公式：(rpm × 60 × 轮胎周长) / (速度 × 1000)
+    // ===== 阶段2: 传动比计算 =====
     double currentRatio = (rpm * 60 * tireCircumference) / (speed * 1000);
 
-    // ==== 4. 应用 Scale Factor（轮胎误差补偿）====
-    double scaledRatio = currentRatio * _ratioScale;
+    // ===== 阶段3: 半离合检测 =====
+    _isInCreepMode = _isCreepingState(speed, throttle, rpm, currentRatio);
 
-    // ==== 5. 半离合蠕动状态检测 ====
-    // 半离合时传动比不稳定（打滑），需要放宽判定条件
-    bool isCreeping = _isCreepingState(speed, throttle, rpm, scaledRatio);
+    if (_isInCreepMode) {
+      // 半离合状态：使用放宽阈值重新匹配
+      return _matchGearWithThreshold(currentRatio, _creepThreshold);
+    }
 
-    // ==== 6. Log 误差匹配算法 ====
-    // 使用 log 误差替代线性误差，对比例误差更敏感
+    // ===== 阶段4: 正常档位匹配 =====
     int bestGear = 0;
-    double minLogError = double.infinity;
+    double minRelativeError = double.infinity;
 
     for (int i = 0; i < _theoreticalTotals.length; i++) {
       double theory = _theoreticalTotals[i];
-      // log 误差：|log(测量值) - log(理论值)|
-      double logError = (log(scaledRatio) - log(theory)).abs();
+      double relativeError = (currentRatio - theory).abs() / theory;
 
-      if (logError < minLogError) {
-        minLogError = logError;
+      if (relativeError < minRelativeError) {
+        minRelativeError = relativeError;
         bestGear = i + 1;
       }
     }
 
-    // ==== 7. 动态阈值判定 ====
+    // ===== 阶段5: 动态阈值验证 =====
     if (bestGear > 0) {
-      double theory = _theoreticalTotals[bestGear - 1];
-      double threshold = _getThreshold(theory);
+      double threshold = _gearThresholds[bestGear - 1];
 
-      // 半离合状态：放宽阈值
-      if (isCreeping) {
-        threshold *= _creepThresholdMultiplier;
-      }
-
-      if (minLogError > threshold) {
-        // 误差超过阈值，保持原档位
-        if (_lastValidGear > 0) {
-          return _lastValidGear;
+      if (minRelativeError > threshold) {
+        // 误差过大，但不立即返回0
+        // 检查是否接近相邻档位（换挡过渡区）
+        if (_isNearShifting(currentRatio, bestGear)) {
+          return _smoothTransition(bestGear);
         }
-        return 0;
+
+        // 真正无法匹配时才返回上次档位
+        return _lastValidGear > 0 ? _lastValidGear : 0;
       }
     }
 
-    // ==== 8. Scale Factor 自动校准 ====
-    // 条件：速度 > 30km/h 且稳定 10 帧以上
-    if (speed > _calibrationMinSpeed && _stableFrames > _calibrationStableFrames && bestGear > 0) {
-      // 检测档位变化：如果档位变化，重置采样
-      if (_calibrationGear != 0 && _calibrationGear != bestGear) {
-        _calibrationFrames = 0;
-        _accumulatedError = 0;
-      }
-      _calibrationGear = bestGear;
-
-      double theory = _theoreticalTotals[bestGear - 1];
-      // 计算线性误差用于校准判断
-      double linearError = (scaledRatio - theory).abs() / theory;
-
-      // 误差小于阈值，累加用于校准
-      if (linearError < _calibrationErrorThreshold) {
-        _accumulatedError += scaledRatio / theory;
-        _calibrationFrames++;
-
-        // 每 50 帧更新一次 scale
-        if (_calibrationFrames >= _calibrationSampleFrames) {
-          _ratioScale = _accumulatedError / _calibrationFrames;
-          _accumulatedError = 0;
-          _calibrationFrames = 0;
-        }
-      }
-    }
-
-    // ==== 9. 档位平滑滤波 ====
-    // 只有连续 N 帧以上匹配才切换档位
-    if (bestGear != _pendingGear) {
-      _pendingGear = bestGear;
-      _stableFrames = 0;
-    } else {
-      _stableFrames++;
-      if (_stableFrames < _stableFramesRequired) {
-        // 未稳定，保持上次档位
-        return _lastValidGear;
-      }
-    }
-
-    // ==== 10. 稳定后更新档位 ====
-    _lastValidGear = bestGear;
-    return bestGear;
+    // ===== 阶段6: 平滑滤波 =====
+    return _applyFilter(bestGear);
   }
 
-  /// 重置滤波状态
+  // ==================== 辅助方法 ====================
+
+  /// 使用指定阈值匹配档位（半离合专用）
+  static int _matchGearWithThreshold(double ratio, double threshold) {
+    int bestGear = 0;
+    double minError = double.infinity;
+
+    for (int i = 0; i < _theoreticalTotals.length; i++) {
+      double error = (ratio - _theoreticalTotals[i]).abs() / _theoreticalTotals[i];
+      if (error < minError && error < threshold) {
+        minError = error;
+        bestGear = i + 1;
+      }
+    }
+
+    return bestGear > 0 ? bestGear : _lastValidGear;
+  }
+
+  /// 检查是否在换挡过渡区（传动比介于两档之间）
+  static bool _isNearShifting(double ratio, int gear) {
+    if (gear <= 0 || gear > 6) return false;
+
+    double currentTheory = _theoreticalTotals[gear - 1];
+
+    // 检查与相邻档位的距离
+    if (gear > 1) {
+      double lowerTheory = _theoreticalTotals[gear - 2];  // 更高档位（传动比更小）
+      if (ratio < currentTheory && ratio > lowerTheory) {
+        return true;
+      }
+    }
+
+    if (gear < 6) {
+      double upperTheory = _theoreticalTotals[gear];      // 更低档位（传动比更大）
+      if (ratio > currentTheory && ratio < upperTheory) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// 平滑换挡过渡（减少抖动）
+  static int _smoothTransition(int newGear) {
+    // 只在相邻档位之间才允许快速切换
+    if ((_lastValidGear - newGear).abs() == 1) {
+      return _applyFilter(newGear, requiredFrames: 2); // 减少到2帧
+    }
+
+    // 跨档换挡需要更多确认
+    return _applyFilter(newGear, requiredFrames: 4);
+  }
+
+  /// 改进的平滑滤波器
+  static int _applyFilter(int gear, {int requiredFrames = 3}) {
+    if (gear != _pendingGear) {
+      _pendingGear = gear;
+      _stableFrames = 1; // 从1开始计数
+    } else {
+      _stableFrames++;
+    }
+
+    if (_stableFrames >= requiredFrames) {
+      _lastValidGear = gear;
+      return gear;
+    }
+
+    // 未稳定时的策略：
+    // - 如果是相邻档位切换，显示新档位（响应快）
+    // - 如果是跳档，保持旧档位（避免误判）
+    if ((_lastValidGear - gear).abs() == 1) {
+      return gear;
+    }
+
+    return _lastValidGear;
+  }
+
   static void _resetFilter() {
     _lastValidGear = 0;
     _stableFrames = 0;
     _pendingGear = 0;
-    _isShifting = false;
-    _shiftHoldFramesCounter = 0;
+    _isInCreepMode = false;
   }
 
-  /// 重置档位计算器（用于断开连接后）
   static void reset() {
     _resetFilter();
-    _ratioScale = 1.0;
-    _calibrationFrames = 0;
-    _accumulatedError = 0;
-    _calibrationGear = 0;
+    _lastRatio = 0;
+  }
+
+  // ==================== 调试接口 ====================
+  static Map<String, dynamic> getDebugInfo(int rpm, int speed) {
+    double ratio = (rpm * 60 * tireCircumference) / (speed * 1000);
+    return {
+      'currentRatio': ratio.toStringAsFixed(3),
+      'isCreepMode': _isInCreepMode,
+      'pendingGear': _pendingGear,
+      'stableFrames': _stableFrames,
+      'theoreticalRatios': _theoreticalTotals.map((r) => r.toStringAsFixed(3)).toList(),
+    };
   }
 }
