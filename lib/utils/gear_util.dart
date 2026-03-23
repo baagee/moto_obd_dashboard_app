@@ -17,8 +17,8 @@ class GSX8SCalculator {
     0.15,  // 2档
     0.12,  // 3档
     0.10,  // 4档
-    0.09,  // 5档: 减小阈值提高准确性
-    0.10,  // 6档: 传动比接近需更严格
+    0.08,  // 5档: 传动比接近6档，加严区分度
+    0.12,  // 6档: 放宽阈值减少误判
   ];
 
   // 半离合专用阈值（放宽）
@@ -190,6 +190,12 @@ class GSX8SCalculator {
 
   /// 改进的平滑滤波器
   static int _applyFilter(int gear, {int requiredFrames = 3}) {
+    // 5<->6档切换：需要更多稳定帧防止抖动
+    if ((_lastValidGear == 5 && gear == 6) ||
+        (_lastValidGear == 6 && gear == 5)) {
+      requiredFrames = 5;  // 5帧约250ms，比普通档位切换更慢确认
+    }
+
     if (gear != _pendingGear) {
       _pendingGear = gear;
       _stableFrames = 1; // 从1开始计数
@@ -205,6 +211,12 @@ class GSX8SCalculator {
     // 未稳定时的策略：
     // - 如果是相邻档位切换，显示新档位（响应快）
     // - 如果是跳档，保持旧档位（避免误判）
+    // - 5<->6档除外，即使相邻也必须等待稳定
+    if ((_lastValidGear == 5 && gear == 6) ||
+        (_lastValidGear == 6 && gear == 5)) {
+      return _lastValidGear;  // 保持稳定档位
+    }
+
     if ((_lastValidGear - gear).abs() == 1) {
       return gear;
     }
