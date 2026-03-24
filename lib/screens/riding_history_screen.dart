@@ -15,21 +15,21 @@ class RidingHistoryScreen extends StatelessWidget {
 
   /// 显示骑行记录详情弹窗
   void _showRecordDetailDialog(BuildContext context, RidingRecord record) {
-    CyberDialog.show(
+    showDialog(
       context: context,
-      title: '骑行详情',
-      icon: Icons.route,
-      accentColor: AppTheme.primary,
-      content: _RecordDetailContent(record: record),
-      actions: [
-        CyberButton.secondary(
-          text: '关闭',
-          onPressed: () => Navigator.pop(context),
-          height: 32,
-          fontSize: 12,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text('骑行详情', style: AppTheme.titleMedium),
+        content: SingleChildScrollView(
+          child: _RecordDetailContent(record: record),
         ),
-      ],
-      width: 360,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
     );
   }
 
