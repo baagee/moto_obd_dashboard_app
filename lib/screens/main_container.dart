@@ -36,9 +36,9 @@ class _MainContainerState extends State<MainContainer> {
 
   final List<Widget> _pages = const [
     DashboardScreen(),
+    RidingHistoryScreen(),
     LogsScreen(),
     BluetoothScanScreen(),
-    RidingHistoryScreen(),
   ];
 
   @override
@@ -141,7 +141,7 @@ class _MainContainerState extends State<MainContainer> {
 
   void _navigateToBluetoothScan() {
     // 始终切换到 DEVICES 页面（使用 IndexedStack，共享顶部导航栏）
-    _navigateTo(2);
+    _navigateTo(3);
   }
 
   /// 构建PageView并监听骑行事件

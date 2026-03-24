@@ -17,9 +17,12 @@ class NavigationProvider extends ChangeNotifier {
   /// 导航到仪表盘
   void goToDashboard() => setIndex(0);
 
+  /// 导航到骑行记录
+  void goToRiding() => setIndex(1);
+
   /// 导航到日志
-  void goToLogs() => setIndex(1);
+  void goToLogs() => setIndex(2);
 
   /// 导航到设备
-  void goToDevices() => setIndex(2);
+  void goToDevices() => setIndex(3);
 }

@@ -31,9 +31,9 @@ class TopNavigationBar extends StatelessWidget {
     this.deviceName,
     this.navItems = const [
       NavItem(icon: Icons.dashboard, label: 'DASHBOARD'),
+      NavItem(icon: Icons.route, label: 'RIDING'),
       NavItem(icon: Icons.article, label: 'LOGS'),
       NavItem(icon: Icons.bluetooth, label: 'DEVICES'),
-      NavItem(icon: Icons.route, label: '骑行'),
     ],
   });
 
@@ -197,7 +197,7 @@ class _NavItem extends StatelessWidget {
               Icon(
                 item.icon,
                 color: isActive ? AppTheme.primary : AppTheme.textSecondary,
-                size: 14,
+                size: 13,
               ),
               const SizedBox(height: 2),
               Text(
