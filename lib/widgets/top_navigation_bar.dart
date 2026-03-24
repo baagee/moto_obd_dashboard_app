@@ -2,6 +2,17 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'bluetooth_status_icon.dart';
 
+/// 导航项数据类
+class NavItem {
+  final IconData icon;
+  final String label;
+
+  const NavItem({
+    required this.icon,
+    required this.label,
+  });
+}
+
 /// 顶部导航栏
 class TopNavigationBar extends StatelessWidget {
   final int currentIndex;
@@ -9,7 +20,7 @@ class TopNavigationBar extends StatelessWidget {
   final VoidCallback? onLinkVehiclePressed;
   final bool isConnected;
   final String? deviceName;
-  final List<String> navItems;
+  final List<NavItem> navItems;
 
   const TopNavigationBar({
     super.key,
@@ -18,7 +29,12 @@ class TopNavigationBar extends StatelessWidget {
     this.onLinkVehiclePressed,
     required this.isConnected,
     this.deviceName,
-    this.navItems = const ['DASHBOARD', 'LOGS', 'DEVICES'],
+    this.navItems = const [
+      NavItem(icon: Icons.dashboard, label: 'DASHBOARD'),
+      NavItem(icon: Icons.article, label: 'LOGS'),
+      NavItem(icon: Icons.bluetooth, label: 'DEVICES'),
+      NavItem(icon: Icons.route, label: '骑行'),
+    ],
   });
 
   @override
@@ -160,11 +176,11 @@ class TopNavigationBar extends StatelessWidget {
 }
 
 class _NavItem extends StatelessWidget {
-  final String label;
+  final NavItem item;
   final bool isActive;
   final VoidCallback? onTap;
 
-  const _NavItem(this.label, {this.isActive = false, this.onTap});
+  const _NavItem(this.item, {this.isActive = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -178,8 +194,14 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              Icon(
+                item.icon,
+                color: isActive ? AppTheme.primary : AppTheme.textSecondary,
+                size: 14,
+              ),
+              const SizedBox(height: 2),
               Text(
-                label,
+                item.label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: isActive ? AppTheme.primary : AppTheme.textSecondary,
