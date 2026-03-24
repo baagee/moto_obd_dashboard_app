@@ -7,6 +7,7 @@ import 'providers/bluetooth_provider.dart';
 import 'providers/log_provider.dart';
 import 'providers/sensor_provider.dart';
 import 'providers/riding_stats_provider.dart';
+import 'providers/riding_record_provider.dart';
 import 'providers/navigation_provider.dart';
 import 'services/audio_service.dart';
 import 'screens/main_container.dart';
@@ -85,6 +86,18 @@ void main() {
                 obdDataProvider: obdDataProvider,
                 logProvider: logProvider,
                 audioService: context.read<AudioService>(),
+              ),
+        ),
+
+        // 骑行记录 Provider - 管理骑行记录状态和存储（依赖 LogProvider）
+        ChangeNotifierProxyProvider<LogProvider, RidingRecordProvider>(
+          create: (context) => RidingRecordProvider(
+            logProvider: context.read<LogProvider>(),
+          ),
+          update: (context, logProvider, previous) =>
+              previous ??
+              RidingRecordProvider(
+                logProvider: logProvider,
               ),
         ),
       ],

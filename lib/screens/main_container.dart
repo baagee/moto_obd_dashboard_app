@@ -5,6 +5,7 @@ import '../providers/bluetooth_provider.dart';
 import '../providers/log_provider.dart';
 import '../providers/sensor_provider.dart';
 import '../providers/riding_stats_provider.dart';
+import '../providers/riding_record_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../services/audio_service.dart';
 import '../models/riding_event.dart';
@@ -15,6 +16,8 @@ import '../widgets/top_navigation_bar.dart';
 import 'dashboard_screen.dart';
 import 'logs_screen.dart';
 import 'bluetooth_scan_screen.dart';
+import 'riding_history_screen.dart';
+import 'riding_record_screen.dart';
 
 /// 主容器 - 管理页面导航
 class MainContainer extends StatefulWidget {
@@ -35,6 +38,7 @@ class _MainContainerState extends State<MainContainer> {
     DashboardScreen(),
     LogsScreen(),
     BluetoothScanScreen(),
+    RidingHistoryScreen(),
   ];
 
   @override
@@ -94,6 +98,10 @@ class _MainContainerState extends State<MainContainer> {
     // 初始化蓝牙（依赖已通过 ProxyProvider 注入）
     // 骑行统计在蓝牙连接成功后自动开始
     await bluetoothProvider.initialize();
+
+    // 初始化骑行记录 Provider (必须在 BluetoothProvider 初始化之后)
+    await context.read<RidingRecordProvider>().initialize();
+
     _hasCheckedBluetooth = true;
     await _checkAndShowBluetoothDialog();
   }
@@ -153,12 +161,33 @@ class _MainContainerState extends State<MainContainer> {
             });
           });
         }
-        return PageView(
-          controller: _pageController,
-          onPageChanged: (index) {
-            context.read<NavigationProvider>().setIndex(index);
-          },
-          children: _pages,
+
+        return Stack(
+          children: [
+            // 底层 PageView
+            PageView(
+              controller: _pageController,
+              onPageChanged: (index) {
+                context.read<NavigationProvider>().setIndex(index);
+              },
+              children: _pages,
+            ),
+            // 骑行跟踪时显示实时记录页面
+            Selector<RidingRecordProvider, bool>(
+              selector: (_, record) => record.isTracking && record.isRiding,
+              builder: (context, isTracking, _) {
+                if (isTracking) {
+                  return const Positioned.fill(
+                    child: Material(
+                      color: Color(0xFF0A1114),
+                      child: RidingRecordScreen(),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
         );
       },
     );
@@ -220,12 +249,14 @@ class _MainContainerState extends State<MainContainer> {
                       _hasStartedRide = false;
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         context.read<RidingStatsProvider>().endRide();
+                        context.read<RidingRecordProvider>().endRide();
                       });
                     }
                     if (isConnected && !_hasStartedRide) {
                       _hasStartedRide = true;
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         context.read<RidingStatsProvider>().startRide();
+                        context.read<RidingRecordProvider>().startRide();
                       });
                     }
 
