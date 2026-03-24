@@ -1,0 +1,106 @@
+class GSX8SCalculator {
+  // --- 铃木 GSX-8S 固有参数 https://bikeswiki.com/Suzuki_GSX-8S ---
+  static const double primaryRatio = 1.675;
+  static const double finalRatio = 2.764; // 47/17
+  static const double tireCircumference = 1.97857; // 180/55ZR17
+  static const List<double> internalGearRatios = [
+    3.071,
+    2.200,
+    1.700,
+    1.416,
+    1.230,
+    1.107
+  ];
+
+  // 缓存各档位的理论总传动比，避免重复计算
+  static final List<double> _theoreticalTotals =
+      internalGearRatios.map((g) => primaryRatio * g * finalRatio).toList();
+
+  // --- 档位平滑滤波状态 ---
+  static int _lastValidGear = 0; // 上次有效档位
+  static int _stableFrames = 0;  // 稳定帧数计数
+  static int _pendingGear = 0;   // 待确认档位
+
+  // --- 动态误差阈值 ---
+  // 低档位差距大可严格，高档位差距小需宽松
+  // 优化：放宽高档位阈值，减少误判
+  static const List<double> _gearThresholds = [
+    0.20, // 1档: 20%
+    0.18, // 2档: 18%
+    0.15, // 3档: 15%
+    0.15, // 4档: 15% (原12%)
+    0.15, // 5档: 15% (原10%)
+    0.15, // 6档: 15% (原8%)
+  ];
+
+  /// 计算当前档位（带平滑滤波）
+  /// [rpm] 转速, [speed] 时速(km/h), [throttle] 油门开度(0-100), [load] 发动机负载(0-100)
+  static int calculateGear(int rpm, int speed, {int? throttle, int? load}) {
+    // 1. 改进的边界判定
+    // 低于3km/h或800rpm视为空档/拉离合
+    if (speed < 3 || rpm < 800) {
+      _resetFilter();
+      return 0;
+    }
+
+    // 2. 计算实时总传动比
+    double currentRatio = (rpm * 60 * tireCircumference) / (speed * 1000);
+
+    int bestGear = 0;
+    double minRelativeError = double.infinity;
+
+    // 3. 相对误差匹配算法
+    for (int i = 0; i < _theoreticalTotals.length; i++) {
+      double theory = _theoreticalTotals[i];
+      // 计算相对误差: |测量值 - 理论值| / 理论值
+      double relativeError = (currentRatio - theory).abs() / theory;
+
+      if (relativeError < minRelativeError) {
+        minRelativeError = relativeError;
+        bestGear = i + 1;
+      }
+    }
+
+    // 4. 动态阈值判定
+    if (bestGear > 0) {
+      double threshold = _gearThresholds[bestGear - 1];
+      if (minRelativeError > threshold) {
+        // 误差超过阈值，检查是否在换挡过程中
+        // 如果当前有有效档位，保持不变
+        if (_lastValidGear > 0) {
+          return _lastValidGear;
+        }
+        return 0;
+      }
+    }
+
+    // 5. 档位平滑滤波（滞后判定）
+    // 只有连续 5 帧以上匹配才切换档位（增加帧数减少抖动）
+    if (bestGear != _pendingGear) {
+      _pendingGear = bestGear;
+      _stableFrames = 0;
+    } else {
+      _stableFrames++;
+      if (_stableFrames < 5) {
+        // 未稳定，保持上次档位
+        return _lastValidGear;
+      }
+    }
+
+    // 6. 稳定后更新档位
+    _lastValidGear = bestGear;
+    return bestGear;
+  }
+
+  /// 重置滤波状态
+  static void _resetFilter() {
+    _lastValidGear = 0;
+    _stableFrames = 0;
+    _pendingGear = 0;
+  }
+
+  /// 重置档位计算器（用于断开连接后）
+  static void reset() {
+    _resetFilter();
+  }
+}

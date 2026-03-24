@@ -1,0 +1,1045 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - list [ref=e5]:
+      - listitem [ref=e6]:
+        - link "首页" [ref=e7] [cursor=pointer]:
+          - /url: //www.bilibili.com
+          - img [ref=e8]
+          - generic [ref=e10]:
+            - generic [ref=e11]: 首页
+            - img [ref=e12]
+      - listitem [ref=e15]:
+        - link "番剧" [ref=e16] [cursor=pointer]:
+          - /url: //www.bilibili.com/anime/
+      - listitem [ref=e17]:
+        - link "直播" [ref=e18] [cursor=pointer]:
+          - /url: //live.bilibili.com
+      - listitem [ref=e19]:
+        - link "游戏中心" [ref=e20] [cursor=pointer]:
+          - /url: //game.bilibili.com/platform
+      - listitem [ref=e21]:
+        - link "会员购" [ref=e22] [cursor=pointer]:
+          - /url: //show.bilibili.com/platform/home.html?msource=pc_web
+      - listitem [ref=e23]:
+        - link "漫画" [ref=e24] [cursor=pointer]:
+          - /url: //manga.bilibili.com?from=bill_top_mnav
+      - listitem [ref=e25]:
+        - link "赛事" [ref=e26] [cursor=pointer]:
+          - /url: //www.bilibili.com/match/home/
+      - listitem [ref=e27]:
+        - link "下载客户端" [ref=e28] [cursor=pointer]:
+          - /url: //app.bilibili.com
+          - img [ref=e29]
+          - generic [ref=e32]: 下载客户端
+    - list [ref=e34]:
+      - listitem [ref=e35] [cursor=pointer]:
+        - listitem [ref=e36]:
+          - generic [ref=e38]: 登录
+      - listitem [ref=e39] [cursor=pointer]:
+        - listitem [ref=e41]:
+          - link "大会员" [ref=e42]:
+            - /url: //account.bilibili.com/big
+            - img [ref=e43]
+            - generic [ref=e47]: 大会员
+      - listitem [ref=e48] [cursor=pointer]:
+        - generic [ref=e49]:
+          - img [ref=e50]
+          - generic [ref=e53]: 消息
+      - listitem [ref=e54] [cursor=pointer]:
+        - generic [ref=e55]:
+          - img [ref=e56]
+          - generic [ref=e62]: 动态
+      - listitem [ref=e63] [cursor=pointer]:
+        - generic [ref=e64]:
+          - img [ref=e65]
+          - generic [ref=e68]: 收藏
+      - listitem [ref=e69] [cursor=pointer]:
+        - generic [ref=e70]:
+          - img [ref=e71]
+          - generic [ref=e73]: 历史
+      - listitem [ref=e74] [cursor=pointer]:
+        - generic [ref=e75]:
+          - img [ref=e76]
+          - generic [ref=e80]: 创作中心
+      - listitem [ref=e81] [cursor=pointer]:
+        - listitem [ref=e82]:
+          - generic [ref=e84]:
+            - img [ref=e85]
+            - generic [ref=e88]: 投稿
+  - generic [ref=e91]:
+    - generic [ref=e92]:
+      - generic [ref=e96]:
+        - img [ref=e97]
+        - img [ref=e100] [cursor=pointer]
+        - textbox "输入关键字搜索" [ref=e102]: Iphone18
+        - button "搜索" [ref=e103] [cursor=pointer]
+      - navigation [ref=e106]:
+        - list [ref=e107]:
+          - listitem [ref=e108]:
+            - generic [ref=e110] [cursor=pointer]: 综合
+          - listitem [ref=e111]:
+            - generic [ref=e112] [cursor=pointer]:
+              - generic [ref=e113]: 视频
+              - generic [ref=e114]: 99+
+          - listitem [ref=e115]:
+            - generic [ref=e116] [cursor=pointer]:
+              - generic [ref=e117]: 番剧
+              - generic [ref=e118]: "0"
+          - listitem [ref=e119]:
+            - generic [ref=e120] [cursor=pointer]:
+              - generic [ref=e121]: 影视
+              - generic [ref=e122]: "0"
+          - listitem [ref=e123]:
+            - generic [ref=e124] [cursor=pointer]:
+              - generic [ref=e125]: 直播
+              - generic [ref=e126]: "0"
+          - listitem [ref=e127]:
+            - generic [ref=e128] [cursor=pointer]:
+              - generic [ref=e129]: 专栏
+              - generic [ref=e130]: 99+
+          - listitem [ref=e131]:
+            - generic [ref=e132] [cursor=pointer]:
+              - generic [ref=e133]: 用户
+              - generic [ref=e134]: "52"
+      - separator [ref=e136]
+      - generic [ref=e139]:
+        - generic [ref=e140]:
+          - button "综合排序" [ref=e141] [cursor=pointer]
+          - button "最多播放" [ref=e142] [cursor=pointer]
+          - button "最新发布" [ref=e143] [cursor=pointer]
+          - button "最多弹幕" [ref=e144] [cursor=pointer]
+          - button "最多收藏" [ref=e145] [cursor=pointer]
+        - button "更多筛选" [ref=e146] [cursor=pointer]:
+          - text: 更多筛选
+          - img [ref=e147]
+    - generic [ref=e152]:
+      - generic [ref=e154]:
+        - generic [ref=e157]:
+          - link "iPhone18史诗级升级爆料，先别买17了！ 37.6万 125 04:19" [ref=e158] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1He6KBRE13/
+            - generic [ref=e159]:
+              - img "iPhone18史诗级升级爆料，先别买17了！" [ref=e162]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 37.6万
+                    - generic:
+                      - img
+                      - generic: "125"
+                  - generic: 04:19
+          - generic [ref=e164]:
+            - link "iPhone18史诗级升级爆料，先别买17了！" [ref=e165] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1He6KBRE13/
+              - heading "iPhone18史诗级升级爆料，先别买17了！" [level=3] [ref=e166]:
+                - emphasis [ref=e167]: iPhone18
+                - text: 史诗级升级爆料，先别买17了！
+            - link "友人朦 · 01-27" [ref=e169] [cursor=pointer]:
+              - /url: //space.bilibili.com/167531912
+              - img [ref=e170]
+              - generic [ref=e174]: 友人朦
+              - generic [ref=e175]: · 01-27
+        - generic [ref=e178]:
+          - link "iPhone 18最新泄露！重大升级曝光，但有个坏消息... 苹果发布策略大调整！ 6267 3 09:05" [ref=e179] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1AuP9zDEd2/
+            - generic [ref=e180]:
+              - img "iPhone 18最新泄露！重大升级曝光，但有个坏消息... 苹果发布策略大调整！" [ref=e183]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "6267"
+                    - generic:
+                      - img
+                      - generic: "3"
+                  - generic: 09:05
+          - generic [ref=e185]:
+            - link "iPhone 18最新泄露！重大升级曝光，但有个坏消息... 苹果发布策略大调整！" [ref=e186] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1AuP9zDEd2/
+              - heading "iPhone 18最新泄露！重大升级曝光，但有个坏消息... 苹果发布策略大调整！" [level=3] [ref=e187]:
+                - emphasis [ref=e188]: iPhone
+                - emphasis [ref=e189]: "18"
+                - text: 最新泄露！重大升级曝光，但有个坏消息... 苹果发布策略大调整！
+            - link "大风吹乱了我的 · 03-09" [ref=e191] [cursor=pointer]:
+              - /url: //space.bilibili.com/1888915717
+              - img [ref=e192]
+              - generic [ref=e196]: 大风吹乱了我的
+              - generic [ref=e197]: · 03-09
+        - generic [ref=e200]:
+          - link "iPhone18Pro全面曝光！A20Pro+2nm工艺⚡相机大升级📸价格或维持不变？ 5.2万 16 04:01" [ref=e201] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1QnZSBNEwP/
+            - generic [ref=e202]:
+              - img "iPhone18Pro全面曝光！A20Pro+2nm工艺⚡相机大升级📸价格或维持不变？" [ref=e205]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 5.2万
+                    - generic:
+                      - img
+                      - generic: "16"
+                  - generic: 04:01
+          - generic [ref=e207]:
+            - link "iPhone18Pro全面曝光！A20Pro+2nm工艺⚡相机大升级📸价格或维持不变？" [ref=e208] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1QnZSBNEwP/
+              - heading "iPhone18Pro全面曝光！A20Pro+2nm工艺⚡相机大升级📸价格或维持不变？" [level=3] [ref=e209]:
+                - emphasis [ref=e210]: iPhone18
+                - text: Pro全面曝光！A20Pro+2nm工艺⚡相机大升级📸价格或维持不变？
+            - link "CY数码 · 02-18" [ref=e212] [cursor=pointer]:
+              - /url: //space.bilibili.com/3632320288393452
+              - img [ref=e213]
+              - generic [ref=e217]: CY数码
+              - generic [ref=e218]: · 02-18
+        - generic [ref=e221]:
+          - link "iPhone 18 Pro Max重磅爆料：史诗级改版？折叠屏与屏下相机未来展望！ 4173 0 06:10" [ref=e222] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1ePcXzsE5F/
+            - generic [ref=e223]:
+              - img "iPhone 18 Pro Max重磅爆料：史诗级改版？折叠屏与屏下相机未来展望！" [ref=e226]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "4173"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 06:10
+          - generic [ref=e228]:
+            - link "iPhone 18 Pro Max重磅爆料：史诗级改版？折叠屏与屏下相机未来展望！" [ref=e229] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1ePcXzsE5F/
+              - heading "iPhone 18 Pro Max重磅爆料：史诗级改版？折叠屏与屏下相机未来展望！" [level=3] [ref=e230]:
+                - emphasis [ref=e231]: iPhone
+                - emphasis [ref=e232]: "18"
+                - text: Pro Max重磅爆料：史诗级改版？折叠屏与屏下相机未来展望！
+            - link "油管视频搬运-Apple · 03-10" [ref=e234] [cursor=pointer]:
+              - /url: //space.bilibili.com/298551697
+              - img [ref=e235]
+              - generic [ref=e239]: 油管视频搬运-Apple
+              - generic [ref=e240]: · 03-10
+        - generic [ref=e243]:
+          - link "iPhone 18系列已经泄完了 1.2万 6 01:15" [ref=e244] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1MpNKz8ENg/
+            - generic [ref=e245]:
+              - img "iPhone 18系列已经泄完了" [ref=e248]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 1.2万
+                    - generic:
+                      - img
+                      - generic: "6"
+                  - generic: 01:15
+          - generic [ref=e250]:
+            - link "iPhone 18系列已经泄完了" [ref=e251] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1MpNKz8ENg/
+              - heading "iPhone 18系列已经泄完了" [level=3] [ref=e252]:
+                - emphasis [ref=e253]: iPhone
+                - emphasis [ref=e254]: "18"
+                - text: 系列已经泄完了
+            - link "surfdog · 03-08" [ref=e256] [cursor=pointer]:
+              - /url: //space.bilibili.com/1152917428
+              - img [ref=e257]
+              - generic [ref=e261]: surfdog
+              - generic [ref=e262]: · 03-08
+        - generic [ref=e265]:
+          - link "跟我去看看iPhone18新机长啥样 9903 17 03:52" [ref=e266] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV19jcfzzEsc/
+            - generic [ref=e267]:
+              - img "跟我去看看iPhone18新机长啥样" [ref=e270]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "9903"
+                    - generic:
+                      - img
+                      - generic: "17"
+                  - generic: 03:52
+          - generic [ref=e272]:
+            - link "跟我去看看iPhone18新机长啥样" [ref=e273] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV19jcfzzEsc/
+              - heading "跟我去看看iPhone18新机长啥样" [level=3] [ref=e274]:
+                - text: 跟我去看看
+                - emphasis [ref=e275]: iPhone18
+                - text: 新机长啥样
+            - link "王氏君 · 17小时前" [ref=e277] [cursor=pointer]:
+              - /url: //space.bilibili.com/1587288
+              - img [ref=e278]
+              - generic [ref=e282]: 王氏君
+              - generic [ref=e283]: · 17小时前
+        - generic [ref=e286]:
+          - link "麻了！iPhone18Pro多项升级与国行无关！冲不冲？ 1.7万 6 02:30" [ref=e287] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1nTAazUE11/
+            - generic [ref=e288]:
+              - img "麻了！iPhone18Pro多项升级与国行无关！冲不冲？" [ref=e291]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 1.7万
+                    - generic:
+                      - img
+                      - generic: "6"
+                  - generic: 02:30
+          - generic [ref=e293]:
+            - link "麻了！iPhone18Pro多项升级与国行无关！冲不冲？" [ref=e294] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1nTAazUE11/
+              - heading "麻了！iPhone18Pro多项升级与国行无关！冲不冲？" [level=3] [ref=e295]:
+                - text: 麻了！
+                - emphasis [ref=e296]: iPhone18
+                - text: Pro多项升级与国行无关！冲不冲？
+            - link "菠萝派TV · 02-28" [ref=e298] [cursor=pointer]:
+              - /url: //space.bilibili.com/3546608169913129
+              - img [ref=e299]
+              - generic [ref=e303]: 菠萝派TV
+              - generic [ref=e304]: · 02-28
+        - generic [ref=e307]:
+          - link "iPhone 18最新爆料 5.1万 25 17:31" [ref=e308] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1DsFnzdEqk/
+            - generic [ref=e309]:
+              - img "iPhone 18最新爆料" [ref=e312]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 5.1万
+                    - generic:
+                      - img
+                      - generic: "25"
+                  - generic: 17:31
+          - generic [ref=e314]:
+            - link "iPhone 18最新爆料" [ref=e315] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1DsFnzdEqk/
+              - heading "iPhone 18最新爆料" [level=3] [ref=e316]:
+                - emphasis [ref=e317]: iPhone
+                - emphasis [ref=e318]: "18"
+                - text: 最新爆料
+            - link "蘋果爹频道 · 02-07" [ref=e320] [cursor=pointer]:
+              - /url: //space.bilibili.com/24269486
+              - img [ref=e321]
+              - generic [ref=e325]: 蘋果爹频道
+              - generic [ref=e326]: · 02-07
+        - generic [ref=e329]:
+          - link "iPhone 18 Pro 将无缘屏下Face ID，外观和17相同！ 992 1 00:43" [ref=e330] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1ifwAz4ERE/
+            - generic [ref=e331]:
+              - img "iPhone 18 Pro 将无缘屏下Face ID，外观和17相同！" [ref=e334]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "992"
+                    - generic:
+                      - img
+                      - generic: "1"
+                  - generic: 00:43
+          - generic [ref=e336]:
+            - link "iPhone 18 Pro 将无缘屏下Face ID，外观和17相同！" [ref=e337] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1ifwAz4ERE/
+              - heading "iPhone 18 Pro 将无缘屏下Face ID，外观和17相同！" [level=3] [ref=e338]:
+                - emphasis [ref=e339]: iPhone
+                - emphasis [ref=e340]: "18"
+                - text: Pro 将无缘屏下Face ID，外观和17相同！
+            - link "Tech-Show · 4小时前" [ref=e342] [cursor=pointer]:
+              - /url: //space.bilibili.com/618591196
+              - img [ref=e343]
+              - generic [ref=e347]: Tech-Show
+              - generic [ref=e348]: · 4小时前
+        - generic [ref=e351]:
+          - link "iPhone18要取消灵动岛？绝不可能！真实到底！一人一台 63.2万 17 01:03" [ref=e352] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1DCNuzkE8U/
+            - generic [ref=e353]:
+              - img "iPhone18要取消灵动岛？绝不可能！真实到底！一人一台" [ref=e356]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 63.2万
+                    - generic:
+                      - img
+                      - generic: "17"
+                  - generic: 01:03
+          - generic [ref=e358]:
+            - link "iPhone18要取消灵动岛？绝不可能！真实到底！一人一台" [ref=e359] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1DCNuzkE8U/
+              - heading "iPhone18要取消灵动岛？绝不可能！真实到底！一人一台" [level=3] [ref=e360]:
+                - emphasis [ref=e361]: iPhone18
+                - text: 要取消灵动岛？绝不可能！真实到底！一人一台
+            - link "视觉风暴XR · 03-08" [ref=e363] [cursor=pointer]:
+              - /url: //space.bilibili.com/3690992880323214
+              - img [ref=e364]
+              - generic [ref=e368]: 视觉风暴XR
+              - generic [ref=e369]: · 03-08
+        - generic [ref=e372]:
+          - link "【科技美学】iPhone18外观大概率没有变化，vision Pro销量很差，有可能会停产 2.2万 24 06:58" [ref=e373] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1DdzuBVE7r/
+            - generic [ref=e374]:
+              - img "【科技美学】iPhone18外观大概率没有变化，vision Pro销量很差，有可能会停产" [ref=e377]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 2.2万
+                    - generic:
+                      - img
+                      - generic: "24"
+                  - generic: 06:58
+          - generic [ref=e379]:
+            - link "【科技美学】iPhone18外观大概率没有变化，vision Pro销量很差，有可能会停产" [ref=e380] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1DdzuBVE7r/
+              - heading "【科技美学】iPhone18外观大概率没有变化，vision Pro销量很差，有可能会停产" [level=3] [ref=e381]:
+                - text: 【科技美学】
+                - emphasis [ref=e382]: iPhone18
+                - text: 外观大概率没有变化，vision Pro销量很差，有可能会停产
+            - link "彼咔丘 · 01-23" [ref=e384] [cursor=pointer]:
+              - /url: //space.bilibili.com/3546759812877247
+              - img [ref=e385]
+              - generic [ref=e389]: 彼咔丘
+              - generic [ref=e390]: · 01-23
+        - generic [ref=e393]:
+          - link "【那岩】iphone18会取消灵动岛吗？ 2517 19 01:03" [ref=e394] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1Kacfz8EXf/
+            - generic [ref=e395]:
+              - img "【那岩】iphone18会取消灵动岛吗？" [ref=e398]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "2517"
+                    - generic:
+                      - img
+                      - generic: "19"
+                  - generic: 01:03
+          - generic [ref=e400]:
+            - link "【那岩】iphone18会取消灵动岛吗？" [ref=e401] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1Kacfz8EXf/
+              - heading "【那岩】iphone18会取消灵动岛吗？" [level=3] [ref=e402]:
+                - text: 【那岩】
+                - emphasis [ref=e403]: iphone18
+                - text: 会取消灵动岛吗？
+            - link "拂乱的风的切片屋 · 19小时前" [ref=e405] [cursor=pointer]:
+              - /url: //space.bilibili.com/6127378
+              - img [ref=e406]
+              - generic [ref=e410]: 拂乱的风的切片屋
+              - generic [ref=e411]: · 19小时前
+        - generic [ref=e414]:
+          - link "iPhone 18 Pro Max重磅爆料：透明设计？灵动岛大缩水！A20芯片更强？ 1144 0 07:10" [ref=e415] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1Ywwwz2EjM/
+            - generic [ref=e416]:
+              - img "iPhone 18 Pro Max重磅爆料：透明设计？灵动岛大缩水！A20芯片更强？" [ref=e419]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "1144"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 07:10
+          - generic [ref=e421]:
+            - link "iPhone 18 Pro Max重磅爆料：透明设计？灵动岛大缩水！A20芯片更强？" [ref=e422] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1Ywwwz2EjM/
+              - heading "iPhone 18 Pro Max重磅爆料：透明设计？灵动岛大缩水！A20芯片更强？" [level=3] [ref=e423]:
+                - emphasis [ref=e424]: iPhone
+                - emphasis [ref=e425]: "18"
+                - text: Pro Max重磅爆料：透明设计？灵动岛大缩水！A20芯片更强？
+            - link "油管视频搬运-Apple · 17小时前" [ref=e427] [cursor=pointer]:
+              - /url: //space.bilibili.com/298551697
+              - img [ref=e428]
+              - generic [ref=e432]: 油管视频搬运-Apple
+              - generic [ref=e433]: · 17小时前
+        - generic [ref=e436]:
+          - link "iPhone18pro要是真这样 刚入手iPhone17系列的后悔吗ι？ 2055 0 06:21" [ref=e437] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV189PNzxE3D/
+            - generic [ref=e438]:
+              - img "iPhone18pro要是真这样 刚入手iPhone17系列的后悔吗ι？" [ref=e441]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "2055"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 06:21
+          - generic [ref=e443]:
+            - link "iPhone18pro要是真这样 刚入手iPhone17系列的后悔吗ι？" [ref=e444] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV189PNzxE3D/
+              - heading "iPhone18pro要是真这样 刚入手iPhone17系列的后悔吗ι？" [level=3] [ref=e445]:
+                - emphasis [ref=e446]: iPhone18
+                - text: pro要是真这样 刚入手
+                - emphasis [ref=e447]: iPhone
+                - text: 17系列的后悔吗ι？
+            - link "数码视讯a · 03-04" [ref=e449] [cursor=pointer]:
+              - /url: //space.bilibili.com/3493267050072067
+              - img [ref=e450]
+              - generic [ref=e454]: 数码视讯a
+              - generic [ref=e455]: · 03-04
+        - generic [ref=e458]:
+          - link "消息称苹果 iPhone 18 Pro 系列考虑复用部分前代模具，屏下 Face ID（缩小灵动岛）延期给下代 2547 0 01:08" [ref=e459] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1pBcfzxEzk/
+            - generic [ref=e460]:
+              - img "消息称苹果 iPhone 18 Pro 系列考虑复用部分前代模具，屏下 Face ID（缩小灵动岛）延期给下代" [ref=e463]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "2547"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 01:08
+          - generic [ref=e465]:
+            - link "消息称苹果 iPhone 18 Pro 系列考虑复用部分前代模具，屏下 Face ID（缩小灵动岛）延期给下代" [ref=e466] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1pBcfzxEzk/
+              - heading "消息称苹果 iPhone 18 Pro 系列考虑复用部分前代模具，屏下 Face ID（缩小灵动岛）延期给下代" [level=3] [ref=e467]:
+                - text: 消息称苹果
+                - emphasis [ref=e468]: iPhone
+                - emphasis [ref=e469]: "18"
+                - text: Pro 系列考虑复用部分前代模具，屏下 Face ID（缩小灵动岛）延期给下代
+            - link "゙数码情报站 · 21小时前" [ref=e471] [cursor=pointer]:
+              - /url: //space.bilibili.com/3493142716221787
+              - img [ref=e472]
+              - generic [ref=e476]: ゙数码情报站
+              - generic [ref=e477]: · 21小时前
+        - generic [ref=e480]:
+          - link "iPhone18 FLOD折叠屏手机“上手”展示 1722 0 00:54" [ref=e481] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1gXNwzWEbm/
+            - generic [ref=e482]:
+              - img "iPhone18 FLOD折叠屏手机“上手”展示" [ref=e485]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "1722"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 00:54
+          - generic [ref=e487]:
+            - link "iPhone18 FLOD折叠屏手机“上手”展示" [ref=e488] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1gXNwzWEbm/
+              - heading "iPhone18 FLOD折叠屏手机“上手”展示" [level=3] [ref=e489]:
+                - emphasis [ref=e490]: iPhone18
+                - text: FLOD折叠屏手机“上手”展示
+            - link "转转小熊妹 · 03-08" [ref=e492] [cursor=pointer]:
+              - /url: //space.bilibili.com/673490659
+              - img [ref=e493]
+              - generic [ref=e497]: 转转小熊妹
+              - generic [ref=e498]: · 03-08
+        - generic [ref=e501]:
+          - link "iPhone 18 Pro真机首爆！折叠款无折痕屏确认，史上最贵苹果手机预警? 1.2万 3 20:58" [ref=e502] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1QM6sBsEQw/
+            - generic [ref=e503]:
+              - img "iPhone 18 Pro真机首爆！折叠款无折痕屏确认，史上最贵苹果手机预警?" [ref=e506]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 1.2万
+                    - generic:
+                      - img
+                      - generic: "3"
+                  - generic: 20:58
+          - generic [ref=e508]:
+            - link "iPhone 18 Pro真机首爆！折叠款无折痕屏确认，史上最贵苹果手机预警?" [ref=e509] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1QM6sBsEQw/
+              - heading "iPhone 18 Pro真机首爆！折叠款无折痕屏确认，史上最贵苹果手机预警?" [level=3] [ref=e510]:
+                - emphasis [ref=e511]: iPhone
+                - emphasis [ref=e512]: "18"
+                - text: Pro真机首爆！折叠款无折痕屏确认，史上最贵
+                - emphasis [ref=e513]: 苹果手机
+                - text: 预警?
+            - link "油管视频搬运-Apple · 02-01" [ref=e515] [cursor=pointer]:
+              - /url: //space.bilibili.com/298551697
+              - img [ref=e516]
+              - generic [ref=e520]: 油管视频搬运-Apple
+              - generic [ref=e521]: · 02-01
+        - generic [ref=e524]:
+          - link "iPhone18来了⁉️⁉️⁉️ 245 0 00:44" [ref=e525] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1WpPDz5E8G/
+            - generic [ref=e526]:
+              - img "iPhone18来了⁉️⁉️⁉️" [ref=e529]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "245"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 00:44
+          - generic [ref=e531]:
+            - link "iPhone18来了⁉️⁉️⁉️" [ref=e532] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1WpPDz5E8G/
+              - heading "iPhone18来了⁉️⁉️⁉️" [level=3] [ref=e533]:
+                - emphasis [ref=e534]: iPhone18
+                - text: 来了⁉️⁉️⁉️
+            - link "科技北数码 · 03-09" [ref=e536] [cursor=pointer]:
+              - /url: //space.bilibili.com/3546954845916000
+              - img [ref=e537]
+              - generic [ref=e541]: 科技北数码
+              - generic [ref=e542]: · 03-09
+        - generic [ref=e545]:
+          - link "iPhone18外观大改，有可能做电池可拆卸设计 7509 4 01:19" [ref=e546] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1pfABzME77/
+            - generic [ref=e547]:
+              - img "iPhone18外观大改，有可能做电池可拆卸设计" [ref=e550]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "7509"
+                    - generic:
+                      - img
+                      - generic: "4"
+                  - generic: 01:19
+          - generic [ref=e552]:
+            - link "iPhone18外观大改，有可能做电池可拆卸设计" [ref=e553] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1pfABzME77/
+              - heading "iPhone18外观大改，有可能做电池可拆卸设计" [level=3] [ref=e554]:
+                - emphasis [ref=e555]: iPhone18
+                - text: 外观大改，有可能做电池可拆卸设计
+            - link "邦乔威与锋子呀 · 03-01" [ref=e557] [cursor=pointer]:
+              - /url: //space.bilibili.com/474549782
+              - img [ref=e558]
+              - generic [ref=e562]: 邦乔威与锋子呀
+              - generic [ref=e563]: · 03-01
+        - generic [ref=e566]:
+          - link "Apple【iPhone 18 Pro 宣传片来啦！】左边打孔屏！屏下结构光！A20芯片！苹果美学！ 2799 0 00:38" [ref=e567] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1tf6fBEEvs/
+            - generic [ref=e568]:
+              - img "Apple【iPhone 18 Pro 宣传片来啦！】左边打孔屏！屏下结构光！A20芯片！苹果美学！" [ref=e571]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "2799"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 00:38
+          - generic [ref=e573]:
+            - link "Apple【iPhone 18 Pro 宣传片来啦！】左边打孔屏！屏下结构光！A20芯片！苹果美学！" [ref=e574] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1tf6fBEEvs/
+              - heading "Apple【iPhone 18 Pro 宣传片来啦！】左边打孔屏！屏下结构光！A20芯片！苹果美学！" [level=3] [ref=e575]:
+                - text: Apple【
+                - emphasis [ref=e576]: iPhone
+                - emphasis [ref=e577]: "18"
+                - text: Pro 宣传片来啦！】左边打孔屏！屏下结构光！A20芯片！苹果美学！
+            - link "Bseries官方 · 01-12" [ref=e579] [cursor=pointer]:
+              - /url: //space.bilibili.com/148033436
+              - img [ref=e580]
+              - generic [ref=e584]: Bseries官方
+              - generic [ref=e585]: · 01-12
+        - generic [ref=e588]:
+          - link "iPhone18Pro试生产，没惊喜 5.7万 12 01:37" [ref=e589] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1ykACzWEZW/
+            - generic [ref=e590]:
+              - img "iPhone18Pro试生产，没惊喜" [ref=e593]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 5.7万
+                    - generic:
+                      - img
+                      - generic: "12"
+                  - generic: 01:37
+          - generic [ref=e595]:
+            - link "iPhone18Pro试生产，没惊喜" [ref=e596] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1ykACzWEZW/
+              - heading "iPhone18Pro试生产，没惊喜" [level=3] [ref=e597]:
+                - emphasis [ref=e598]: iPhone18
+                - text: Pro试生产，没惊喜
+            - link "邦乔威与锋子呀 · 02-27" [ref=e600] [cursor=pointer]:
+              - /url: //space.bilibili.com/474549782
+              - img [ref=e601]
+              - generic [ref=e605]: 邦乔威与锋子呀
+              - generic [ref=e606]: · 02-27
+        - generic [ref=e609]:
+          - link "iphone18值得等吗？一期视频告诉你，为什么可以直接买iphone17！ 7517 1 04:34" [ref=e610] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1BPr2BhETB/
+            - generic [ref=e611]:
+              - img "iphone18值得等吗？一期视频告诉你，为什么可以直接买iphone17！" [ref=e614]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "7517"
+                    - generic:
+                      - img
+                      - generic: "1"
+                  - generic: 04:34
+          - generic [ref=e616]:
+            - link "iphone18值得等吗？一期视频告诉你，为什么可以直接买iphone17！" [ref=e617] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1BPr2BhETB/
+              - heading "iphone18值得等吗？一期视频告诉你，为什么可以直接买iphone17！" [level=3] [ref=e618]:
+                - emphasis [ref=e619]: iphone18
+                - text: 值得等吗？一期视频告诉你，为什么可以直接买
+                - emphasis [ref=e620]: iphone
+                - text: 17！
+            - link "机车Mike · 01-17" [ref=e622] [cursor=pointer]:
+              - /url: //space.bilibili.com/3546895783824125
+              - img [ref=e623]
+              - generic [ref=e627]: 机车Mike
+              - generic [ref=e628]: · 01-17
+        - generic [ref=e631]:
+          - link "这升级，太狠了！iPhone 18 ：这次，真的没短板了？ 6.4万 22 01:06" [ref=e632] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1eNzTB6EdY/
+            - generic [ref=e633]:
+              - img "这升级，太狠了！iPhone 18 ：这次，真的没短板了？" [ref=e636]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 6.4万
+                    - generic:
+                      - img
+                      - generic: "22"
+                  - generic: 01:06
+          - generic [ref=e638]:
+            - link "这升级，太狠了！iPhone 18 ：这次，真的没短板了？" [ref=e639] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1eNzTB6EdY/
+              - heading "这升级，太狠了！iPhone 18 ：这次，真的没短板了？" [level=3] [ref=e640]:
+                - text: 这升级，太狠了！
+                - emphasis [ref=e641]: iPhone
+                - emphasis [ref=e642]: "18"
+                - text: ：这次，真的没短板了？
+            - link "趣码社 · 01-23" [ref=e644] [cursor=pointer]:
+              - /url: //space.bilibili.com/497519189
+              - img [ref=e645]
+              - generic [ref=e649]: 趣码社
+              - generic [ref=e650]: · 01-23
+        - generic [ref=e653]:
+          - link "看看18年战神苹果能不能秒21年888 2915 0 00:54" [ref=e654] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1UcAfzqEzX/
+            - generic [ref=e655]:
+              - img "看看18年战神苹果能不能秒21年888" [ref=e658]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "2915"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 00:54
+          - generic [ref=e660]:
+            - link "看看18年战神苹果能不能秒21年888" [ref=e661] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1UcAfzqEzX/
+              - heading "看看18年战神苹果能不能秒21年888" [level=3] [ref=e662]:
+                - text: 看看
+                - emphasis [ref=e663]: "18"
+                - text: 年战神苹果能不能秒21年888
+            - link "芜湖淘机 · 03-03" [ref=e665] [cursor=pointer]:
+              - /url: //space.bilibili.com/3546832942664284
+              - img [ref=e666]
+              - generic [ref=e670]: 芜湖淘机
+              - generic [ref=e671]: · 03-03
+        - generic [ref=e674]:
+          - link "iPhone18改充电方式？绝不可能 只玩真实！一人一台 13.4万 24 01:03" [ref=e675] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1CKAozxEzq/
+            - generic [ref=e676]:
+              - img "iPhone18改充电方式？绝不可能 只玩真实！一人一台" [ref=e679]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: 13.4万
+                    - generic:
+                      - img
+                      - generic: "24"
+                  - generic: 01:03
+          - generic [ref=e681]:
+            - link "iPhone18改充电方式？绝不可能 只玩真实！一人一台" [ref=e682] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1CKAozxEzq/
+              - heading "iPhone18改充电方式？绝不可能 只玩真实！一人一台" [level=3] [ref=e683]:
+                - emphasis [ref=e684]: iPhone18
+                - text: 改充电方式？绝不可能 只玩真实！一人一台
+            - link "视觉风暴XR · 03-03" [ref=e686] [cursor=pointer]:
+              - /url: //space.bilibili.com/3690992880323214
+              - img [ref=e687]
+              - generic [ref=e691]: 视觉风暴XR
+              - generic [ref=e692]: · 03-03
+        - generic [ref=e695]:
+          - link "iPhone 18E重磅爆料：苹果最大设计变革？A20芯片、动态岛全解析！ 1590 0 08:12" [ref=e696] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1ZbPWzsEb9/
+            - generic [ref=e697]:
+              - img "iPhone 18E重磅爆料：苹果最大设计变革？A20芯片、动态岛全解析！" [ref=e700]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "1590"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 08:12
+          - generic [ref=e702]:
+            - link "iPhone 18E重磅爆料：苹果最大设计变革？A20芯片、动态岛全解析！" [ref=e703] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1ZbPWzsEb9/
+              - heading "iPhone 18E重磅爆料：苹果最大设计变革？A20芯片、动态岛全解析！" [level=3] [ref=e704]:
+                - emphasis [ref=e705]: iPhone
+                - emphasis [ref=e706]: "18"
+                - text: E重磅爆料：苹果最大设计变革？A20芯片、动态岛全解析！
+            - link "油管视频搬运-Apple · 03-06" [ref=e708] [cursor=pointer]:
+              - /url: //space.bilibili.com/298551697
+              - img [ref=e709]
+              - generic [ref=e713]: 油管视频搬运-Apple
+              - generic [ref=e714]: · 03-06
+        - generic [ref=e717]:
+          - link "苹果ai不可能！iPhone18不可能！一人一台 不玩跑路！ 256 1 01:04" [ref=e718] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1fNwczREJJ/
+            - generic [ref=e719]:
+              - img "苹果ai不可能！iPhone18不可能！一人一台 不玩跑路！" [ref=e722]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "256"
+                    - generic:
+                      - img
+                      - generic: "1"
+                  - generic: 01:04
+          - generic [ref=e724]:
+            - link "苹果ai不可能！iPhone18不可能！一人一台 不玩跑路！" [ref=e725] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1fNwczREJJ/
+              - heading "苹果ai不可能！iPhone18不可能！一人一台 不玩跑路！" [level=3] [ref=e726]:
+                - text: 苹果ai不可能！
+                - emphasis [ref=e727]: iPhone18
+                - text: 不可能！一人一台 不玩跑路！
+            - link "视觉风暴XR · 14小时前" [ref=e729] [cursor=pointer]:
+              - /url: //space.bilibili.com/3690992880323214
+              - img [ref=e730]
+              - generic [ref=e734]: 视觉风暴XR
+              - generic [ref=e735]: · 14小时前
+        - generic [ref=e738]:
+          - link "iPhone 18E重磅爆料：半透明背板、A20芯片、24MP自拍，苹果要放大招？ 7 0 06:03" [ref=e739] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1MhcBz6EWw/
+            - generic [ref=e740]:
+              - img "iPhone 18E重磅爆料：半透明背板、A20芯片、24MP自拍，苹果要放大招？" [ref=e743]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "7"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 06:03
+          - generic [ref=e745]:
+            - link "iPhone 18E重磅爆料：半透明背板、A20芯片、24MP自拍，苹果要放大招？" [ref=e746] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1MhcBz6EWw/
+              - heading "iPhone 18E重磅爆料：半透明背板、A20芯片、24MP自拍，苹果要放大招？" [level=3] [ref=e747]:
+                - emphasis [ref=e748]: iPhone
+                - emphasis [ref=e749]: "18"
+                - text: E重磅爆料：半透明背板、A20芯片、24MP自拍，苹果要放大招？
+            - link "油管视频搬运-Apple · 12分钟前" [ref=e751] [cursor=pointer]:
+              - /url: //space.bilibili.com/298551697
+              - img [ref=e752]
+              - generic [ref=e756]: 油管视频搬运-Apple
+              - generic [ref=e757]: · 12分钟前
+        - generic [ref=e760]:
+          - link "曝iPhone18 Pro或无屏下FaceID！ 170 0 00:36" [ref=e761] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1LawFzEEoY/
+            - generic [ref=e762]:
+              - img "曝iPhone18 Pro或无屏下FaceID！" [ref=e765]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "170"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 00:36
+          - generic [ref=e767]:
+            - link "曝iPhone18 Pro或无屏下FaceID！" [ref=e768] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV1LawFzEEoY/
+              - heading "曝iPhone18 Pro或无屏下FaceID！" [level=3] [ref=e769]:
+                - text: 曝
+                - emphasis [ref=e770]: iPhone18
+                - text: Pro或无屏下FaceID！
+            - link "燃木为光 · 14小时前" [ref=e772] [cursor=pointer]:
+              - /url: //space.bilibili.com/3546848285428339
+              - img [ref=e773]
+              - generic [ref=e777]: 燃木为光
+              - generic [ref=e778]: · 14小时前
+        - generic [ref=e781]:
+          - link "iPhone 18 pro新配色曝光！看看你喜欢哪个色？ 274 0 00:52" [ref=e782] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV18YNcz7EDt/
+            - generic [ref=e783]:
+              - img "iPhone 18 pro新配色曝光！看看你喜欢哪个色？" [ref=e786]
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic: "274"
+                    - generic:
+                      - img
+                      - generic: "0"
+                  - generic: 00:52
+          - generic [ref=e788]:
+            - link "iPhone 18 pro新配色曝光！看看你喜欢哪个色？" [ref=e789] [cursor=pointer]:
+              - /url: //www.bilibili.com/video/BV18YNcz7EDt/
+              - heading "iPhone 18 pro新配色曝光！看看你喜欢哪个色？" [level=3] [ref=e790]:
+                - emphasis [ref=e791]: iPhone
+                - emphasis [ref=e792]: "18"
+                - text: pro新配色曝光！看看你喜欢哪个色？
+            - link "向南之木 · 03-07" [ref=e794] [cursor=pointer]:
+              - /url: //space.bilibili.com/487150172
+              - img [ref=e795]
+              - generic [ref=e799]: 向南之木
+              - generic [ref=e800]: · 03-07
+      - generic [ref=e803]:
+        - button "上一页" [disabled] [ref=e804]
+        - button "1" [ref=e805] [cursor=pointer]
+        - button "2" [ref=e806] [cursor=pointer]
+        - button "3" [ref=e807] [cursor=pointer]
+        - button "4" [ref=e808] [cursor=pointer]
+        - button "5" [ref=e809] [cursor=pointer]
+        - button "6" [ref=e810] [cursor=pointer]
+        - button "7" [ref=e811] [cursor=pointer]
+        - generic [ref=e812]: ...
+        - button "34" [ref=e813] [cursor=pointer]
+        - button "下一页" [ref=e814] [cursor=pointer]
+  - generic [ref=e819]:
+    - generic [ref=e820]:
+      - generic [ref=e821]:
+        - generic [ref=e822]: bilibili
+        - generic [ref=e823]:
+          - link "关于我们" [ref=e824] [cursor=pointer]:
+            - /url: //www.bilibili.com/blackboard/aboutUs.html
+          - link "联系我们" [ref=e825] [cursor=pointer]:
+            - /url: //www.bilibili.com/blackboard/contact.html
+          - link "用户协议" [ref=e826] [cursor=pointer]:
+            - /url: //www.bilibili.com/protocal/licence.html
+          - link "加入我们" [ref=e827] [cursor=pointer]:
+            - /url: //www.bilibili.com/blackboard/join.html
+          - link "隐私协议" [ref=e828] [cursor=pointer]:
+            - /url: //www.bilibili.com/blackboard/privacy-pc.html
+          - link "bilibili认证" [ref=e829] [cursor=pointer]:
+            - /url: //account.bilibili.com/account/official/home
+          - link "Investor Relations" [ref=e830] [cursor=pointer]:
+            - /url: //ir.bilibili.com/
+      - generic [ref=e831]:
+        - generic [ref=e832]: 传送门
+        - generic [ref=e833]:
+          - link "协议汇总" [ref=e834] [cursor=pointer]:
+            - /url: //www.bilibili.com/blackboard/topic/activity-cn8bxPLzz.html
+          - link "活动中心" [ref=e835] [cursor=pointer]:
+            - /url: //www.bilibili.com/blackboard/activity-list.html
+          - link "活动专题页" [ref=e836] [cursor=pointer]:
+            - /url: //www.bilibili.com/blackboard/topic_list.html
+          - link "侵权申诉" [ref=e837] [cursor=pointer]:
+            - /url: //www.bilibili.com/v/copyright/intro/
+          - link "帮助中心" [ref=e838] [cursor=pointer]:
+            - /url: //www.bilibili.com/blackboard/help.html
+          - link "社区中心" [ref=e839] [cursor=pointer]:
+            - /url: https://www.bilibili.com/blackboard/activity-5zJxM3spoS.html
+          - link "壁纸站" [ref=e840] [cursor=pointer]:
+            - /url: //space.bilibili.com/6823116#/album
+          - link "广告合作" [ref=e841] [cursor=pointer]:
+            - /url: //e.bilibili.com/
+          - link "名人堂" [ref=e842] [cursor=pointer]:
+            - /url: //www.bilibili.com/blackboard/activity-S1jfy69Jz.html
+          - link "MCN管理中心" [ref=e843] [cursor=pointer]:
+            - /url: //mcn.bilibili.com/studio/mcn/entry
+          - link "高级弹幕" [ref=e844] [cursor=pointer]:
+            - /url: //www.bilibili.com/video/BV1Xx411c7cH/
+          - link "品牌号官网" [ref=e845] [cursor=pointer]:
+            - /url: //b.bilibili.com/
+      - generic [ref=e846]:
+        - link "下载APP" [ref=e848] [cursor=pointer]:
+          - /url: //app.bilibili.com/
+          - img [ref=e850]
+          - paragraph [ref=e852]: 下载APP
+        - link "公益" [ref=e854] [cursor=pointer]:
+          - /url: //love.bilibili.com/
+          - img [ref=e856]
+          - paragraph [ref=e861]: 公益
+        - link "官方微博" [ref=e863] [cursor=pointer]:
+          - /url: //weibo.com/bilibiliweb
+          - img [ref=e865]
+          - paragraph [ref=e867]: 官方微博
+        - generic [ref=e869]:
+          - img [ref=e871]
+          - paragraph [ref=e873]: 官方微信
+    - generic [ref=e876]:
+      - generic [ref=e877]:
+        - link "营业执照" [ref=e878] [cursor=pointer]:
+          - /url: //i0.hdslb.com/bfs/activity-plat/static/20240516/9ccf041718e5d6d6dfaebc91b85c791c/gd85E6tDco.jpg
+        - text: 信息网络传播视听节目许可证：0910417
+        - link "网络文化经营许可证 沪网文【2025】0258-085号" [ref=e879] [cursor=pointer]:
+          - /url: //i0.hdslb.com/bfs/activity-plat/static/20260209/3b3c5705bda98d50983f6f47df360fef/K4t52YryBV.jpeg
+        - text: 广播电视节目制作经营许可证：（沪）字第01248号增值电信业务经营许可证 沪B2-20100043
+      - generic [ref=e880]:
+        - link "互联网ICP备案：沪ICP备13002172号-3" [ref=e881] [cursor=pointer]:
+          - /url: //beian.miit.gov.cn/
+        - link "出版物经营许可证 沪批字第U6699 号" [ref=e882] [cursor=pointer]:
+          - /url: //i0.hdslb.com/bfs/activity-plat/static/20240516/9ccf041718e5d6d6dfaebc91b85c791c/4ainzbFKao.jpg
+        - text: 互联网药品信息服务资格证 沪-非经营性-2022-0011营业性演出许可证 沪市文演（经）00-2253 |
+      - generic [ref=e883]:
+        - link "不良信息举报邮箱：help@bilibili.com" [ref=e884] [cursor=pointer]:
+          - /url: mailto:help@bilibili.com
+        - link "涉未成年举报邮箱：teenprotect@bilibili.com" [ref=e885] [cursor=pointer]:
+          - /url: mailto:teenprotect@bilibili.com
+        - text: 不良信息举报电话：4006262233转3
+        - link "上海互联网举报中心 |" [ref=e887] [cursor=pointer]:
+          - /url: http://www.shjbzx.cn/
+        - link "12345政务服务便民热线 |" [ref=e888] [cursor=pointer]:
+          - /url: http://www.sh12345.gov.cn/
+      - generic [ref=e889]:
+        - link "沪公网安备31011002002436号 |" [ref=e891] [cursor=pointer]:
+          - /url: http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31011002002436
+        - link "儿童色情信息举报专区 |" [ref=e892] [cursor=pointer]:
+          - /url: mailto:userreport@bilibili.com
+        - link "扫黄打非举报" [ref=e893] [cursor=pointer]:
+          - /url: https://bzpt.shdf.gov.cn/www/shouye/gzfw/wsjb/index.shtml
+      - generic [ref=e894]:
+        - link "网信算备310110764385705230011号" [ref=e895] [cursor=pointer]:
+          - /url: https://beian.cac.gov.cn/api/static/fileUpload/principalOrithm/additional/user_699bbd78-36f4-459c-aeb0-bf98a2a562d8_6185ea2c-c84c-404a-9280-c5465af05948.pdf
+        - link "网信算备310110764385702230013号" [ref=e896] [cursor=pointer]:
+          - /url: https://beian.cac.gov.cn/api/static/fileUpload/principalOrithm/additional/user_699bbd78-36f4-459c-aeb0-bf98a2a562d8_e03e6855-76a6-43fb-b799-d090e7fce25d.pdf
+      - generic [ref=e897]:
+        - text: 网上有害信息举报专区：
+        - link "中国互联网违法和不良信息举报中心" [ref=e899] [cursor=pointer]:
+          - /url: https://www.12377.cn/
+        - text: 亲爱的市民朋友，上海警方反诈劝阻电话“96110”系专门针对避免您财产被骗受损而设，请您一旦收到来电，立即接听。
+      - generic [ref=e900]: 公司名称：上海宽娱数码科技有限公司 |公司地址：上海市杨浦区政立路489号 |电话：021-25099888
+    - generic [ref=e901]:
+      - img [ref=e902]
+      - img [ref=e903]
+      - img [ref=e904]

@@ -1,0 +1,415 @@
+新增蓝牙权限检测功能
+打开APP进行初始化
+1. 检测蓝牙权限是否授权，获取系统授权
+2. 检测蓝牙是否开启，未开启的话，顶部右上角蓝牙状态处于关闭状态Icon，同时给出弹窗提示(弹窗风格和整体页面风格一样，支持点击跳转到设置APP蓝牙页面)
+3. 如果已经开启蓝牙，顶部右上角蓝牙处于开启状态Icon
+
+顶部状态栏信号模块展示的是已连接设备的信号强度，当蓝牙未打开/未授权时也要展示无信号的Icon样式
+
+
+实现业务逻辑日志Logs页面展示功能
+比如当页面初始化时蓝牙未授权，或者蓝牙未开启这种需要业务逻辑日志，要输出到Logs页面进行展示
+后续的其他功能也会用到这个日志输出展示功能，比如蓝牙OBD ELM327模块的日志等
+设计一个通用的技术实现方式
+
+仪表盘刻度显示的不够精细啊，粒度太粗了，优化下
+
+
+新增车辆连接-蓝牙扫描设备连接页面
+参考这个obd_connect_page.html页面布局实现，整体风格和App保持一致
+功能：
+上方展示一个扫描状态，通过来回渐变的进度条展示正在扫描中，下方实时展示扫描出来的周围设备列表。
+如果未扫描到设备，设计一个兜底页面占位。点击设备条目上的连接按钮开始进行蓝牙连接。
+右侧卡片展示已经连接的设备信息详情，比如设备名，设备地址，信号强度，发送&接收的数据量。
+未连接时展示上次连接的设备信息，如果没有上次设备信息，设计一个默认的占位区域
+设备状态有：未连接，连接中，已连接。
+数据先动态Mock，先实现页面展示
+
+扫描进度条动画有点短了，和设备列表保持同长度，另外扫描动画有点延迟，排查下原因，给出技术方案
+
+修改蓝牙扫描设备页面，新增真实的支持ELM327蓝牙OBD设备扫描
+0. 移除现有的Mock测试数据代码，重新按照新的产品需求梳理设计
+1. 进入页面如果之前没有扫描过，默认自动开始扫描，扫描3s超时暂停，点击重新扫描按钮 支持重新扫描
+2. 扫描出来的设备列表按照信号从高到低排列，信号太差的设备过滤不需要展示
+3. 上次连接的设备信息要保存到文件里，下次重新打开APP后自动读取上次设备信息
+4. 重新打开APP后自动读取上次设备信息，如果当前处于未连接状态，自动扫描并连接上次的设备。如果未找到上次的设备，就不做任何处理。
+5. 如果异常断开设备，要支持自动重连上次断开的设备，重试2次
+6. 点击设备的连接按钮，进行真实的设备连接，点击断开连接icon，执行断开设备操作
+7. 其他项目用到的连接设备标识信息如下：通过这些信息连接OBD设备
+  static const String notifyUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
+  static const String writeUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
+  static const List<Map<String, String>> alternativeUuids = [
+    {'notify': "0000ffe1-0000-1000-8000-00805f9b34fb", 'write': "0000ffe2-0000-1000-8000-00805f9b34fb"},
+    {'notify': "0000fff0-0000-1000-8000-00805f9b34fb", 'write': "0000fff1-0000-1000-8000-00805f9b34fb"},
+    {'notify': "6e400003-b5a3-f393-e0a9-e50e24dcca9e", 'write': "6e400002-b5a3-f393-e0a9-e50e24dcca9e"},
+  ];
+
+
+
+建立蓝牙连接后应该初始化并且轮询查询OBD数据
+下面是其他项目的参考代码：
+  Future<void> _initializeElm327() async {
+    Duration waitTime =  Duration(milliseconds: _settingsService.minCommandInterval);
+    log("Initializing ELM327 command waitTime:{$waitTime}ms");
+    await _sendAtCommand("ATZ");
+    await Future.delayed(const Duration(milliseconds: 1000));
+    await _sendAtCommand("ATE0");
+    await Future.delayed(waitTime);
+    await _sendAtCommand("ATL0");
+    await Future.delayed(waitTime);
+    await _sendAtCommand("ATH0");
+    await Future.delayed(waitTime);
+    await _sendAtCommand("ATSP0"); // 不要自动模式
+    // await _sendAtCommand("ATSP6"); // 强制 CAN 11/500（GSX8s用的这个）
+    await Future.delayed(waitTime);
+  }
+
+  Future<void> _sendAtCommand(String command) async {
+    if (_writeCharacteristic == null) throw Exception("Write characteristic not available");
+
+    final bytes = utf8.encode("$command\r");
+    await _writeCharacteristic!.write(bytes, withoutResponse: false);
+    log("AT command: $command");
+  }
+
+  void _handleNotification(List<int> value) {
+    try {
+      final response = utf8.decode(value, allowMalformed: true);
+      _processObdResponse(response.trim());
+    } catch (e) {
+      logError("Notification error: $e");
+    }
+  }
+
+  void _processObdResponse(String response) {
+    // 过滤掉提示符和无效响应
+    if (response.startsWith(">")) {
+      return; // ELM327 提示符，跳过
+    }
+
+    if (!response.startsWith("41")) {
+      // 非标准 OBD 响应，可能是错误信息
+      logWarning("非标准 OBD 响应: $response");
+      return;
+    }
+
+    final parts = response.split(" ");
+    if (parts.length < 3) {
+      logWarning("OBD 数据长度不足: $response");
+      return;
+    }
+
+    final pid = parts[1];
+    switch (pid) {
+      case "0C":
+        if (parts.length >= 4) {
+          final a = int.tryParse(parts[2], radix: 16) ?? 0;
+          final b = int.tryParse(parts[3], radix: 16) ?? 0;
+          final rpm = ((a * 256) + b) / 4.0;
+          _currentObdData = _currentObdData.copyWith(engineRpm: rpm);
+        }
+        break;
+      case "0D":
+        if (parts.length >= 3) {
+          final speed = int.tryParse(parts[2], radix: 16) ?? 0;
+          _currentObdData = _currentObdData.copyWith(vehicleSpeed: speed.toDouble());
+        }
+        break;
+      case "05":
+        if (parts.length >= 3) {
+          final temp = int.tryParse(parts[2], radix: 16) ?? 0;
+          final celsius = (temp - 40).toDouble();
+          _currentObdData = _currentObdData.copyWith(coolantTemperature: celsius);
+        }
+        break;
+      case "11":
+        if (parts.length >= 3) {
+          final position = int.tryParse(parts[2], radix: 16) ?? 0;
+          final percent = (position * 100) / 255;
+          _currentObdData = _currentObdData.copyWith(throttlePosition: percent);
+        }
+        break;
+      case "0F":
+        if (parts.length >= 3) {
+          final temp = int.tryParse(parts[2], radix: 16) ?? 0;
+          final celsius = (temp - 40).toDouble();
+          _currentObdData = _currentObdData.copyWith(intakeAirTemperature: celsius);
+        }
+        break;
+      case "0B":
+        if (parts.length >= 3) {
+          final pressure = int.tryParse(parts[2], radix: 16) ?? 0;
+          _currentObdData = _currentObdData.copyWith(manifoldPressure: pressure.toDouble());
+        }
+        break;
+      case "04":
+        if (parts.length >= 3) {
+          final load = int.tryParse(parts[2], radix: 16) ?? 0;
+          final percent = (load * 100) / 255;
+          _currentObdData = _currentObdData.copyWith(engineLoad: percent);
+        }
+        break;
+      case "1F":
+        if (parts.length >= 4) {
+          final a = int.tryParse(parts[2], radix: 16) ?? 0;
+          final b = int.tryParse(parts[3], radix: 16) ?? 0;
+          final minutes = (a * 256) + b;
+          _currentObdData = _currentObdData.copyWith(runTime: minutes);
+        }
+        break;
+      case "45":
+        if (parts.length >= 3) {
+          final position = int.tryParse(parts[2], radix: 16) ?? 0;
+          final percent = (position * 100) / 255;
+          _currentObdData = _currentObdData.copyWith(absoluteThrottlePosition: percent);
+        }
+        break;
+      case "42":
+        if (parts.length >= 4) {
+          final a = int.tryParse(parts[2], radix: 16) ?? 0;
+          final b = int.tryParse(parts[3], radix: 16) ?? 0;
+          final voltage = ((a * 256) + b) / 1000.0;
+          _currentObdData = _currentObdData.copyWith(controlModuleVoltage: voltage);
+        }
+        break;
+      case "21":
+        if (parts.length >= 4) {
+          final a = int.tryParse(parts[2], radix: 16) ?? 0;
+          final b = int.tryParse(parts[3], radix: 16) ?? 0;
+          final distance = (a * 256) + b;
+          _currentObdData = _currentObdData.copyWith(distanceSinceMilOn: distance.toDouble());
+        }
+        break;
+    }
+    // 打印输出日志..
+  }
+
+
+
+Logs页面增加一键清空历史日志的功能
+1. 在Export按钮旁边增加清空按钮，点击进行二次确认
+2. 用户确认清空后将下方实时日志列表清空，同时将log文件内容清空
+
+状态栏菜单栏优化
+1.  LINK VEHICLE按钮文案优化
+    - 如果蓝牙设备已连接，展示已连接的蓝牙设备的名称
+    - 如果未连接，展示设备未连接
+
+
+问题修复：
+1. flutter_blue_plus 重复导入两次问题
+2. **修复初始化流程** - 使用 `await` 确保初始化完成后再显示对话框
+3. 设备扫描页面的手动刷新扫描按钮去掉外边框，只展示Icon即可
+
+
+/// 新增倾角传感器服务，由于OBD数据获取不到摩托车倾角，使用手机实现
+///
+/// 使用手机加速度计和陀螺仪传感器计算摩托车转弯时的左右倾角
+///
+/// 手机放置方式：横屏放在车把上，屏幕上方朝左，下方朝右
+///
+/// 功能：
+/// - 10Hz采样率输出
+/// - 互补滤波融合加速度计和陀螺仪数据
+/// - 横屏坐标系转换
+/// - 零点校准
+/// - 移动平均滤波
+/// - 死区滤波
+
+改造现有的事件展示逻辑，原来使用的是RidingEvent废弃掉，用新的事件类lib/models/riding_event.dart:37 RidingEvent
+显示如下关键信息：事件类型编码，事件名称，事件icon
+根据不同的事件类型，显示不同的icon，不同的颜色
+点击事件弹窗查看具体事件详情RidingEvent的属性信息，比如事件名称，icon，触发条件原因，扩展信息等
+
+
+骑行事件优化，做的更炫酷一些:
+0. 新事件到来时弹窗提示，使用事件通知专用的弹窗样式，弹窗做到半透明效果，整个弹窗0.8的透明度，可配置调节
+1. 新事件到来时弹窗提示，并且弹窗动态效果：轻微快速抖动
+2. 新事件来到时弹窗提示，同时播放语音mp3提示，弹窗在语音播放结束后自动关闭，弹窗顶部有个语音播放进度条，不可调整播放进度，仅用于提醒弹窗关闭倒计时。
+3. 新建一个事件语音文件配置，指定事件类型，事件用的语音音频文件地址，语音时长动态获取
+
+
+
+我的摩托车是铃木GSX8S，帮我看下下面的计算档位和瞬时油耗代码是否合理？
+计算档位：
+int calculateGear(int rpm, int speed) {
+  // 1. 基础物理参数 (Suzuki GSX-8S 官方规格)
+  const double primaryRatio = 1.681; // 初级减速比
+  const double finalRatio = 2.764;   // 终传比 (47/17)
+  const double tireCircumference = 1.97857; // 180/55ZR17 轮胎周长 (米)
+
+  // GSX-8S 1-6 档原始齿比
+  const List<double> internalGearRatios = [
+    3.076, // 1档
+    2.125, // 2档
+    1.619, // 3档
+    1.285, // 4档
+    1.083, // 5档
+    0.956  // 6档
+  ];
+
+  // 2. 状态判定：过滤静止或拉离合的无效情况
+  if (speed < 3 || rpm < 1000) return 0; // 0 代表空档 N 或停车
+
+  // 3. 计算当前的实时总传动比
+  // 公式推导：TotalRatio = (RPM * 60 * WheelCircumference) / (Speed * 1000)
+  double currentTotalRatio = (rpm * 60 * tireCircumference) / (speed * 1000);
+
+  // 4. 寻找匹配度最高的档位
+  int bestGear = 0;
+  double minDifference = double.infinity;
+
+  for (int i = 0; i < internalGearRatios.length; i++) {
+    // 该档位的理论总传动比
+    double theoreticalTotalRatio = primaryRatio * internalGearRatios[i] * finalRatio;
+
+    // 计算实时比率与理论比率的绝对差值
+    double difference = (currentTotalRatio - theoreticalTotalRatio).abs();
+
+    if (difference < minDifference) {
+      minDifference = difference;
+      bestGear = i + 1; // 档位从 1 开始
+    }
+  }
+
+  // 5. 容错校验：如果计算出的差值过大（通常超过 15%），说明可能正在换挡或离合半联动
+  double threshold = (primaryRatio * internalGearRatios[bestGear - 1] * finalRatio) * 0.15;
+  if (minDifference > threshold) {
+    return 0; // 判定为空档或过渡态
+  }
+
+  return bestGear;
+}
+
+瞬时油耗
+Map<String, double> calculateInstantaneousFuel(
+    int rpm, int speed, int pressure, int intakeTemp, int load) {
+
+  // 1. 车辆固有参数 (Suzuki GSX-8S)
+  const double displacement = 0.776; // 排量 L
+  const double fuelDensity = 735.0;  // 汽油密度 g/L
+  const double targetAFR = 14.7;     // 理论空燃比
+  const double R = 8.314;            // 理想气体常数
+
+  // 2. 状态判定：如果发动机没转，油耗为 0
+  if (rpm < 400) return {"L_per_h": 0.0, "L_per_100km": 0.0};
+
+  // 3. 计算进气质量流量 (MAF 估算)
+  // 将摄氏度转为开尔文: K = °C + 273.15
+  double intakeTempK = intakeTemp + 273.15;
+
+  // 动态容积效率 (VE) 简单修正：随负载 load (0-100) 线性变化
+  double ve = 0.65 + (load / 100.0) * 0.25;
+
+  // MAF (克/秒) = (P * V * n * VE * M) / (120 * R * T)
+  // M (空气分子量) ≈ 28.97 g/mol
+  double maf = (pressure * displacement * rpm * ve * 28.97) / (120 * R * intakeTempK);
+
+  // 4. 计算油耗速率
+  // 每秒燃油质量 (g/s)
+  double fuelMassPerSec = maf / targetAFR;
+  // 每小时油耗 (L/h)
+  double litersPerHour = (fuelMassPerSec * 3600) / fuelDensity;
+
+  // 5. 计算百公里油耗 (L/100km)
+  double litersPer100km = 0.0;
+  if (speed > 5) {
+    litersPer100km = (litersPerHour * 100) / speed;
+  }
+
+  return {
+    "L_per_h": double.parse(litersPerHour.toStringAsFixed(2)),
+    "L_per_100km": double.parse(litersPer100km.toStringAsFixed(2)),
+  };
+}
+
+
+class GSX8SAdvancedCalculator {
+  // --- 铃木 GSX-8S 核心物理常数 ---
+  static const double primaryRatio = 1.681;
+  static const double finalRatio = 2.764;
+  static const double displacement = 0.776; // 升
+  static const List<double> gearRatios = [3.076, 2.125, 1.619, 1.285, 1.083, 0.956];
+
+  // 预计算总传动比，提升运算性能
+  static final List<double> _theoryTotals =
+      gearRatios.map((g) => primaryRatio * g * finalRatio).toList();
+
+  /// 优化后的档位计算：引入离合判定与动态误差窗口
+  static int calculateGear(int rpm, int speed, int throttle, int load) {
+    if (speed < 5 || rpm < 1100) return 0;
+
+    // 计算实时总传动比
+    // 轮胎周长考虑动态变形（高速下由于离心率，实际滚动圆周会略微增加，取均值 1.98）
+    double currentRatio = (rpm * 60 * 1.98) / (speed * 1000);
+
+    int bestGear = 0;
+    double minRelativeError = double.infinity;
+
+    for (int i = 0; i < _theoryTotals.length; i++) {
+      double error = (currentRatio - _theoryTotals[i]).abs() / _theoryTotals[i];
+      if (error < minRelativeError) {
+        minRelativeError = error;
+        bestGear = i + 1;
+      }
+    }
+
+    // --- 逻辑修正窗 ---
+    // 1. 离合器/换挡判定：若相对误差 > 12%，判定为非挂档状态（切离合或空档）
+    if (minRelativeError > 0.12) return 0;
+
+    // 2. 载荷判定：若转速极高但油门/负载极低，可能是拉离合滑行
+    if (rpm > 3000 && load < 5 && throttle < 2) return 0;
+
+    return bestGear;
+  }
+
+  /// 优化后的油耗计算：引入非线性 VE 曲线与 Lambda 修正
+  /// [lambda] 选填，若 OBD 能读到 PID 0x24 (Lambda)，精度提升 15%
+  static Map<String, double> calculateFuel(
+      {required int rpm,
+       required int speed,
+       required int map, // 单位: kPa
+       required int iat, // 单位: Celsius
+       required int load,
+       double lambda = 1.0}) {
+
+    if (rpm < 500) return {"L_h": 0.0, "L_100km": 0.0};
+
+    // 1. 进气温度 K
+    double tempK = iat + 273.15;
+
+    // 2. 构建非线性 VE (容积效率) 模型
+    // GSX-8S 的 270度曲轴发动机在 6800rpm 达到充气效率峰值
+    double rpmFactor = 1.0 - ((rpm - 6800).abs() / 15000.0); // 模拟钟形效率曲线
+    double mapFactor = map / 101.3; // 压力越高，充气效率越高
+
+    // 经验公式修正：VE 在 0.65 (怠速) 到 0.92 (高转全开) 之间波动
+    double ve = 0.62 + (0.25 * mapFactor) + (0.05 * rpmFactor);
+    ve = ve.clamp(0.6, 0.95);
+
+    // 3. 计算 MAF (空气质量流量 g/s)
+    // 公式：(P * V * RPM * VE * M) / (120 * R * T)
+    double maf = (map * displacement * rpm * ve * 28.97) / (120 * 8.314 * tempK);
+
+    // 4. 计算油耗 (L/h)
+    // 实际 AFR = 理论 AFR (14.7) * Lambda
+    double actualAFR = 14.7 * lambda;
+
+    // 判定发动机制动断油 (Fuel Cut-off)
+    // 当进气压力极低（真空度大）且转速较高时，喷油嘴关闭
+    bool isFuelCut = map < 28 && rpm > 2200;
+    double fuelGps = isFuelCut ? 0.005 : (maf / actualAFR); // 断油时保留极微量维持润滑计算
+
+    double lPerHour = (fuelGps * 3600) / 735.0; // 汽油密度取 735g/L
+    double lPer100km = speed > 8 ? (lPerHour * 100) / speed : 0.0;
+
+    return {
+      "L_h": double.parse(lPerHour.toStringAsFixed(2)),
+      "L_100km": double.parse(lPer100km.toStringAsFixed(2))
+    };
+  }
+}
+
+引入百度摩托车导航，新增个菜单和页面来展示导航功能
+导航页面默认展示标准地图，左上方悬浮出现搜索地点入口，点击输入目的地名进行目的地搜索，地图展示候选地点，选中目的地之后进行规划路线导航

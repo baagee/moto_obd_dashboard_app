@@ -13,22 +13,21 @@
 
 ### 2.2 自动开始/停止逻辑
 
-- **开始条件**：蓝牙设备连接成功 → 启动 GPS 跟踪 → 创建新记录
-- **停止条件**：蓝牙断开连接 → 自动保存记录 → 停止 GPS 跟踪
+- **开始条件**：蓝牙设备连接成功 → 开始统计骑行事件startRide同时启动 GPS 跟踪 → 创建新记录
+- **停止条件**：蓝牙断开连接 → 结束骑行事件时自动保存记录 → 停止 GPS 跟踪
 - 无需用户手动操作
 
 ### 2.3 骑行记录页（实时）
 
 - 实时地图显示（Flutter Map + OpenStreetMap），跟随当前位置
 - 显示指标（精简统计）：
-  - 当前速度
   - 骑行时长
   - 里程
   - 最高速度（实时更新）
   - 平均速度（实时更新）
-- 事件统计（骑行中小计）：
-  - 极限压弯次数
-  - 性能爆发次数
+  - 左右分别最大倾角
+- 事件统计记录：
+  - 极限压弯次数，性能爆发次数等所有事件
 
 ### 2.4 历史记录列表
 
@@ -53,7 +52,7 @@ class RidingRecord {
   final Duration duration;       // 时长
   final double maxSpeed;         // 最高速度 (km/h)
   final double avgSpeed;         // 平均速度 (km/h)
-  final Map<RidingEventType, int> eventCounts;  // 事件统计
+  final Map<long, RidingEvent> events;  // 事件记录，触发时间对应的事件信息
   final List<TrackPoint> trackPoints;          // GPS轨迹点
   final bool isCompleted;        // 是否已完成
 }
@@ -137,10 +136,9 @@ final List<Widget> _pages = const [
 
 - 全屏地图（占据主要区域）
 - 底部悬浮统计面板（半透明背景）：
-  - 当前速度（大字体）
   - 骑行时长 | 里程
   - 最高/平均速度
-- 右上角：事件统计图标（显示本次骑行事件数）
+  - 当前左右压弯最大倾角
 
 ### 5.4 缩略轨迹图
 
@@ -152,7 +150,7 @@ final List<Widget> _pages = const [
 ### Phase 1: 数据层
 - 新增 `RidingRecord` 和 `TrackPoint` 模型
 - 创建 `RidingRecordProvider`
-- 配置 Hive 存储
+- 配置 sqllite 存储
 
 ### Phase 2: GPS 服务
 - 集成 `geolocator`

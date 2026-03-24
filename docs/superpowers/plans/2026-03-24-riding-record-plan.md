@@ -374,7 +374,7 @@ class RidingRecordProvider extends ChangeNotifier {
     for (var key in _box!.keys) {
       final data = _box!.get(key);
       if (data != null) {
-        loaded.add(_recordFromMap(Map<String, dynamic>.from(data)));
+        loaded.add(RidingRecord.fromMap(Map<String, dynamic>.from(data)));
       }
     }
     loaded.sort((a, b) => b.startTime.compareTo(a.startTime));
@@ -403,7 +403,7 @@ class RidingRecordProvider extends ChangeNotifier {
     'isCompleted': record.isCompleted,
   };
 
-  factory RidingRecord._recordFromMap(Map<String, dynamic> map) => RidingRecord(
+  static RidingRecord fromMap(Map<String, dynamic> map) => RidingRecord(
     id: map['id'] as String,
     startTime: DateTime.parse(map['startTime'] as String),
     endTime: map['endTime'] != null ? DateTime.parse(map['endTime'] as String) : null,
@@ -420,8 +420,6 @@ class RidingRecordProvider extends ChangeNotifier {
         ?.map((p) => TrackPoint.fromJson(Map<String, dynamic>.from(p)))
         .toList() ?? [],
     isCompleted: map['isCompleted'] as bool? ?? false,
-  )..copyWith(
-    duration: Duration(milliseconds: map['durationMs'] as int),
   );
 
   /// 开始骑行（蓝牙连接成功时调用）
@@ -867,6 +865,7 @@ git commit -m "feat: add MiniTrackPreview widget"
 ```dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/riding_record.dart';
 import '../providers/riding_record_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/riding_record_card.dart';
@@ -874,6 +873,13 @@ import '../widgets/riding_record_card.dart';
 /// 骑行历史记录页面
 class RidingHistoryScreen extends StatelessWidget {
   const RidingHistoryScreen({super.key});
+
+  String _formatDuration(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    if (h > 0) return '${h}h${m}m';
+    return '${m}m';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -931,8 +937,64 @@ class RidingHistoryScreen extends StatelessWidget {
     );
   }
 
-  void _showRecordDetail(BuildContext context, record) {
-    // TODO: 后续可扩展详情页
+  void _showRecordDetail(BuildContext context, RidingRecord record) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text('骑行详情', style: AppTheme.titleMedium),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DetailRow('日期', '${record.startTime.year}/${record.startTime.month}/${record.startTime.day}'),
+              _DetailRow('时长', _formatDuration(record.duration)),
+              _DetailRow('里程', '${record.distance.toStringAsFixed(2)} km'),
+              _DetailRow('最高速度', '${record.maxSpeed.toStringAsFixed(1)} km/h'),
+              _DetailRow('平均速度', '${record.avgSpeed.toStringAsFixed(1)} km/h'),
+              _DetailRow('左倾最大', '${record.maxLeanLeft}°'),
+              _DetailRow('右倾最大', '${record.maxLeanRight}°'),
+              if (record.eventCounts.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text('事件统计', style: AppTheme.labelMedium),
+                const SizedBox(height: 4),
+                ...record.eventCounts.entries.map(
+                  (e) => Text('${e.key}: ${e.value}次', style: AppTheme.labelSmall),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTheme.labelSmall),
+          Text(value, style: AppTheme.valueMedium),
+        ],
+      ),
+    );
   }
 }
 ```
@@ -941,7 +1003,7 @@ class RidingHistoryScreen extends StatelessWidget {
 
 ```bash
 git add lib/screens/riding_history_screen.dart
-git commit -m "feat: add RidingHistoryScreen"
+git commit -m "feat: add RidingHistoryScreen with detail dialog"
 ```
 
 ---
@@ -1232,7 +1294,7 @@ import 'riding_history_screen.dart';
 import 'riding_record_screen.dart';
 ```
 
-添加页面到列表:
+**修改 1：添加页面到列表**（在 `_pages` 列表定义处）:
 ```dart
 final List<Widget> _pages = const [
   DashboardScreen(),
@@ -1242,18 +1304,12 @@ final List<Widget> _pages = const [
 ];
 ```
 
-在 `_buildPageView` 中添加骑行中跳转逻辑:
-```dart
-// 在 builder 的 selector 中添加
-if (provider.isTracking) {
-  // 骑行中时显示 RidingRecordScreen
-  return const RidingRecordScreen();
-}
-```
+**修改 2：在现有的蓝牙连接状态 Selector 内添加 startRide/endRide 调用**
 
-在蓝牙连接状态变化时调用 startRide/endRide:
+在 `Selector<BluetoothProvider, bool>` 的 `builder` 回调中，找到现有的 `_hasStartedRide` 逻辑，添加 RidingRecordProvider 调用：
+
 ```dart
-// 连接成功
+// 连接成功时
 if (isConnected && !_hasStartedRide) {
   _hasStartedRide = true;
   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1261,7 +1317,7 @@ if (isConnected && !_hasStartedRide) {
     context.read<RidingRecordProvider>().startRide(); // 新增
   });
 }
-// 断开连接
+// 断开连接时
 if (!isConnected && _hasStartedRide) {
   _hasStartedRide = false;
   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1270,6 +1326,31 @@ if (!isConnected && _hasStartedRide) {
   });
 }
 ```
+
+**修改 3：在 `_buildPageView` 方法中添加骑行中自动跳转**
+
+修改 `PageView` 的 `builder`，在 `RidingStatsProvider` selector 内添加:
+
+```dart
+builder: (context, latestEvent, _) {
+  if (latestEvent != null && !_hasShownEventNotification) {
+    // ... 现有弹窗逻辑
+  }
+
+  // 新增：骑行中且用户在骑行记录 Tab 时显示实时页面
+  final recordProvider = context.watch<RidingRecordProvider>();
+  final navProvider = context.watch<NavigationProvider>();
+  if (recordProvider.isTracking && navProvider.currentIndex == 3) {
+    return const RidingRecordScreen();
+  }
+
+  return PageView(
+    // ... 现有代码
+  );
+},
+```
+
+> **注意**：`RidingRecordScreen` 会在用户切换到「骑行记录」Tab 时自动显示，覆盖列表页。
 
 - [ ] **Step 3: Commit**
 
