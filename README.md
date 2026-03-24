@@ -10,7 +10,7 @@
 - **倾角传感器**：实时显示摩托车倾斜角度
 - **数据可视化**：fl_chart 折线图展示历史数据
 - **诊断日志**：内存+文件双写日志系统
-- **事件通知弹窗**：骑行事件触发时显示霓虹风格弹窗并播放语音提醒
+- **事件通知弹窗**：骑行事件触发时显示霓虹风格弹窗
 
 ## 项目结构
 
@@ -20,8 +20,7 @@ lib/
 ├── models/
 │   ├── obd_data.dart            # OBD 数据模型
 │   ├── bluetooth_device.dart     # 蓝牙设备模型
-│   ├── riding_event.dart         # 骑行事件模型
-│   └── event_voice_config.dart   # 事件语音配置
+│   └── riding_event.dart         # 骑行事件模型
 ├── providers/
 │   ├── obd_data_provider.dart   # OBD 数据状态管理
 │   ├── bluetooth_provider.dart  # 蓝牙连接管理
@@ -34,8 +33,7 @@ lib/
 │   ├── obd_service.dart         # OBD 协议解析
 │   ├── log_service.dart         # 日志文件服务
 │   ├── sensor_service.dart      # 倾角传感器服务
-│   ├── device_storage_service.dart # 设备存储
-│   └── audio_service.dart       # 音频播放服务
+│   └── device_storage_service.dart # 设备存储
 ├── screens/
 │   ├── main_container.dart      # 主容器页面
 │   ├── dashboard_screen.dart    # 仪表盘视图
@@ -50,19 +48,17 @@ lib/
     ├── rpm_gauge_card.dart            # 转速表
     ├── combined_gauge_card.dart       # 组合仪表
     ├── speed_gear_card.dart           # 速度+档位
-    ├── telemetry_chart_card.dart     # 折线图
+    ├── telemetry_chart_card.dart       # 折线图
     ├── side_stats_panel.dart          # 侧边统计
     ├── diagnostic_logs_panel.dart     # 诊断日志
     ├── riding_events_panel.dart       # 骑行事件
     ├── status_footer.dart             # 底部状态栏
-    ├── bluetooth_status_icon.dart      # 蓝牙状态图标
+    ├── bluetooth_status_icon.dart     # 蓝牙状态图标
     ├── bluetooth_alert_dialog.dart    # 蓝牙提示弹窗
     ├── cyber_button.dart              # 赛博按钮
-    ├── cyber_dialog.dart              # 赛博弹窗
     ├── bluetooth_device_list.dart     # 设备列表
     ├── connected_device_card.dart     # 已连接设备卡片
-    ├── top_navigation_bar.dart        # 顶部导航栏
-    └── event_notification_dialog.dart # 事件通知弹窗
+    └── top_navigation_bar.dart        # 顶部导航栏
 ```
 
 ## 技术栈
@@ -73,8 +69,6 @@ lib/
 - **Bluetooth**: flutter_blue_plus
 - **Charts**: fl_chart
 - **Fonts**: Google Fonts (Space Grotesk)
-- **Sensors**: sensors_plus
-- **Audio**: audioplayers
 
 ## 快速开始
 

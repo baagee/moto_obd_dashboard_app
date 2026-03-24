@@ -81,15 +81,15 @@ class RidingEvent {
     return RidingEvent(
       type: RidingEventType.efficientCruising,
       title: getEventTypeDisplayName(RidingEventType.efficientCruising),
-      description: '车速稳定在60-80km/h且发动机负荷较低且节气门开度稳定',
+      description: '车速稳定在70-100km/h且发动机负荷较低且节气门开度稳定',
       triggerValue: avgSpeed,
-      threshold: 70.0, // 目标巡航速度
+      threshold: 80.0, // 目标巡航速度
       timestamp: timestamp ?? DateTime.now(),
       additionalData: {
         'avgSpeed': avgSpeed,
         'avgLoad': avgLoad,
         'throttleStability': throttleStability,
-        'condition': 'speed 60-80 km/h, load < 30%, throttle stable',
+        'condition': 'speed 70-100 km/h, load < 30%, throttle stable',
       },
     );
   }
@@ -215,7 +215,7 @@ class RidingEvent {
     required String direction,  // 'left' or 'right'
     DateTime? timestamp,
   }) {
-    final angleThreshold = 30.0;
+    final angleThreshold = 20.0;
     final speedThreshold = 60.0;
 
     return RidingEvent(
@@ -233,7 +233,7 @@ class RidingEvent {
         'direction': direction,
         'speedThreshold': speedThreshold,
         'angleThreshold': angleThreshold,
-        'condition': 'speed >= 60 km/h && |leanAngle| >= 30°',
+        'condition': 'speed >= 60 km/h && |leanAngle| >= 20°',
       },
     );
   }

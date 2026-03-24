@@ -198,11 +198,11 @@ class RidingStatsProvider extends ChangeNotifier {
     }
   }
 
-  /// 极限压弯检测：速度 >= 60km/h 且倾角 >= 30°
+  /// 极限压弯检测：速度 >= 60km/h 且倾角 >= 20°
   void _checkExtremeLean(double? avgSpeed, double? avgLean) {
     if (avgSpeed == null || avgLean == null) return;
     if (avgSpeed < 60) return;
-    if (avgLean < 30) return;
+    if (avgLean < 20) return;
     if (!_canTriggerEvent(stats.RidingEventType.extremeLean, customCooldown: extremeLeanCooldown)) return;
 
     final direction = _obdDataProvider.data.leanDirection;
@@ -258,10 +258,10 @@ class RidingStatsProvider extends ChangeNotifier {
     _addEvent(event);
   }
 
-  /// 高效巡航检测：速度 60-80km/h 且负荷 < 30%
+  /// 高效巡航检测：速度 70-100km/h 且负荷 < 30%
   void _checkEfficientCruising(double? avgSpeed, double? avgLoad, double? avgThrottle) {
     if (avgSpeed == null || avgLoad == null || avgThrottle == null) return;
-    if (avgSpeed < 60 || avgSpeed > 80) return;
+    if (avgSpeed < 70 || avgSpeed > 100) return;
     if (avgLoad >= 30) return;
     if (!_canTriggerEvent(stats.RidingEventType.efficientCruising, customCooldown: efficientCruisingCooldown)) return;
 
