@@ -62,7 +62,7 @@ class SideStatsPanel extends StatelessWidget {
                       color: AppTheme.accentCyan,
                     ),
 
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 6),
 
                     // 负载进度条
                     _ProgressBar(
@@ -73,7 +73,7 @@ class SideStatsPanel extends StatelessWidget {
                       color: AppTheme.accentOrange,
                     ),
 
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 6),
 
                     // 倾斜角度指示器
                     _LeanAngleIndicator(
@@ -81,7 +81,7 @@ class SideStatsPanel extends StatelessWidget {
                       direction: data.leanDirection,
                     ),
 
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 6),
 
                     // 气压趋势图
                     _PressureChart(
@@ -89,12 +89,10 @@ class SideStatsPanel extends StatelessWidget {
                       pressureHistory: provider.pressureHistory,
                     ),
 
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 6),
 
                     // 电压显示
                     _VoltageDisplay(voltage: data.voltage),
-
-                    const SizedBox(height: 3),
                   ],
                 ),
               ),
@@ -182,11 +180,11 @@ class _ProgressBar extends StatelessWidget {
               Text('$value%', style: AppTheme.valueSmall.copyWith(color: color)),
             ],
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 6),
           Stack(
             children: [
               Container(
-                height: 6,
+                height: 10,
                 decoration: const BoxDecoration(
                   color: Color(0xFF1E293B),
                   borderRadius: BorderRadius.all(Radius.circular(3)),
@@ -195,7 +193,7 @@ class _ProgressBar extends StatelessWidget {
               FractionallySizedBox(
                 widthFactor: value / 100,
                 child: Container(
-                  height: 6,
+                  height: 10,
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius: BorderRadius.circular(3),
@@ -252,7 +250,7 @@ class _LeanAngleIndicator extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           LayoutBuilder(
             builder: (context, constraints) {
               // 计算指示器位置：50%为中间，最大60度，角度为0时居中
@@ -261,7 +259,7 @@ class _LeanAngleIndicator extends StatelessWidget {
                 children: [
                   // 背景条
                   Container(
-                    height: 7,
+                    height: 12,
                     decoration: const BoxDecoration(
                       color: Color(0xFF1E293B),
                       borderRadius: BorderRadius.all(Radius.circular(6)),
@@ -297,7 +295,7 @@ class _LeanAngleIndicator extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 6),
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -342,11 +340,11 @@ class _PressureChart extends StatelessWidget {
               Text('$pressure kPa', style: AppTheme.valueSmall),
             ],
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 6),
           SizedBox(
-            height: 24,
+            height: 36,
             child: CustomPaint(
-              size: const Size(double.infinity, 24),
+              size: const Size(double.infinity, 36),
               painter: PressureChartPainter(
                 pressureHistory: pressureHistory,
                 minPressure: 0,

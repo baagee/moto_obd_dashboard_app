@@ -17,7 +17,7 @@ class GearDisplayPanel extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             // 顶部标签
-            const Text('档位', style: AppTheme.labelMediumPrimary),
+            const Text('档位', style: AppTheme.labelMediumPrimary12),
             const SizedBox(height: 2),
             // 档位块
             Expanded(

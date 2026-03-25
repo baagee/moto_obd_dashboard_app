@@ -69,6 +69,14 @@ class AppTheme {
     color: primary,
   );
 
+
+  /// 标签样式 - 中号带主色
+  static const TextStyle labelMediumPrimary12 = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w500,
+    color: primary,
+  );
+
   /// 数值样式 - 小号 (fontSize: 11)
   static const TextStyle valueSmall = TextStyle(
     fontSize: 11,

@@ -198,7 +198,7 @@ class CombinedGaugePainter extends CustomPainter {
     // 阶段颜色 - 青色(正常) → 橙色(警告) → 红色(危险)
     Color color;
     if (rpm <= warnRpm) {
-      color = AppTheme.accentCyan; // 青色 - 正常
+      color = AppTheme.primary; // 蓝色 - 正常
     } else if (rpm <= dangerRpm) {
       color = const Color(0xFFFF9800); // 橙色 - 警告
     } else {
@@ -239,10 +239,10 @@ class CombinedGaugePainter extends CustomPainter {
   void _drawSpeedProgress(Canvas canvas, Offset center, double radius) {
     final sweepAngle = _speedToAngle(speed.toDouble());
 
-    // 阶段颜色 - 蓝色(正常) → 紫色(警告) → 红色(危险)
+    // 阶段颜色 - 青色(正常) → 紫色(警告) → 红色(危险)
     Color color;
     if (speed <= warnSpeed) {
-      color = AppTheme.primary; // 蓝色 - 正常
+      color = AppTheme.accentCyan; // 青色 - 正常
     } else if (speed <= dangerSpeed) {
       color = const Color(0xFF9C27B0); // 紫色 - 警告
     } else {
@@ -464,7 +464,7 @@ class CombinedGaugePainter extends CustomPainter {
       // 根据刻度值区间确定颜色
       Color tickColor;
       if (i < warnRpm) {
-        tickColor = AppTheme.accentCyan; // 青色 - 正常
+        tickColor = AppTheme.primary; // 蓝色 - 正常
       } else if (i < dangerRpm) {
         tickColor = const Color(0xFFFF9800); // 橙色 - 警告
       } else {
@@ -513,7 +513,7 @@ class CombinedGaugePainter extends CustomPainter {
       // 根据刻度值区间确定颜色
       Color tickColor;
       if (i < warnRpm) {
-        tickColor = AppTheme.accentCyan.withValues(alpha: 0.6); // 青色 - 正常
+        tickColor = AppTheme.primary.withValues(alpha: 0.6); // 蓝色 - 正常
       } else if (i < dangerRpm) {
         tickColor = const Color(0xFFFF9800).withValues(alpha: 0.6); // 橙色 - 警告
       } else {
@@ -547,7 +547,7 @@ class CombinedGaugePainter extends CustomPainter {
       // 根据刻度值区间确定颜色
       Color tickColor;
       if (i < warnSpeed) {
-        tickColor = AppTheme.primary; // 蓝色 - 正常
+        tickColor = AppTheme.accentCyan; // 青色 - 正常
       } else if (i < dangerSpeed) {
         tickColor = const Color(0xFF9C27B0); // 紫色 - 警告
       } else {
@@ -595,7 +595,7 @@ class CombinedGaugePainter extends CustomPainter {
       // 根据刻度值区间确定颜色
       Color tickColor;
       if (i < warnSpeed) {
-        tickColor = AppTheme.primary.withValues(alpha: 0.6); // 蓝色 - 正常
+        tickColor = AppTheme.accentCyan.withValues(alpha: 0.6); // 青色 - 正常
       } else if (i < dangerSpeed) {
         tickColor = const Color(0xFF9C27B0).withValues(alpha: 0.6); // 紫色 - 警告
       } else {
@@ -645,7 +645,7 @@ class CombinedGaugePainter extends CustomPainter {
     final rpmUnitSpan = TextSpan(
       text: 'RPM',
       style: TextStyle(
-        color: AppTheme.primary60,
+        color: AppTheme.primary.withValues(alpha: 0.7),
         fontSize: fontSize * 0.33,
         fontWeight: FontWeight.w500,
       ),
@@ -714,8 +714,8 @@ class CombinedGaugePainter extends CustomPainter {
     _drawInvertedTrapezoidTempGauge(
       canvas: canvas,
       size: size,
-      x: 0,  // 距离左边界 8%
-      y: radius * 0.2,
+      x: 0,
+      y: radius * 0.23,
       radius: radius,
       value: coolantTemp,
       maxValue: maxCoolantTemp,
@@ -729,7 +729,7 @@ class CombinedGaugePainter extends CustomPainter {
       canvas: canvas,
       size: size,
       x: size.width ,
-      y: radius * 0.2,
+      y: radius * 0.23,
       radius: radius,
       value: intakeTemp,
       maxValue: maxIntakeTemp,
@@ -754,9 +754,9 @@ class CombinedGaugePainter extends CustomPainter {
     required bool alignRight, // true=靠右对齐, false=靠左对齐
   }) {
     // 倒梯形尺寸 - 上宽下窄
-    final topWidth = radius * 0.4;    // 顶部宽
-    final bottomWidth = radius * 0.1; // 底部窄
-    final height = radius * 0.30;
+    final topWidth = radius * 0.5;    // 顶部宽
+    final bottomWidth = radius * 0.125; // 底部窄
+    final height = radius * 0.33;
 
     // 直接使用传入的 x, y 坐标作为中心点
     final trapezoidCenter = Offset(x, y);
@@ -861,15 +861,16 @@ class CombinedGaugePainter extends CustomPainter {
 
   /// 绘制温度标签和数值
   void _drawTempLabel(Canvas canvas, Offset center, double height, int value, String label, bool alignRight) {
-    final labelStyle = TextStyle(
-      color: AppTheme.accentCyan.withValues(alpha: 0.99),
-      fontSize: height * 0.25,
-      fontWeight: FontWeight.w500,
-    );
+    final labelStyle = AppTheme.labelMediumPrimary12;
+    //  TextStyle(
+    //       color: AppTheme.accentCyan.withValues(alpha: 0.99),
+    //       fontSize: 12,
+    //       fontWeight: FontWeight.w500,
+    //     );
 
-    final valueStyle = TextStyle(
+    const valueStyle = TextStyle(
       color: AppTheme.textPrimary,
-      fontSize: height * 0.3,
+      fontSize: 13,
       fontWeight: FontWeight.bold,
     );
 

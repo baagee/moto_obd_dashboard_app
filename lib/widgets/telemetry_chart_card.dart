@@ -15,7 +15,7 @@ class TelemetryChartCard extends StatelessWidget {
         final data = provider.data;
 
         return Container(
-          padding: const EdgeInsets.all(9),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: AppTheme.surface40,
             border: Border.all(color: AppTheme.primary10),
@@ -39,7 +39,7 @@ class TelemetryChartCard extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
 
               // 图表区域（带左右Y轴）
               Expanded(
