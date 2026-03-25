@@ -51,7 +51,7 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> with Automati
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 左侧 - 设备扫描列表 (7列比例)
             Expanded(

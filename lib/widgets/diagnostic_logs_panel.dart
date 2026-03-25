@@ -68,7 +68,7 @@ class DiagnosticLogsPanel extends StatelessWidget {
               // 日志列表
               Expanded(
                 child: Container(
-                  color: AppTheme.backgroundDark.withOpacity(0.3),
+                  color: AppTheme.backgroundDark30,
                   child: ListView.separated(
                     padding: const EdgeInsets.all(8),
                     itemCount: provider.logs.length > 5 ? 5 : provider.logs.length,
@@ -112,7 +112,7 @@ class _LogItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.02),
+        color: AppTheme.primary10,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(

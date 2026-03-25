@@ -2,19 +2,15 @@
 class OBDData {
   final int rpm;
   final int speed;
-  final int throttle;// 油门开度
-  final int load;//发动机负载
-  final String leanDirection;// 压弯方向，左右
+  final int throttle; // 油门开度
+  final int load; // 发动机负载
+  final String leanDirection; // 压弯方向，左右
   final int pressure; // 进气歧管压力MAP
   final double voltage; // 电压
   final int coolantTemp; // 冷却液水温
   final int intakeTemp; // 进气温度
-
-  final List<int> rpmHistory;
-  final List<int> velocityHistory;
   final int leanAngle; // 压弯倾角
   final int gear; // 档位 (0=空档, 1-6=实际档位)
-
 
   OBDData({
     required this.rpm,
@@ -28,8 +24,6 @@ class OBDData {
     required this.voltage,
     required this.coolantTemp,
     required this.intakeTemp,
-    required this.rpmHistory,
-    required this.velocityHistory,
   });
 
   OBDData copyWith({
@@ -44,8 +38,6 @@ class OBDData {
     double? voltage,
     int? coolantTemp,
     int? intakeTemp,
-    List<int>? rpmHistory,
-    List<int>? velocityHistory,
   }) {
     return OBDData(
       rpm: rpm ?? this.rpm,
@@ -59,8 +51,6 @@ class OBDData {
       voltage: voltage ?? this.voltage,
       coolantTemp: coolantTemp ?? this.coolantTemp,
       intakeTemp: intakeTemp ?? this.intakeTemp,
-      rpmHistory: rpmHistory ?? this.rpmHistory,
-      velocityHistory: velocityHistory ?? this.velocityHistory,
     );
   }
 }

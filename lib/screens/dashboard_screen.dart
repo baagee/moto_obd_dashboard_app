@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import '../widgets/combined_gauge_card.dart';
 import '../widgets/side_stats_panel.dart';
 import '../widgets/telemetry_chart_card.dart';
@@ -12,7 +13,7 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0A1114),
+        color: AppTheme.backgroundDark,
       ),
       child: const Padding(
         padding: EdgeInsets.all(8),

@@ -40,7 +40,6 @@ class OBDDataProvider extends ChangeNotifier {
 
   // 最大数据点数
   static const int maxDataPoints = 30;
-  static const int maxPressurePoints = 15;
 
   // OBD数据
   OBDData _data = OBDData(
@@ -55,8 +54,6 @@ class OBDDataProvider extends ChangeNotifier {
     voltage: defaultVoltage,
     coolantTemp: defaultCoolantTemp,
     intakeTemp: defaultIntakeTemp,
-    rpmHistory: List.filled(maxDataPoints, 0),
-    velocityHistory: List.filled(maxDataPoints, 0),
   );
 
   // 骑行事件列表
@@ -73,9 +70,10 @@ class OBDDataProvider extends ChangeNotifier {
 
   // Getter
   OBDData get data => _data;
-  // List<RidingEvent> get events => _events;
+  List<int> get rpmHistory => _rpmHistory;
+  List<int> get velocityHistory => _velocityHistory;
   List<int> get pressureHistory => _pressureHistory;
-  List<int> get timestampHistory => _timestampHistory;
+  // List<int> get timestampHistory => _timestampHistory;
   bool get isDeviceConnected => _isDeviceConnected;
 
   OBDDataProvider() {
@@ -110,7 +108,7 @@ class OBDDataProvider extends ChangeNotifier {
     }
     if (pressure != null) {
       _pressureHistory.add(pressure);
-      if (_pressureHistory.length > maxPressurePoints) _pressureHistory.removeAt(0);
+      if (_pressureHistory.length > maxDataPoints) _pressureHistory.removeAt(0);
     }
 
     // 计算档位
@@ -134,8 +132,6 @@ class OBDDataProvider extends ChangeNotifier {
       intakeTemp: intakeTemp ?? _data.intakeTemp,
       pressure: pressure ?? _data.pressure,
       voltage: voltage ?? _data.voltage,
-      rpmHistory: List.from(_rpmHistory),
-      velocityHistory: List.from(_velocityHistory),
     );
 
     notifyListeners();
@@ -162,8 +158,6 @@ class OBDDataProvider extends ChangeNotifier {
       voltage: defaultVoltage,
       coolantTemp: defaultCoolantTemp,
       intakeTemp: defaultIntakeTemp,
-      rpmHistory: List.filled(maxDataPoints, 0),
-      velocityHistory: List.filled(maxDataPoints, 0),
     );
 
     notifyListeners();

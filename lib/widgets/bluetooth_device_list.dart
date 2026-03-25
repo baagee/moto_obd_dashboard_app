@@ -213,7 +213,7 @@ class _DeviceListItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: isConnected ? AppTheme.primary10 : AppTheme.surface.withOpacity(0.5),
+        color: isConnected ? AppTheme.primary10 : AppTheme.surface40,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isConnected

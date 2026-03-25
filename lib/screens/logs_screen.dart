@@ -55,7 +55,7 @@ class _LogsScreenState extends State<LogsScreen> with AutomaticKeepAliveClientMi
     super.build(context);
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0A1114),
+        color: AppTheme.backgroundDark,
       ),
       child: Column(
         children: [

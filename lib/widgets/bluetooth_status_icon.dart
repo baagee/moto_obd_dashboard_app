@@ -66,7 +66,7 @@ class BluetoothStatusIcon extends StatelessWidget {
               color: AppTheme.surface,
               borderRadius: BorderRadius.circular(5),
               border: Border.all(
-                color: AppTheme.primary.withOpacity(0.1),
+                color: AppTheme.primary10,
               ),
             ),
             child: Row(

@@ -186,7 +186,7 @@ class _ProgressBar extends StatelessWidget {
               Container(
                 height: 10,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF1E293B),
+                  color: AppTheme.slateGray,
                   borderRadius: BorderRadius.all(Radius.circular(3)),
                 ),
               ),

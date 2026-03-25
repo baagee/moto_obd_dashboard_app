@@ -10,6 +10,9 @@ class AppTheme {
   static const Color accentRed = Color(0xFFFF4D4D);
   static const Color accentOrange = Color(0xFFFFAB40);
   static const Color accentGreen = Color(0xFF00E676);
+  static const Color accentPurple = Color(0xFF9C27B0);
+  static const Color accentPink = Color(0xFFE91E63);
+  static const Color slateGray = Color(0xFF1E293B);
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFF9CA3AF);
   static const Color textMuted = Color(0xFF6B7280);
@@ -29,6 +32,16 @@ class AppTheme {
 
   static const Color backgroundDark30 = Color(0x4D0A1114);
   static const Color backgroundDark50 = Color(0x800A1114);
+
+  // ========== 间距常量 ==========
+  static const double spacing2 = 2;
+  static const double spacing4 = 4;
+  static const double spacing6 = 6;
+  static const double spacing8 = 8;
+  static const double spacing12 = 12;
+  static const double spacing16 = 16;
+  static const double spacing20 = 20;
+  static const double spacing24 = 24;
 
   // ========== 预定义 TextStyle (const 优化) ==========
   /// 标签样式 - 小号 (fontSize: 9)

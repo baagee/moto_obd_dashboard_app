@@ -55,8 +55,8 @@ class TelemetryChartCard extends StatelessWidget {
                     // 中间图表 - 使用 RepaintBoundary 隔离重绘
                     Expanded(
                       child: _ChartArea(
-                        rpmHistory: data.rpmHistory,
-                        velocityHistory: data.velocityHistory,
+                        rpmHistory: provider.rpmHistory,
+                        velocityHistory: provider.velocityHistory,
                       ),
                     ),
 

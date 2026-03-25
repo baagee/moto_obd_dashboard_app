@@ -61,7 +61,7 @@ class _ConnectedState extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppTheme.primary.withOpacity(0.4),
+          color: AppTheme.primary40,
           width: 1,
         ),
       ),
@@ -124,7 +124,7 @@ class _ConnectedState extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.backgroundDark.withOpacity(0.6),
+              color: AppTheme.backgroundDark50,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: AppTheme.primary20,
@@ -220,8 +220,8 @@ class _LastConnectedState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.surface40,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: AppTheme.primary20,
         ),
@@ -280,7 +280,7 @@ class _LastConnectedState extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.backgroundDark.withOpacity(0.6),
+              color: AppTheme.backgroundDark50,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: AppTheme.primary20,
@@ -353,8 +353,8 @@ class _EmptyState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.surface40,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: AppTheme.primary20,
         ),
@@ -405,7 +405,7 @@ class _InfoBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundDark.withOpacity(0.6),
+        color: AppTheme.backgroundDark50,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isPrimary ? AppTheme.primary20 : AppTheme.primary10,
@@ -447,7 +447,7 @@ class _StabilityIndicator extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundDark.withOpacity(0.6),
+        color: AppTheme.backgroundDark50,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.primary10),
       ),

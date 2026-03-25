@@ -127,8 +127,8 @@ class CombinedGaugePainter extends CustomPainter {
     // 背景渐变
     final gradient = RadialGradient(
       colors: [
-        const Color(0xFF0A1114),
-        const Color(0xFF1E293B).withValues(alpha: 0.5),
+        AppTheme.backgroundDark,
+        AppTheme.slateGray.withValues(alpha: 0.5),
       ],
     );
 
@@ -151,7 +151,7 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 外层 - 宽模糊
     final outerPaint = Paint()
-      ..color = const Color(0xFFFF0000).withValues(alpha: pulse * 0.6) // 纯红色
+      ..color = AppTheme.accentRed.withValues(alpha: pulse * 0.6) // 纯红色
       ..style = PaintingStyle.stroke
       ..strokeWidth = 14
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 25);
@@ -159,7 +159,7 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 内层 - 窄模糊
     final innerPaint = Paint()
-      ..color = const Color(0xFFFF0000).withValues(alpha: pulse)
+      ..color = AppTheme.accentRed.withValues(alpha: pulse)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 8
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15);
@@ -168,7 +168,7 @@ class CombinedGaugePainter extends CustomPainter {
 
   void _drawTickBackground(Canvas canvas, Offset center, double radius) {
     final paint = Paint()
-      ..color = const Color(0xFF1E293B)
+      ..color = AppTheme.slateGray
       ..style = PaintingStyle.stroke
       ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
       ..strokeCap = StrokeCap.round;
@@ -200,9 +200,9 @@ class CombinedGaugePainter extends CustomPainter {
     if (rpm <= warnRpm) {
       color = AppTheme.primary; // 蓝色 - 正常
     } else if (rpm <= dangerRpm) {
-      color = const Color(0xFFFF9800); // 橙色 - 警告
+      color = AppTheme.accentOrange; // 橙色 - 警告
     } else {
-      color = const Color(0xFFFF0000); // 红色 - 危险
+      color = AppTheme.accentRed; // 红色 - 危险
     }
 
     final paint = Paint()
@@ -244,9 +244,9 @@ class CombinedGaugePainter extends CustomPainter {
     if (speed <= warnSpeed) {
       color = AppTheme.accentCyan; // 青色 - 正常
     } else if (speed <= dangerSpeed) {
-      color = const Color(0xFF9C27B0); // 紫色 - 警告
+      color = AppTheme.accentPurple; // 紫色 - 警告
     } else {
-      color = const Color(0xFFFF0000); // 红色 - 危险
+      color = AppTheme.accentRed; // 红色 - 危险
     }
 
     final paint = Paint()
@@ -284,7 +284,7 @@ class CombinedGaugePainter extends CustomPainter {
     if (rpm <= 0) return;
 
     // 固定颜色 - 橙色，与数字蓝色区分
-    const color = Color(0xFFFF9800);
+    const color = AppTheme.accentOrange;
 
     // 使用非线性映射计算角度
     final sweepAngle = _rpmToAngle(rpm.toDouble());
@@ -348,7 +348,7 @@ class CombinedGaugePainter extends CustomPainter {
     if (speed <= 0) return;
 
     // 固定颜色 - 品红色，与数字青色区分
-    const color = Color(0xFFE91E63);
+    const color = AppTheme.accentPink;
 
     // 使用非线性映射计算角度（逆时针）
     final sweepAngle = _speedToAngle(speed.toDouble());
@@ -466,9 +466,9 @@ class CombinedGaugePainter extends CustomPainter {
       if (i < warnRpm) {
         tickColor = AppTheme.primary; // 蓝色 - 正常
       } else if (i < dangerRpm) {
-        tickColor = const Color(0xFFFF9800); // 橙色 - 警告
+        tickColor = AppTheme.accentOrange; // 橙色 - 警告
       } else {
-        tickColor = const Color(0xFFFF0000); // 红色 - 危险
+        tickColor = AppTheme.accentRed; // 红色 - 危险
       }
 
       final tickPaintColored = Paint()
@@ -515,9 +515,9 @@ class CombinedGaugePainter extends CustomPainter {
       if (i < warnRpm) {
         tickColor = AppTheme.primary.withValues(alpha: 0.6); // 蓝色 - 正常
       } else if (i < dangerRpm) {
-        tickColor = const Color(0xFFFF9800).withValues(alpha: 0.6); // 橙色 - 警告
+        tickColor = AppTheme.accentOrange.withValues(alpha: 0.6); // 橙色 - 警告
       } else {
-        tickColor = const Color(0xFFFF0000).withValues(alpha: 0.6); // 红色 - 危险
+        tickColor = AppTheme.accentRed.withValues(alpha: 0.6); // 红色 - 危险
       }
 
       final fineTickPaintColored = Paint()
@@ -549,9 +549,9 @@ class CombinedGaugePainter extends CustomPainter {
       if (i < warnSpeed) {
         tickColor = AppTheme.accentCyan; // 青色 - 正常
       } else if (i < dangerSpeed) {
-        tickColor = const Color(0xFF9C27B0); // 紫色 - 警告
+        tickColor = AppTheme.accentPurple; // 紫色 - 警告
       } else {
-        tickColor = const Color(0xFFFF0000); // 红色 - 危险
+        tickColor = AppTheme.accentRed; // 红色 - 危险
       }
 
       final tickPaintColored = Paint()
@@ -597,9 +597,9 @@ class CombinedGaugePainter extends CustomPainter {
       if (i < warnSpeed) {
         tickColor = AppTheme.accentCyan.withValues(alpha: 0.6); // 青色 - 正常
       } else if (i < dangerSpeed) {
-        tickColor = const Color(0xFF9C27B0).withValues(alpha: 0.6); // 紫色 - 警告
+        tickColor = AppTheme.accentPurple.withValues(alpha: 0.6); // 紫色 - 警告
       } else {
-        tickColor = const Color(0xFFFF0000).withValues(alpha: 0.6); // 红色 - 危险
+        tickColor = AppTheme.accentRed.withValues(alpha: 0.6); // 红色 - 危险
       }
 
       final speedFineTickPaint = Paint()
@@ -779,7 +779,7 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 背景槽：使用半透明填充，显示轮廓
     final bgPaint = Paint()
-      ..color = const Color(0xFF1E293B).withValues(alpha: 0.15)
+      ..color = AppTheme.slateGray.withValues(alpha: 0.15)
       ..style = PaintingStyle.fill;
 
     final bgPath = Path()
@@ -812,7 +812,7 @@ class CombinedGaugePainter extends CustomPainter {
       // 确定颜色
       Color segmentColor;
       if (!isFilled) {
-        segmentColor = const Color(0xFF1E293B);
+        segmentColor = AppTheme.slateGray;
       } else {
         // 根据温度区间确定颜色
         final segmentRatio = (i + 1) / tempSegmentCount;
