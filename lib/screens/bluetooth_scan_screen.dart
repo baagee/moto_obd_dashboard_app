@@ -97,7 +97,7 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> with Automati
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppTheme.primary20,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

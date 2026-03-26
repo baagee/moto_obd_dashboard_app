@@ -167,7 +167,7 @@ class _EventItem extends StatelessWidget {
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: _color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
           border: Border(
             left: BorderSide(color: _color, width: 3),
           ),

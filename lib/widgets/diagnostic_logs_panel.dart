@@ -18,7 +18,7 @@ class DiagnosticLogsPanel extends StatelessWidget {
             border: Border.all(
               color: AppTheme.primary.withOpacity(0.2),
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppTheme.radiusCard),
           ),
           child: Column(
             children: [
@@ -113,7 +113,7 @@ class _LogItem extends StatelessWidget {
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: AppTheme.primary10,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -12,14 +12,13 @@ class TelemetryChartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<OBDDataProvider>(
       builder: (context, provider, child) {
-        final data = provider.data;
 
         return Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: AppTheme.surface40,
             border: Border.all(color: AppTheme.primary10),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppTheme.radiusCard),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -66,7 +66,7 @@ class CyberDialog extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppTheme.radiusCard),
           border: Border.all(
             color: accentColor.withOpacity(0.5),
             width: 1,
@@ -91,7 +91,7 @@ class CyberDialog extends StatelessWidget {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: accentColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusButton),
                     ),
                     child: Icon(
                       icon,

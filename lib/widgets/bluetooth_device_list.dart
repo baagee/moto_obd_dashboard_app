@@ -106,7 +106,7 @@ class _ScanProgressBarState extends State<_ScanProgressBar>
           width: double.infinity,
           decoration: BoxDecoration(
             color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
           ),
           child: AnimatedBuilder(
             animation: _animation,
@@ -129,7 +129,7 @@ class _ScanProgressBarState extends State<_ScanProgressBar>
                               Colors.transparent,
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                           boxShadow: AppTheme.glowShadow(AppTheme.primary, blur: 10),
                         ),
                       ),
@@ -214,7 +214,7 @@ class _DeviceListItem extends StatelessWidget {
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: isConnected ? AppTheme.primary10 : AppTheme.surface40,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
         border: Border.all(
           color: isConnected
               ? AppTheme.primary.withOpacity(0.6)
@@ -230,7 +230,7 @@ class _DeviceListItem extends StatelessWidget {
             height: 32,
             decoration: BoxDecoration(
               color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppTheme.radiusButton),
               border: Border.all(
                 color: isConnected ? AppTheme.primary : AppTheme.primary20,
               ),

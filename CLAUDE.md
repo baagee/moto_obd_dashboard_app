@@ -336,9 +336,91 @@ static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
 
 ### 7. 设计系统
 
-- 赛博朋克主题：深色背景 (#0A1114)，霓虹强调色 (#0DA6F2, #00F2FF)
-- 使用 Space Grotesk 字体（Google Fonts）
-- 所有卡片样式通过 `AppTheme.surfaceBorder()`，发光效果通过 `AppTheme.glowShadow()`
+#### 7.1 颜色规范 (AppTheme)
+
+**基础颜色** - 定义在 `lib/theme/app_theme.dart`：
+
+| 常量 | 色值 | 用途 |
+|------|------|------|
+| `primary` | `#0DA6F2` | 主强调色（蓝色） |
+| `backgroundDark` | `#0A1114` | 应用背景 |
+| `surface` | `#162229` | 卡片/面板背景 |
+| `accentCyan` | `#00F2FF` | 青色霓虹强调 |
+| `accentRed` | `#FFFF4D4D` | 危险/错误状态 |
+| `accentOrange` | `#FFFFAB40` | 警告状态 |
+| `accentGreen` | `#FF00E676` | 成功/正常状态 |
+| `accentPurple` | `#FF9C27B0` | 速度警告 |
+| `accentPink` | `#FFE91E63` | 仪表指针 |
+| `slateGray` | `#FF1E293B` | 进度条背景/深色分隔线 |
+| `textPrimary` | `#FFFFFFFF` | 主要文字 |
+| `textSecondary` | `#FF9CA3AF` | 次要文字 |
+| `textMuted` | `#FF6B7280` | 弱化文字 |
+
+**预定义透明度变体** - **必须使用这些常量，禁止使用 `withOpacity()`**：
+
+```dart
+// primary 透明度变体
+AppTheme.primary60   // 0.6 opacity
+AppTheme.primary50   // 0.5 opacity
+AppTheme.primary40   // 0.4 opacity
+AppTheme.primary30   // 0.3 opacity
+AppTheme.primary20   // 0.2 opacity
+AppTheme.primary10   // 0.1 opacity
+
+// surface 透明度变体
+AppTheme.surface40   // 0.4 opacity
+
+// backgroundDark 透明度变体
+AppTheme.backgroundDark30  // 0.3 opacity
+AppTheme.backgroundDark50  // 0.5 opacity
+
+// 其他透明度
+AppTheme.accentCyan20     // 0.2 opacity
+AppTheme.accentOrange20   // 0.2 opacity
+```
+
+#### 7.2 间距规范
+
+使用预定义间距常量，禁止硬编码数值：
+
+```dart
+AppTheme.spacing2   // 2dp
+AppTheme.spacing4   // 4dp
+AppTheme.spacing6   // 6dp
+AppTheme.spacing8   // 8dp
+AppTheme.spacing12  // 12dp
+AppTheme.spacing16  // 16dp
+AppTheme.spacing20  // 20dp
+AppTheme.spacing24  // 24dp
+```
+
+#### 7.3 圆角规范
+
+统一使用 `BorderRadius.circular(12)` 作为卡片圆角，避免混用不同半径。
+
+#### 7.4 禁止事项
+
+- **禁止**使用 `withOpacity()` - 必须使用预定义透明度常量
+- **禁止**硬编码颜色 hex 值 - 必须使用 `AppTheme.*` 常量
+- **禁止**在 CustomPainter 中使用原始 hex 值 - 必须引用 AppTheme 常量
+
+#### 7.5 平台横屏配置
+
+**Android** - `android/app/src/main/AndroidManifest.xml`:
+```xml
+<activity
+    android:screenOrientation="landscape"
+    ... />
+```
+
+**iOS** - `ios/Runner/Info.plist`:
+```xml
+<key>UISupportedInterfaceOrientations</key>
+<array>
+    <string>UIInterfaceOrientationLandscapeLeft</string>
+    <string>UIInterfaceOrientationLandscapeRight</string>
+</array>
+```
 
 ---
 

@@ -183,7 +183,7 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppTheme.radiusCard),
               border: Border.all(
                 color: neonColor,
                 width: 3,
@@ -207,7 +207,7 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: eventColor.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusButton),
                         ),
                         child: Icon(
                           _getEventIcon(),

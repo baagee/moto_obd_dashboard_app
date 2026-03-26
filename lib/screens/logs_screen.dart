@@ -108,7 +108,7 @@ class _LogsScreenState extends State<LogsScreen> with AutomaticKeepAliveClientMi
                     border: Border.all(
                       color: AppTheme.primary.withOpacity(0.1),
                     ),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusCard),
                   ),
                   child: ListView.separated(
                     padding: const EdgeInsets.all(8),
@@ -245,7 +245,7 @@ class _CompactHeader extends StatelessWidget {
                   margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
                     color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(5),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusButton),
                     border: Border.all(
                       color: AppTheme.accentRed.withOpacity(0.5),
                     ),
@@ -278,7 +278,7 @@ class _CompactHeader extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
                     color: AppTheme.primary,
-                    borderRadius: BorderRadius.circular(5),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusButton),
                     boxShadow: AppTheme.glowShadow(AppTheme.primary),
                   ),
                   child: Center(
@@ -372,14 +372,14 @@ class _CompactFilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
       splashColor: _color.withOpacity(0.2),
       highlightColor: _color.withOpacity(0.1),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: isActive ? _color.withOpacity(0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
           border: Border.all(
             color: isActive ? _color : AppTheme.textMuted.withOpacity(0.3),
             width: 1,
@@ -458,7 +458,7 @@ class _LogItem extends StatelessWidget {
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: _color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
         border: Border(
           left: BorderSide(color: _color, width: 3),
         ),

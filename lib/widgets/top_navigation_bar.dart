@@ -112,7 +112,7 @@ class TopNavigationBar extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 80),
               decoration: BoxDecoration(
                 color: isConnected ? AppTheme.accentGreen : AppTheme.primary,
-                borderRadius: BorderRadius.circular(5),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                 boxShadow: AppTheme.glowShadow(
                   isConnected ? AppTheme.accentGreen : AppTheme.primary,
                 ),

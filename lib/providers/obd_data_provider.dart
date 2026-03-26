@@ -60,16 +60,16 @@ class OBDDataProvider extends ChangeNotifier {
   // final List<RidingEvent> _events = [];
 
   // 历史数据
-  final List<int> _rpmHistory = [];
-  final List<int> _velocityHistory = [];
-  final List<int> _pressureHistory = [];
-  final List<int> _timestampHistory = [];
+  final List<int> _rpmHistory = List.generate(maxDataPoints, (_) => 0);
+  final List<int> _velocityHistory = List.generate(maxDataPoints, (_) => 0);
+  final List<int> _pressureHistory = List.generate(maxDataPoints, (_) => 0);
+  // final List<int> _timestampHistory = List.generate(maxDataPoints, (_) => 0);
 
   // 连接状态
   bool _isDeviceConnected = false;
 
   // Getter
-  OBDData get data => _data;
+  OBDData get data => _data; // cur data
   List<int> get rpmHistory => _rpmHistory;
   List<int> get velocityHistory => _velocityHistory;
   List<int> get pressureHistory => _pressureHistory;
@@ -93,10 +93,10 @@ class OBDDataProvider extends ChangeNotifier {
     int? timestamp,
   }) {
     // 更新时间戳历史
-    if (timestamp != null) {
-      _timestampHistory.add(timestamp);
-      if (_timestampHistory.length > maxDataPoints) _timestampHistory.removeAt(0);
-    }
+    // if (timestamp != null) {
+    //   _timestampHistory.add(timestamp);
+    //   if (_timestampHistory.length > maxDataPoints) _timestampHistory.removeAt(0);
+    // }
     // 更新历史数据
     if (rpm != null) {
       _rpmHistory.add(rpm);
@@ -144,7 +144,7 @@ class OBDDataProvider extends ChangeNotifier {
     _rpmHistory.clear();
     _velocityHistory.clear();
     _pressureHistory.clear();
-    _timestampHistory.clear();
+    // _timestampHistory.clear();
 
     _data = OBDData(
       rpm: defaultRpm,

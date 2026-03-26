@@ -64,7 +64,7 @@ class BluetoothStatusIcon extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
             decoration: BoxDecoration(
               color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(5),
+              borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
               border: Border.all(
                 color: AppTheme.primary10,
               ),

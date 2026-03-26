@@ -59,7 +59,7 @@ class _ConnectedState extends StatelessWidget {
             AppTheme.primary10,
           ],
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
         border: Border.all(
           color: AppTheme.primary40,
           width: 1,
@@ -125,7 +125,7 @@ class _ConnectedState extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppTheme.backgroundDark50,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppTheme.radiusButton),
               border: Border.all(
                 color: AppTheme.primary20,
               ),
@@ -137,7 +137,7 @@ class _ConnectedState extends StatelessWidget {
                   height: 56,
                   decoration: BoxDecoration(
                     color: AppTheme.primary20,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusButton),
                     boxShadow: AppTheme.glowShadow(AppTheme.primary, blur: 15, opacity: 0.3),
                   ),
                   child: const Icon(
@@ -221,7 +221,7 @@ class _LastConnectedState extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.surface40,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
         border: Border.all(
           color: AppTheme.primary20,
         ),
@@ -281,7 +281,7 @@ class _LastConnectedState extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppTheme.backgroundDark50,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppTheme.radiusButton),
               border: Border.all(
                 color: AppTheme.primary20,
               ),
@@ -293,7 +293,7 @@ class _LastConnectedState extends StatelessWidget {
                   height: 56,
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusButton),
                     border: Border.all(
                       color: AppTheme.primary20,
                     ),
@@ -354,7 +354,7 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.surface40,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
         border: Border.all(
           color: AppTheme.primary20,
         ),
@@ -406,7 +406,7 @@ class _InfoBox extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppTheme.backgroundDark50,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppTheme.radiusButton),
         border: Border.all(
           color: isPrimary ? AppTheme.primary20 : AppTheme.primary10,
         ),
@@ -448,7 +448,7 @@ class _StabilityIndicator extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppTheme.backgroundDark50,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppTheme.radiusButton),
         border: Border.all(color: AppTheme.primary10),
       ),
       child: Column(
@@ -484,7 +484,7 @@ class _StabilityIndicator extends StatelessWidget {
                     margin: EdgeInsets.only(right: index < 6 ? 2 : 0),
                     decoration: BoxDecoration(
                       color: isActive ? AppTheme.primary : AppTheme.primary30,
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                     ),
                   ),
                 );

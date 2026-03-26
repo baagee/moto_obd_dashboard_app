@@ -111,7 +111,7 @@ class CyberButton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: AppTheme.primary,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(AppTheme.radiusButton),
         boxShadow: AppTheme.glowShadow(AppTheme.primary, blur: 10),
       ),
       child: _buildContent(Colors.white),
@@ -124,7 +124,7 @@ class CyberButton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(AppTheme.radiusButton),
         border: Border.all(
           color: AppTheme.primary.withOpacity(0.8),
           width: 1,
@@ -140,7 +140,7 @@ class CyberButton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: AppTheme.accentRed,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(AppTheme.radiusButton),
         boxShadow: AppTheme.glowShadow(AppTheme.accentRed, blur: 10),
       ),
       child: _buildContent(Colors.white),
@@ -153,7 +153,7 @@ class CyberButton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: AppTheme.accentGreen,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(AppTheme.radiusButton),
         boxShadow: AppTheme.glowShadow(AppTheme.accentGreen, blur: 10),
       ),
       child: _buildContent(Colors.white),
