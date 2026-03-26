@@ -240,6 +240,7 @@ class _MainContainerState extends State<MainContainer> {
                           onLinkVehiclePressed: _navigateToBluetoothScan,
                           isConnected: isConnected,
                           deviceName: deviceName,
+                          navItems: const ['DASHBOARD', 'RECORD', 'LOGS', 'DEVICES'],
                         );
                       },
                     );

@@ -162,6 +162,16 @@ class DatabaseService {
     );
   }
 
+  /// 删除骑行事件
+  static Future<int> deleteRidingEvent(int id) async {
+    final db = await database;
+    return await db.delete(
+      'riding_events',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   // ========== 每日聚合 ==========
 
   /// 更新或插入每日统计（UPSERT）

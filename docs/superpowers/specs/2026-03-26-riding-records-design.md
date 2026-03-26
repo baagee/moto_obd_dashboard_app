@@ -97,33 +97,17 @@ CREATE TABLE riding_events (
   FOREIGN KEY (record_id) REFERENCES riding_records(id) ON DELETE CASCADE
 );
 
--- 聚合缓存表（周/月预计算）
-CREATE TABLE aggregation_cache (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  period_type TEXT NOT NULL,             -- 'week' / 'month'
-  period_key TEXT NOT NULL,             -- '2026-W12' / '2026-03'
-  total_distance REAL DEFAULT 0,
-  avg_speed REAL DEFAULT 0,
-  total_duration INTEGER DEFAULT 0,
-  max_speed REAL DEFAULT 0,
-  max_left_lean REAL DEFAULT 0,
-  max_right_lean REAL DEFAULT 0,
-  ride_count INTEGER DEFAULT 0,
-  updated_at INTEGER NOT NULL,
-  UNIQUE(period_type, period_key)
-);
-
 -- 每日聚合表
 CREATE TABLE daily_stats (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   date TEXT NOT NULL UNIQUE,             -- '2026-03-26'
-  total_distance REAL DEFAULT 0,
-  avg_speed REAL DEFAULT 0,
-  total_duration INTEGER DEFAULT 0,
-  max_speed REAL DEFAULT 0,
-  max_left_lean REAL DEFAULT 0,
-  max_right_lean REAL DEFAULT 0,
-  ride_count INTEGER DEFAULT 0,
+  total_distance REAL DEFAULT 0,          -- 当日总骑行距离(km)
+  total_duration INTEGER DEFAULT 0,       -- 当日总骑行时长(秒)
+  avg_speed REAL DEFAULT 0,               -- 当日加权平均速度(km/h)
+  max_speed REAL DEFAULT 0,              -- 当日最高速度(km/h)
+  max_left_lean REAL DEFAULT 0,          -- 当日最大左倾角(°)
+  max_right_lean REAL DEFAULT 0,         -- 当日最大右倾角(°)
+  ride_count INTEGER DEFAULT 0,          -- 当日骑行次数
   updated_at INTEGER NOT NULL
 );
 ```
@@ -131,13 +115,13 @@ CREATE TABLE daily_stats (
 ### 3. 聚合查询策略
 
 **混合模式**：
-- **日统计**：实时从 `daily_stats` 表查询
-- **周/月统计**：从 `aggregation_cache` 表查询预计算结果
+- **今日统计**：实时从 `riding_records` 表聚合计算当日数据
+- **近一周（7天）**：从 `daily_stats` 表SUM过去7天数据
+- **近一月（30天）**：从 `daily_stats` 表SUM过去30天数据
 
-**预计算时机**：
-- 每次骑行结束时，更新当日统计（`daily_stats`）
-- 每周第一天计算上周聚合（`aggregation_cache`）
-- 每月第一天计算上月聚合（`aggregation_cache`）
+**每日汇总更新时机**：
+- 每次骑行结束时，更新或插入当日 `daily_stats` 记录
+- 使用 `INSERT ... ON CONFLICT UPDATE` 原子操作
 
 ### 4. 数据流
 
@@ -156,9 +140,7 @@ OBD 数据采样 + 事件检测（RidingStatsProvider）
     ├──► GPS 记录终点坐标 + 地名
     ├──► 计算本次骑行统计
     ├──► 保存 RidingRecord 到 SQLite
-    ├──► 保存 RidingEvent 列表到 SQLite
-    ├──► 更新 daily_stats 表
-    └──► 检查是否需要更新周/月聚合缓存
+    └──► 保存 RidingEvent 列表到 SQLite
 ```
 
 ## 页面设计
@@ -248,8 +230,7 @@ lib/
 ├── models/
 │   └── riding_record.dart          # 骑行记录数据模型
 ├── providers/
-│   ├── riding_record_provider.dart  # 骑行记录状态管理
-│   └── location_provider.dart       # GPS定位状态管理
+│   └── riding_record_provider.dart  # 骑行记录状态管理
 ├── services/
 │   ├── location_service.dart        # GPS定位服务
 │   ├── database_service.dart        # SQLite数据库服务
@@ -282,7 +263,7 @@ dependencies:
 3. 实现 LocationService（GPS 服务）
 4. 实现 GeocodingService（坐标转地名）
 5. 创建 RidingRecord 模型
-6. 创建 RidingRecordProvider（记录状态管理）
+6. 创建 RidingRecordProvider（记录状态管理 + 聚合查询）
 7. 修改 MainContainer 添加 RECORD 页面入口
 8. 实现 RecordScreen 页面
 9. 实现 SwipeableRecordCard（左滑删除）
