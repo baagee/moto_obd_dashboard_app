@@ -52,8 +52,11 @@ class TelemetryChartCard extends StatelessWidget {
                     ),
 
                     // 中间图表 - 使用 RepaintBoundary 隔离重绘
+                    // 使用 ValueKey 强制在数据变化时重建，确保 CustomPaint 刷新
                     Expanded(
                       child: _ChartArea(
+                        key: ValueKey(
+                            'chart_${provider.rpmHistory.length}_${provider.rpmHistory.last}_${provider.velocityHistory.length}_${provider.velocityHistory.last}'),
                         rpmHistory: provider.rpmHistory,
                         velocityHistory: provider.velocityHistory,
                       ),
@@ -136,6 +139,7 @@ class _ChartArea extends StatelessWidget {
   final List<int> velocityHistory;
 
   const _ChartArea({
+    super.key,
     required this.rpmHistory,
     required this.velocityHistory,
   });
@@ -339,7 +343,7 @@ class TelemetryChartPainter extends CustomPainter {
     // 优化：比较长度和最后一个元素，避免深度比较
     if (oldDelegate.rpmHistory.length != rpmHistory.length) return true;
     if (oldDelegate.velocityHistory.length != velocityHistory.length) return true;
-    if (rpmHistory.isEmpty || velocityHistory.isEmpty) return false;
+    // if (rpmHistory.isEmpty || velocityHistory.isEmpty) return false;
     return oldDelegate.rpmHistory.last != rpmHistory.last ||
         oldDelegate.velocityHistory.last != velocityHistory.last;
   }
