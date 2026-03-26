@@ -78,12 +78,13 @@ void main() {
           create: (_) => RidingRecordProvider(),
         ),
 
-        // 骑行统计 Provider - 管理事件检测和统计（依赖 OBDDataProvider + LogProvider + AudioService）
+        // 骑行统计 Provider - 管理事件检测和统计（依赖 OBDDataProvider + LogProvider + AudioService + RidingRecordProvider）
         ChangeNotifierProxyProvider2<OBDDataProvider, LogProvider, RidingStatsProvider>(
           create: (context) => RidingStatsProvider(
             obdDataProvider: context.read<OBDDataProvider>(),
             logProvider: context.read<LogProvider>(),
             audioService: context.read<AudioService>(),
+            ridingRecordProvider: context.read<RidingRecordProvider>(),
           ),
           update: (context, obdDataProvider, logProvider, previous) =>
               previous ??
@@ -91,6 +92,7 @@ void main() {
                 obdDataProvider: obdDataProvider,
                 logProvider: logProvider,
                 audioService: context.read<AudioService>(),
+                ridingRecordProvider: context.read<RidingRecordProvider>(),
               ),
         ),
       ],

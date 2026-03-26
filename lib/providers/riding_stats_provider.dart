@@ -4,16 +4,19 @@ import 'package:flutter/foundation.dart';
 import 'package:obd_dashboard/utils/gear_util.dart';
 import '../models/obd_data.dart';
 import '../models/riding_event.dart' as stats;
+import '../models/riding_record.dart';
 import '../services/audio_service.dart';
 import 'log_provider.dart';
 import 'loggable.dart';
 import 'obd_data_provider.dart';
+import 'riding_record_provider.dart';
 
 /// 骑行统计 Provider
 /// 负责数据采样、事件检测、统计汇总
 class RidingStatsProvider extends ChangeNotifier {
   final OBDDataProvider _obdDataProvider;
   final AudioService? _audioService;
+  RidingRecordProvider? _ridingRecordProvider;
 
   // 日志回调
   late final void Function(String source, LogType type, String message) _logCallback;
@@ -66,8 +69,10 @@ class RidingStatsProvider extends ChangeNotifier {
     required OBDDataProvider obdDataProvider,
     required LogProvider logProvider,
     AudioService? audioService,
+    RidingRecordProvider? ridingRecordProvider,
   })  : _obdDataProvider = obdDataProvider,
-        _audioService = audioService {
+        _audioService = audioService,
+        _ridingRecordProvider = ridingRecordProvider {
     _logCallback = createLogger(logProvider);
   }
 
@@ -95,10 +100,13 @@ class RidingStatsProvider extends ChangeNotifier {
     GSX8SCalculator.reset();
 
     final duration = _rideStartTime != null
-        ? DateTime.now().difference(_rideStartTime!)
-        : Duration.zero;
-    _logCallback?.call('Stats', LogType.info, '骑行结束，总时长: ${duration.inMinutes}分钟');
+        ? DateTime.now().difference(_rideStartTime!).inSeconds
+        : 0;
+    _logCallback?.call('Stats', LogType.info, '骑行结束，总时长: ${duration ~/ 60}分钟');
     notifyListeners();
+
+    // 保存骑行记录
+    _saveRidingRecord(duration);
   }
 
   /// 启动降频采样
@@ -322,6 +330,62 @@ class RidingStatsProvider extends ChangeNotifier {
     _latestEvent = event;
     _logCallback?.call('Stats', LogType.warning, '事件触发: ${event.title}');
     notifyListeners();
+  }
+
+  void _saveRidingRecord(int duration) async {
+    if (_ridingRecordProvider == null || _rideStartTime == null) return;
+
+    // 计算统计数据
+    final avgSpeed = duration > 0 ? (_sampler.getAverage('speed') ?? 0) / 3600 * duration : 0.0;
+    final maxSpeed = _getMaxSpeed();
+    final maxLeftLean = _getMaxLeanAngle('left');
+    final maxRightLean = _getMaxLeanAngle('right');
+
+    // 转换事件
+    final events = _eventHistory.map((e) => RidingRecordEvent(
+      type: e.type.toString(),
+      title: e.title,
+      description: e.description,
+      triggerValue: e.triggerValue,
+      threshold: e.threshold,
+      timestamp: e.timestamp.millisecondsSinceEpoch,
+      additionalData: e.additionalData,
+    )).toList();
+
+    // 计算距离（简化为：平均速度 * 时长）
+    final distance = avgSpeed * (duration / 3600);
+
+    _ridingRecordProvider!.saveRidingRecord(
+      startTime: _rideStartTime!.millisecondsSinceEpoch,
+      endTime: DateTime.now().millisecondsSinceEpoch,
+      duration: duration,
+      distance: distance,
+      avgSpeed: avgSpeed,
+      maxSpeed: maxSpeed,
+      maxLeftLean: maxLeftLean,
+      maxRightLean: maxRightLean,
+      events: events,
+    );
+  }
+
+  double _getMaxSpeed() {
+    double max = 0;
+    for (final event in _eventHistory) {
+      final speed = event.additionalData['vehicleSpeed'] as double?;
+      if (speed != null && speed > max) max = speed;
+    }
+    return max;
+  }
+
+  double _getMaxLeanAngle(String direction) {
+    double max = 0;
+    for (final event in _eventHistory) {
+      if (event.additionalData['direction'] == direction) {
+        final angle = event.additionalData['leanAngle'] as double?;
+        if (angle != null && angle.abs() > max) max = angle.abs();
+      }
+    }
+    return max;
   }
 
   @override
