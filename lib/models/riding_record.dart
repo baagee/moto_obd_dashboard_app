@@ -283,6 +283,9 @@ class AggregationStats {
   String get formattedDuration {
     final hours = duration ~/ 3600;
     final minutes = (duration % 3600) ~/ 60;
-    return '$hours.${minutes.toString().padLeft(2, '0')}h';
+    if (hours > 0) {
+      return '${hours}h${minutes.toString().padLeft(2, '0')}m';
+    }
+    return '${minutes}min';
   }
 }

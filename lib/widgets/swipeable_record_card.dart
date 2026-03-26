@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/riding_record.dart';
 import '../theme/app_theme.dart';
-import 'delete_confirm_dialog.dart';
+import 'cyber_dialog.dart';
+import 'cyber_button.dart';
 
-/// 可滑动删除的骑行记录卡片
-class SwipeableRecordCard extends StatefulWidget {
+/// 骑行强度等级（按最高速度分级）
+enum _RideIntensity { normal, moderate, intense }
+
+/// 可滑动删除的骑行记录卡片（基于 Dismissible）
+class SwipeableRecordCard extends StatelessWidget {
   final RidingRecord record;
   final VoidCallback onViewEvents;
   final VoidCallback onDelete;
@@ -16,124 +20,233 @@ class SwipeableRecordCard extends StatefulWidget {
     required this.onDelete,
   });
 
-  @override
-  State<SwipeableRecordCard> createState() => _SwipeableRecordCardState();
-}
+  _RideIntensity get _intensity {
+    final maxSpeed = record.maxSpeed;
+    if (maxSpeed >= 100) return _RideIntensity.intense;
+    if (maxSpeed >= 60) return _RideIntensity.moderate;
+    return _RideIntensity.normal;
+  }
 
-class _SwipeableRecordCardState extends State<SwipeableRecordCard> {
-  double _dragExtent = 0;
-  static const double _deleteButtonWidth = 80;
+  Color get _accentColor {
+    switch (_intensity) {
+      case _RideIntensity.intense:
+        return AppTheme.accentRed;
+      case _RideIntensity.moderate:
+        return AppTheme.accentOrange;
+      case _RideIntensity.normal:
+        return AppTheme.accentCyan;
+    }
+  }
+
+  String get _intensityLabel {
+    switch (_intensity) {
+      case _RideIntensity.intense:
+        return 'INTENSE';
+      case _RideIntensity.moderate:
+        return 'ACTIVE';
+      case _RideIntensity.normal:
+        return 'CASUAL';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onHorizontalDragUpdate: (details) {
-        setState(() {
-          _dragExtent = (_dragExtent + details.delta.dx).clamp(-_deleteButtonWidth, 0);
-        });
-      },
-      onHorizontalDragEnd: (details) {
-        if (_dragExtent < -_deleteButtonWidth / 2) {
-          setState(() => _dragExtent = -_deleteButtonWidth);
-        } else {
-          setState(() => _dragExtent = 0);
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: Stack(
-          children: [
-            // 删除按钮（在卡片下面）
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: GestureDetector(
-                onTap: () => _showDeleteConfirm(),
-                child: Container(
-                  width: _deleteButtonWidth,
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentRed,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '删除',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+    final accent = _accentColor;
+
+    return Dismissible(
+      key: ValueKey(record.id),
+      direction: DismissDirection.endToStart,
+      // 确认弹窗：取消返回 false，确认返回 true
+      confirmDismiss: (_) async {
+        bool confirmed = false;
+        await CyberDialog.show(
+          context: context,
+          title: '确认删除',
+          icon: Icons.delete_outline,
+          accentColor: AppTheme.accentRed,
+          content: Text(
+            '确定要删除这条骑行记录吗？\n删除后无法恢复。',
+            textAlign: TextAlign.center,
+            style: AppTheme.labelMedium.copyWith(color: AppTheme.textSecondary),
+          ),
+          actions: [
+            CyberButton.secondary(
+              text: '取消',
+              onPressed: () {
+                confirmed = false;
+                Navigator.of(context).pop();
+              },
+              height: 32,
+              fontSize: 12,
             ),
-            // 卡片主体
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 100),
-              transform: Matrix4.translationValues(_dragExtent, 0, 0),
-              child: _buildCard(),
+            const SizedBox(width: 10),
+            CyberButton.danger(
+              text: '删除',
+              onPressed: () {
+                confirmed = true;
+                Navigator.of(context).pop();
+              },
+              height: 32,
+              fontSize: 12,
+            ),
+          ],
+        );
+        return confirmed;
+      },
+      onDismissed: (_) => onDelete(),
+      // 右侧滑出背景：红色删除按钮
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.accentRed,
+          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.delete_outline, color: Colors.white, size: 20),
+            SizedBox(height: 2),
+            Text(
+              '删除',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
       ),
+      child: _buildCard(context, accent),
     );
   }
 
-  Widget _buildCard() {
-    final record = widget.record;
-    final showDeleteButton = _dragExtent < -10;
-
+  Widget _buildCard(BuildContext context, Color accent) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-        border: Border.all(color: AppTheme.primary20),
+        color: accent.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+        border: Border(
+          left: BorderSide(color: accent, width: 3),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 第一行：时间和查看事件按钮
+          // ── 第一行：强度标签 + 时间 + 查看事件按钮 ──
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${record.formattedStartTime} → ${record.formattedEndTime}',
-                style: AppTheme.valueMedium.copyWith(color: AppTheme.textPrimary),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                  border: Border.all(color: accent.withOpacity(0.4), width: 1),
+                ),
+                child: Text(
+                  _intensityLabel,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 7,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
               ),
-              if (!showDeleteButton)
-                GestureDetector(
-                  onTap: widget.onViewEvents,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.slateGray,
-                      borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                    ),
-                    child: Text(
-                      '查看事件',
-                      style: AppTheme.labelSmall.copyWith(color: AppTheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${record.formattedStartTime} → ${record.formattedEndTime}',
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: onViewEvents,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                    border:
+                        Border.all(color: accent.withOpacity(0.35), width: 1),
+                  ),
+                  child: Text(
+                    '查看事件',
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
-          // 第二行：地点
-          Text(
-            '${record.startPlaceName ?? '未知'} → ${record.endPlaceName ?? '未知'}',
-            style: AppTheme.labelMedium.copyWith(color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          // 第三行：统计数据
+          // ── 第二行：地点（左）+ 4项统计（右）──
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _buildStat('距离', '${record.distance.toStringAsFixed(1)}km'),
-              _buildStat('均速', '${record.avgSpeed.toStringAsFixed(0)}km/h'),
-              _buildStat('极速', '${record.maxSpeed.toStringAsFixed(0)}km/h'),
-              _buildLeanAngle(),
+              // 地点（flex 3）
+              Expanded(
+                flex: 3,
+                child: Row(
+                  children: [
+                    Icon(Icons.location_on_outlined,
+                        size: 14, color: AppTheme.textMuted.withOpacity(0.7)),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        '${record.startPlaceName ?? '未知'} → ${record.endPlaceName ?? '未知'}',
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              // 统计数据（flex 5，4项均分）
+              Expanded(
+                flex: 5,
+                child: Row(
+                  children: [
+                    _buildStat(
+                        Icons.route,
+                        '距离',
+                        '${record.distance.toStringAsFixed(1)}',
+                        'km',
+                        AppTheme.textPrimary),
+                    _buildStat(
+                        Icons.speed,
+                        '均速',
+                        '${record.avgSpeed.toStringAsFixed(0)}',
+                        'km/h',
+                        AppTheme.accentCyan),
+                    _buildStat(
+                        Icons.flash_on,
+                        '极速',
+                        '${record.maxSpeed.toStringAsFixed(0)}',
+                        'km/h',
+                        accent),
+                    _buildLeanStat(),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
@@ -141,34 +254,61 @@ class _SwipeableRecordCardState extends State<SwipeableRecordCard> {
     );
   }
 
-  Widget _buildStat(String label, String value) {
+  Widget _buildStat(
+      IconData icon, String label, String value, String unit, Color color) {
     return Expanded(
-      child: Text(
-        '$label:$value',
-        style: AppTheme.labelMedium.copyWith(color: AppTheme.textMuted),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 14, color: color.withOpacity(0.6)),
+          const SizedBox(width: 3),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label,
+                  style:
+                      const TextStyle(color: AppTheme.textMuted, fontSize: 10)),
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: value,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextSpan(
+                      text: unit,
+                      style: const TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildLeanAngle() {
-    final record = widget.record;
+  Widget _buildLeanStat() {
     final left = record.maxLeftLean;
     final right = record.maxRightLean;
     final maxLean = left > right ? left : right;
-    final direction = left > right ? '左' : '右';
+    final direction = left > right ? 'L' : 'R';
 
-    return Expanded(
-      child: Text(
-        '倾角:${maxLean.toStringAsFixed(0)}°$direction',
-        style: AppTheme.labelMedium.copyWith(color: AppTheme.accentPink),
-      ),
-    );
-  }
-
-  void _showDeleteConfirm() {
-    showDialog(
-      context: context,
-      builder: (ctx) => DeleteConfirmDialog(onConfirm: widget.onDelete),
+    return _buildStat(
+      Icons.rotate_right,
+      '倾角',
+      '${maxLean.toStringAsFixed(0)}°$direction',
+      '',
+      AppTheme.accentPink,
     );
   }
 }

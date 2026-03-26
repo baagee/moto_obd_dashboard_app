@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:obd_dashboard/utils/gear_util.dart';
 import '../models/obd_data.dart';
 import '../models/riding_event.dart' as stats;
 import '../models/riding_record.dart';
 import '../services/audio_service.dart';
+import '../services/location_service.dart';
 import 'log_provider.dart';
 import 'loggable.dart';
 import 'obd_data_provider.dart';
@@ -19,7 +21,8 @@ class RidingStatsProvider extends ChangeNotifier {
   RidingRecordProvider? _ridingRecordProvider;
 
   // 日志回调
-  late final void Function(String source, LogType type, String message) _logCallback;
+  late final void Function(String source, LogType type, String message)
+      _logCallback;
 
   // 最新添加的事件（用于外部监听）
   stats.RidingEvent? _latestEvent;
@@ -54,13 +57,25 @@ class RidingStatsProvider extends ChangeNotifier {
   // 事件冷却时间记录
   final Map<stats.RidingEventType, DateTime> _lastEventTime = {};
 
-
   // 事件历史列表
   final List<stats.RidingEvent> _eventHistory = [];
 
   // 骑行状态
   bool _isRiding = false;
   DateTime? _rideStartTime;
+
+  // GPS 轨迹追踪
+  StreamSubscription<Position>? _positionSubscription;
+  final List<PositionData> _gpsTrack = [];
+  double _totalGpsDistance = 0; // 米
+  PositionData? _lastPosition;
+
+  // 全程统计数据（用于保存记录）
+  double _maxSpeed = 0;
+  double _maxLeftLean = 0;
+  double _maxRightLean = 0;
+  double _totalSpeedSum = 0;
+  int _totalSampleCount = 0;
 
   List<stats.RidingEvent> get eventHistory => _eventHistory;
   bool get isRiding => _isRiding;
@@ -76,7 +91,6 @@ class RidingStatsProvider extends ChangeNotifier {
     _logCallback = createLogger(logProvider);
   }
 
-
   /// 开始骑行
   void startRide() {
     _isRiding = true;
@@ -84,10 +98,22 @@ class RidingStatsProvider extends ChangeNotifier {
     _sampler.clear();
     _lastEventTime.clear();
     _eventHistory.clear();
-    // _statistics = stats.EventStatistics.empty();
+    _gpsTrack.clear();
+    _totalGpsDistance = 0;
+    _lastPosition = null;
+
+    // 重置全程统计数据
+    _maxSpeed = 0;
+    _maxLeftLean = 0;
+    _maxRightLean = 0;
+    _totalSpeedSum = 0;
+    _totalSampleCount = 0;
 
     // 启动降频采样定时器
     _startSampling();
+
+    // 启动 GPS 追踪
+    _startGpsTracking();
 
     _logCallback?.call('Stats', LogType.info, '开始骑行统计');
     notifyListeners();
@@ -97,12 +123,14 @@ class RidingStatsProvider extends ChangeNotifier {
   void endRide() {
     _isRiding = false;
     _stopSampling();
+    _stopGpsTracking();
     GSX8SCalculator.reset();
 
     final duration = _rideStartTime != null
         ? DateTime.now().difference(_rideStartTime!).inSeconds
         : 0;
-    _logCallback?.call('Stats', LogType.info, '骑行结束，总时长: ${duration ~/ 60}分钟');
+    _logCallback?.call('Stats', LogType.info,
+        '骑行结束，总时长: ${duration ~/ 60}分钟，总距离: ${(_totalGpsDistance / 1000).toStringAsFixed(2)} km');
     notifyListeners();
 
     // 保存骑行记录
@@ -112,13 +140,97 @@ class RidingStatsProvider extends ChangeNotifier {
   /// 启动降频采样
   void _startSampling() {
     _sampleTimer?.cancel();
-    _sampleTimer = Timer.periodic(sampleInterval, (_) => _performSamplingAndDetection());
+    _sampleTimer =
+        Timer.periodic(sampleInterval, (_) => _performSamplingAndDetection());
   }
 
   /// 停止采样
   void _stopSampling() {
     _sampleTimer?.cancel();
     _sampleTimer = null;
+  }
+
+  /// 启动 GPS 追踪
+  void _startGpsTracking() {
+    _stopGpsTracking();
+
+    // 请求后台定位权限（确保 APP 切后台时 GPS 仍然工作）
+    LocationService.requestBackgroundPermission().then((granted) {
+      if (!granted) {
+        _logCallback?.call(
+            'GPS', LogType.warning, '后台定位权限未授权，切换到后台时 GPS 追踪可能暂停');
+      } else {
+        _logCallback?.call('GPS', LogType.success, '后台定位权限已授权');
+      }
+    });
+
+    try {
+      _positionSubscription = LocationService.getPositionStream(
+        distanceFilter: 0, // 0米触发（每次位置变化都回调，最高精度）
+      ).listen((position) {
+        _onPositionUpdate(PositionData.fromGeolocator(position));
+      });
+    } catch (e) {
+      _logCallback?.call('Stats', LogType.warning, 'GPS 追踪启动失败: $e');
+    }
+  }
+
+  /// 停止 GPS 追踪
+  void _stopGpsTracking() {
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
+  }
+
+  /// GPS 位置更新处理
+  void _onPositionUpdate(PositionData position) {
+    if (!_isRiding) return;
+
+    // 时间过滤：距离上次更新至少 0.5 秒（避免静止时频繁回调）
+    if (_lastPosition != null) {
+      final timeDiff = position.timestamp.difference(_lastPosition!.timestamp);
+      if (timeDiff.inMilliseconds < 500) return;
+    }
+
+    _gpsTrack.add(position);
+
+    if (_lastPosition != null) {
+      final distance = _calculateDistance(_lastPosition!, position);
+      final timeDiff =
+          position.timestamp.difference(_lastPosition!.timestamp).inSeconds;
+
+      // 计算瞬时速度（m/s）
+      final speed = timeDiff > 0 ? (distance / timeDiff) : 0;
+
+      // 智能过滤：
+      // 1. 距离 < 200m（放宽阈值，容忍高速场景下的延迟采样）
+      // 2. 速度 < 50m/s (180km/h，过滤异常漂移)
+      if (distance < 200 && speed < 50) {
+        _totalGpsDistance += distance;
+      } else {
+        // 记录过滤日志（用于诊断）
+        _logCallback?.call('GPS', LogType.warning,
+            '过滤异常采样点: ${distance.toStringAsFixed(1)}m, ${(speed * 3.6).toStringAsFixed(1)}km/h');
+      }
+    }
+    _lastPosition = position;
+  }
+
+  /// 使用 Haversine 公式计算两个 GPS 点之间的距离（米）
+  double _calculateDistance(PositionData p1, PositionData p2) {
+    const R = 6371000.0; // 地球半径（米）
+    final dLat = _toRadians(p2.latitude - p1.latitude);
+    final dLon = _toRadians(p2.longitude - p1.longitude);
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRadians(p1.latitude)) *
+            cos(_toRadians(p2.latitude)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return R * c;
+  }
+
+  double _toRadians(double degree) {
+    return degree * pi / 180;
   }
 
   /// 执行采样和检测
@@ -139,6 +251,22 @@ class RidingStatsProvider extends ChangeNotifier {
     _sampler.addSample('lean', data.leanAngle.toDouble());
     _sampler.addSample('intakeTemp', data.intakeTemp.toDouble());
     _sampler.addSample('throttle', data.throttle.toDouble());
+
+    // 实时更新全程统计数据
+    final speed = data.speed.toDouble();
+    if (speed > _maxSpeed) _maxSpeed = speed;
+
+    final leanAngle = data.leanAngle.toDouble();
+    final leanDirection = data.leanDirection.toLowerCase();
+    if (leanDirection == 'left' && leanAngle > _maxLeftLean) {
+      _maxLeftLean = leanAngle;
+    } else if (leanDirection == 'right' && leanAngle > _maxRightLean) {
+      _maxRightLean = leanAngle;
+    }
+
+    // 累积速度和计数（用于计算全程平均速度）
+    _totalSpeedSum += speed;
+    _totalSampleCount++;
 
     // 获取窗口数据
     final avgSpeed = _sampler.getAverage('speed');
@@ -177,7 +305,8 @@ class RidingStatsProvider extends ChangeNotifier {
   }
 
   /// 检查是否可以触发事件
-  bool _canTriggerEvent(stats.RidingEventType type, {Duration? customCooldown}) {
+  bool _canTriggerEvent(stats.RidingEventType type,
+      {Duration? customCooldown}) {
     final lastTime = _lastEventTime[type];
     final cooldown = customCooldown ?? eventCooldown;
     if (lastTime == null) return true;
@@ -211,7 +340,8 @@ class RidingStatsProvider extends ChangeNotifier {
     if (avgSpeed == null || avgLean == null) return;
     if (avgSpeed < 60) return;
     if (avgLean < 20) return;
-    if (!_canTriggerEvent(stats.RidingEventType.extremeLean, customCooldown: extremeLeanCooldown)) return;
+    if (!_canTriggerEvent(stats.RidingEventType.extremeLean,
+        customCooldown: extremeLeanCooldown)) return;
 
     final direction = _obdDataProvider.data.leanDirection;
     final event = stats.RidingEvent.extremeLean(
@@ -260,18 +390,21 @@ class RidingStatsProvider extends ChangeNotifier {
 
     final duration = DateTime.now().difference(_rideStartTime!);
     if (duration.inHours < 1) return;
-    if (!_canTriggerEvent(stats.RidingEventType.longRiding, customCooldown: longRidingCooldown)) return;
+    if (!_canTriggerEvent(stats.RidingEventType.longRiding,
+        customCooldown: longRidingCooldown)) return;
 
     final event = stats.RidingEvent.longRiding(duration: duration);
     _addEvent(event);
   }
 
   /// 高效巡航检测：速度 70-100km/h 且负荷 < 30%
-  void _checkEfficientCruising(double? avgSpeed, double? avgLoad, double? avgThrottle) {
+  void _checkEfficientCruising(
+      double? avgSpeed, double? avgLoad, double? avgThrottle) {
     if (avgSpeed == null || avgLoad == null || avgThrottle == null) return;
     if (avgSpeed < 70 || avgSpeed > 100) return;
     if (avgLoad >= 30) return;
-    if (!_canTriggerEvent(stats.RidingEventType.efficientCruising, customCooldown: efficientCruisingCooldown)) return;
+    if (!_canTriggerEvent(stats.RidingEventType.efficientCruising,
+        customCooldown: efficientCruisingCooldown)) return;
 
     // 计算油门稳定性（标准差）
     final throttleStdDev = _sampler.getStdDev('throttle');
@@ -305,7 +438,8 @@ class RidingStatsProvider extends ChangeNotifier {
     if (avgIntakeTemp == null || avgSpeed == null) return;
     if (avgIntakeTemp >= 5) return;
     if (avgSpeed <= 40) return;
-    if (!_canTriggerEvent(stats.RidingEventType.coldEnvironmentRisk, customCooldown: coldEnvironmentCooldown)) return;
+    if (!_canTriggerEvent(stats.RidingEventType.coldEnvironmentRisk,
+        customCooldown: coldEnvironmentCooldown)) return;
 
     final vehicleSpeed = _obdDataProvider.data.speed.toDouble();
     final event = stats.RidingEvent.coldEnvironmentRisk(
@@ -335,25 +469,47 @@ class RidingStatsProvider extends ChangeNotifier {
   void _saveRidingRecord(int duration) async {
     if (_ridingRecordProvider == null || _rideStartTime == null) return;
 
-    // 计算统计数据
-    final avgSpeed = duration > 0 ? (_sampler.getAverage('speed') ?? 0) / 3600 * duration : 0.0;
-    final maxSpeed = _getMaxSpeed();
-    final maxLeftLean = _getMaxLeanAngle('left');
-    final maxRightLean = _getMaxLeanAngle('right');
+    // 最小阈值过滤：时长 < 30秒 且 距离 < 20米，视为无效骑行（误触/测试/dispose 遗留），丢弃
+    final distanceMeters = _totalGpsDistance;
+    if (duration < 30 && distanceMeters < 20) {
+      _logCallback?.call('Stats', LogType.warning,
+          '骑行记录已丢弃（时长=${duration}s, 距离=${distanceMeters.toStringAsFixed(1)}m，未达到最小阈值）');
+      return;
+    }
+
+    // 使用实时累积的全程统计数据
+    final avgSpeed =
+        _totalSampleCount > 0 ? _totalSpeedSum / _totalSampleCount : 0.0;
+    final maxSpeed = _maxSpeed;
+    final maxLeftLean = _maxLeftLean;
+    final maxRightLean = _maxRightLean;
+
+    // 从 GPS 轨迹中取起点（第一个点）和终点（最后一个点）
+    // GPS 轨迹在 startRide 时清空，第一个点就是真实起点
+    final startPoint = _gpsTrack.isNotEmpty ? _gpsTrack.first : null;
+    final endPoint = _gpsTrack.isNotEmpty ? _gpsTrack.last : null;
 
     // 转换事件
-    final events = _eventHistory.map((e) => RidingRecordEvent(
-      type: e.type.toString(),
-      title: e.title,
-      description: e.description,
-      triggerValue: e.triggerValue,
-      threshold: e.threshold,
-      timestamp: e.timestamp.millisecondsSinceEpoch,
-      additionalData: e.additionalData,
-    )).toList();
+    final events = _eventHistory
+        .map((e) => RidingRecordEvent(
+              type: e.type.toString(),
+              title: e.title,
+              description: e.description,
+              triggerValue: e.triggerValue,
+              threshold: e.threshold,
+              timestamp: e.timestamp.millisecondsSinceEpoch,
+              additionalData: e.additionalData,
+            ))
+        .toList();
 
-    // 计算距离（简化为：平均速度 * 时长）
-    final distance = avgSpeed * (duration / 3600);
+    // 优先使用 GPS 计算的距离，否则用 OBD 车速积分
+    double distance;
+    if (_totalGpsDistance > 0) {
+      distance = _totalGpsDistance / 1000; // 转换为公里
+    } else {
+      // 回退：平均速度(km/h) * 时长(h)
+      distance = avgSpeed * (duration / 3600);
+    }
 
     _ridingRecordProvider!.saveRidingRecord(
       startTime: _rideStartTime!.millisecondsSinceEpoch,
@@ -365,33 +521,20 @@ class RidingStatsProvider extends ChangeNotifier {
       maxLeftLean: maxLeftLean,
       maxRightLean: maxRightLean,
       events: events,
+      startLatitude: startPoint?.latitude,
+      startLongitude: startPoint?.longitude,
+      endLatitude: endPoint?.latitude,
+      endLongitude: endPoint?.longitude,
     );
-  }
-
-  double _getMaxSpeed() {
-    double max = 0;
-    for (final event in _eventHistory) {
-      final speed = event.additionalData['vehicleSpeed'] as double?;
-      if (speed != null && speed > max) max = speed;
-    }
-    return max;
-  }
-
-  double _getMaxLeanAngle(String direction) {
-    double max = 0;
-    for (final event in _eventHistory) {
-      if (event.additionalData['direction'] == direction) {
-        final angle = event.additionalData['leanAngle'] as double?;
-        if (angle != null && angle.abs() > max) max = angle.abs();
-      }
-    }
-    return max;
   }
 
   @override
   void dispose() {
+    // 注意：dispose 时只做资源清理，不调用 endRide()
+    // 调用 endRide() 会触发 _saveRidingRecord，产生幽灵记录
+    // endRide() 应由业务层（蓝牙断开）主动调用
     _stopSampling();
-    endRide();
+    _stopGpsTracking();
     super.dispose();
   }
 }
@@ -458,7 +601,9 @@ class DataSampler {
 
     final values = points.map((p) => p.value).toList();
     final avg = values.reduce((a, b) => a + b) / values.length;
-    final variance = values.map((v) => pow(v - avg, 2)).reduce((a, b) => a + b) / values.length;
+    final variance =
+        values.map((v) => pow(v - avg, 2)).reduce((a, b) => a + b) /
+            values.length;
     return sqrt(variance);
   }
 

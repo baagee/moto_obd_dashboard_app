@@ -135,7 +135,7 @@ class _MainContainerState extends State<MainContainer> {
 
   void _navigateToBluetoothScan() {
     // 始终切换到 DEVICES 页面（使用 IndexedStack，共享顶部导航栏）
-    _navigateTo(2);
+    _navigateTo(_pages.length - 1);
   }
 
   /// 构建PageView并监听骑行事件
@@ -240,7 +240,7 @@ class _MainContainerState extends State<MainContainer> {
                           onLinkVehiclePressed: _navigateToBluetoothScan,
                           isConnected: isConnected,
                           deviceName: deviceName,
-                          navItems: const ['DASHBOARD', 'RECORD', 'LOGS', 'DEVICES'],
+                          navItems: const ['DASHBOARD', 'RECORDS', 'LOGS', 'DEVICES'],
                         );
                       },
                     );

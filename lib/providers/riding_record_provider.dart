@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import '../models/riding_record.dart';
 import '../services/database_service.dart';
-import '../services/location_service.dart';
 import '../services/geocoding_service.dart';
 
 /// 骑行记录 Provider
@@ -41,7 +40,7 @@ class RidingRecordProvider extends ChangeNotifier {
     _records = maps.map((m) => RidingRecord.fromMap(m)).toList();
   }
 
-  /// 加载今日统计（实时计算）
+  /// 加载今日统计（从 daily_stats 读取，与周/月统计方式一致）
   Future<void> _loadTodayStats() async {
     final stats = await DatabaseService.calculateTodayStats();
     _todayStats = AggregationStats.fromMap(stats);
@@ -80,7 +79,20 @@ class RidingRecordProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 清空所有骑行记录
+  Future<void> clearAllRecords() async {
+    await DatabaseService.deleteAllRidingRecords();
+    _records = [];
+    _todayStats = AggregationStats();
+    _weekStats = AggregationStats();
+    _monthStats = AggregationStats();
+    notifyListeners();
+  }
+
   /// 保存骑行记录（骑行结束时调用）
+  ///
+  /// [startLatitude]/[startLongitude] - 骑行起点坐标（由调用方传入，在 startRide 时获取）
+  /// [endLatitude]/[endLongitude] - 骑行终点坐标（由调用方传入，在 endRide 时获取）
   Future<void> saveRidingRecord({
     required int startTime,
     required int endTime,
@@ -91,24 +103,25 @@ class RidingRecordProvider extends ChangeNotifier {
     required double maxLeftLean,
     required double maxRightLean,
     required List<RidingRecordEvent> events,
+    double? startLatitude,
+    double? startLongitude,
+    double? endLatitude,
+    double? endLongitude,
   }) async {
-    // 获取起点位置
-    final startPosition = await LocationService.getCurrentPosition();
+    // 逆地理编码：将坐标转换为地名（使用高德 API，国内可用）
     String? startPlaceName;
-    if (startPosition != null) {
+    if (startLatitude != null && startLongitude != null) {
       startPlaceName = await GeocodingService.getPlaceName(
-        startPosition.latitude,
-        startPosition.longitude,
+        startLatitude,
+        startLongitude,
       );
     }
 
-    // 获取终点位置
-    final endPosition = await LocationService.getCurrentPosition();
     String? endPlaceName;
-    if (endPosition != null) {
+    if (endLatitude != null && endLongitude != null) {
       endPlaceName = await GeocodingService.getPlaceName(
-        endPosition.latitude,
-        endPosition.longitude,
+        endLatitude,
+        endLongitude,
       );
     }
 
@@ -116,11 +129,11 @@ class RidingRecordProvider extends ChangeNotifier {
     final record = RidingRecord(
       startTime: startTime,
       endTime: endTime,
-      startLatitude: startPosition?.latitude,
-      startLongitude: startPosition?.longitude,
+      startLatitude: startLatitude,
+      startLongitude: startLongitude,
       startPlaceName: startPlaceName,
-      endLatitude: endPosition?.latitude,
-      endLongitude: endPosition?.longitude,
+      endLatitude: endLatitude,
+      endLongitude: endLongitude,
       endPlaceName: endPlaceName,
       distance: distance,
       avgSpeed: avgSpeed,
@@ -143,7 +156,8 @@ class RidingRecordProvider extends ChangeNotifier {
     }
 
     // 更新每日统计
-    await _updateDailyStats(endTime, distance, duration, avgSpeed, maxSpeed, maxLeftLean, maxRightLean);
+    await _updateDailyStats(endTime, distance, duration, avgSpeed, maxSpeed,
+        maxLeftLean, maxRightLean);
 
     // 重新加载
     await initialize();
@@ -174,12 +188,16 @@ class RidingRecordProvider extends ChangeNotifier {
       totalDistance: stats.totalDistance + distance,
       totalDuration: stats.totalDuration + duration,
       avgSpeed: _calculateWeightedAvg(
-        stats.avgSpeed, stats.rideCount,
-        avgSpeed, 1,
+        stats.avgSpeed,
+        stats.rideCount,
+        avgSpeed,
+        1,
       ),
       maxSpeed: maxSpeed > stats.maxSpeed ? maxSpeed : stats.maxSpeed,
-      maxLeftLean: maxLeftLean > stats.maxLeftLean ? maxLeftLean : stats.maxLeftLean,
-      maxRightLean: maxRightLean > stats.maxRightLean ? maxRightLean : stats.maxRightLean,
+      maxLeftLean:
+          maxLeftLean > stats.maxLeftLean ? maxLeftLean : stats.maxLeftLean,
+      maxRightLean:
+          maxRightLean > stats.maxRightLean ? maxRightLean : stats.maxRightLean,
       rideCount: stats.rideCount + 1,
     );
 
@@ -188,8 +206,10 @@ class RidingRecordProvider extends ChangeNotifier {
 
   /// 计算加权平均
   double _calculateWeightedAvg(
-    double avg1, int count1,
-    double avg2, int count2,
+    double avg1,
+    int count1,
+    double avg2,
+    int count2,
   ) {
     if (count1 + count2 == 0) return 0;
     return (avg1 * count1 + avg2 * count2) / (count1 + count2);

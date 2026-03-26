@@ -83,8 +83,10 @@ class DatabaseService {
     ''');
 
     // 创建索引
-    await db.execute('CREATE INDEX idx_riding_records_start_time ON riding_records(start_time)');
-    await db.execute('CREATE INDEX idx_riding_events_record_id ON riding_events(record_id)');
+    await db.execute(
+        'CREATE INDEX idx_riding_records_start_time ON riding_records(start_time)');
+    await db.execute(
+        'CREATE INDEX idx_riding_events_record_id ON riding_events(record_id)');
     await db.execute('CREATE INDEX idx_daily_stats_date ON daily_stats(date)');
   }
 
@@ -119,6 +121,13 @@ class DatabaseService {
     );
   }
 
+  /// 删除所有骑行记录（级联删除事件和每日统计）
+  static Future<void> deleteAllRidingRecords() async {
+    final db = await database;
+    await db.delete('riding_records');
+    await db.delete('daily_stats');
+  }
+
   /// 删除骑行记录（级联删除事件）
   static Future<int> deleteRidingRecord(int id) async {
     final db = await database;
@@ -132,7 +141,8 @@ class DatabaseService {
   // ========== 骑行事件 CRUD ==========
 
   /// 插入骑行事件
-  static Future<int> insertRidingEvent(int recordId, Map<String, dynamic> event) async {
+  static Future<int> insertRidingEvent(
+      int recordId, Map<String, dynamic> event) async {
     final db = await database;
     final data = Map<String, dynamic>.from(event);
     data['record_id'] = recordId;
@@ -140,7 +150,8 @@ class DatabaseService {
   }
 
   /// 批量插入骑行事件
-  static Future<void> insertRidingEvents(int recordId, List<Map<String, dynamic>> events) async {
+  static Future<void> insertRidingEvents(
+      int recordId, List<Map<String, dynamic>> events) async {
     final db = await database;
     final batch = db.batch();
     for (final event in events) {
@@ -152,7 +163,8 @@ class DatabaseService {
   }
 
   /// 查询指定骑行记录的所有事件
-  static Future<List<Map<String, dynamic>>> getEventsByRecordId(int recordId) async {
+  static Future<List<Map<String, dynamic>>> getEventsByRecordId(
+      int recordId) async {
     final db = await database;
     return await db.query(
       'riding_events',
@@ -175,7 +187,8 @@ class DatabaseService {
   // ========== 每日聚合 ==========
 
   /// 更新或插入每日统计（UPSERT）
-  static Future<void> upsertDailyStats(String date, Map<String, dynamic> stats) async {
+  static Future<void> upsertDailyStats(
+      String date, Map<String, dynamic> stats) async {
     final db = await database;
     final data = Map<String, dynamic>.from(stats);
     data['date'] = date;
@@ -216,27 +229,45 @@ class DatabaseService {
 
   // ========== 聚合计算 ==========
 
-  /// 计算今日统计（实时从 riding_records 聚合）
+  /// 计算今日统计（从 daily_stats 读取，与周/月统计方式一致）
+  /// 使用 end_time 日期匹配，避免跨天骑行（如23:50开始、次日00:10结束）被遗漏
   static Future<Map<String, dynamic>> calculateTodayStats() async {
-    final db = await database;
     final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final startTime = startOfDay.millisecondsSinceEpoch;
+    final todayStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
-    final records = await db.query(
-      'riding_records',
-      where: 'start_time >= ?',
-      whereArgs: [startTime],
-    );
+    final todayStat = await getDailyStats(todayStr);
+    if (todayStat == null) {
+      return {
+        'distance': 0.0,
+        'duration': 0,
+        'avgSpeed': 0.0,
+        'maxSpeed': 0.0,
+        'maxLeftLean': 0.0,
+        'maxRightLean': 0.0,
+        'rideCount': 0,
+      };
+    }
 
-    return _aggregateRecords(records);
+    // daily_stats 已经是聚合好的数据，直接转换格式返回
+    return {
+      'distance': (todayStat['total_distance'] as num?)?.toDouble() ?? 0.0,
+      'duration': (todayStat['total_duration'] as int?) ?? 0,
+      'avgSpeed': (todayStat['avg_speed'] as num?)?.toDouble() ?? 0.0,
+      'maxSpeed': (todayStat['max_speed'] as num?)?.toDouble() ?? 0.0,
+      'maxLeftLean': (todayStat['max_left_lean'] as num?)?.toDouble() ?? 0.0,
+      'maxRightLean': (todayStat['max_right_lean'] as num?)?.toDouble() ?? 0.0,
+      'rideCount': (todayStat['ride_count'] as int?) ?? 0,
+    };
   }
 
   /// 从 daily_stats 聚合计算近7天/30天统计
   static Future<Map<String, dynamic>> calculatePeriodStats(int days) async {
     final now = DateTime.now();
-    final endDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final startDate = '${now.subtract(Duration(days: days)).year}-${(now.subtract(Duration(days: days))).month.toString().padLeft(2, '0')}-${(now.subtract(Duration(days: days))).day.toString().padLeft(2, '0')}';
+    final endDate =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final startDate =
+        '${now.subtract(Duration(days: days)).year}-${(now.subtract(Duration(days: days))).month.toString().padLeft(2, '0')}-${(now.subtract(Duration(days: days))).day.toString().padLeft(2, '0')}';
 
     final dailyStats = await getDailyStatsByDateRange(startDate, endDate);
 
@@ -246,24 +277,41 @@ class DatabaseService {
     double maxLeftLean = 0;
     double maxRightLean = 0;
     int rideCount = 0;
-    double totalSpeedSum = 0;
+    // 使用时长加权计算平均速度：sum(avgSpeed_i * duration_i) / sum(duration_i)
+    // 避免"次数加权"导致短途骑行与长途骑行权重相同的问题
+    double weightedSpeedSum = 0;
 
     for (final stat in dailyStats) {
-      totalDistance += (stat['total_distance'] as num?)?.toDouble() ?? 0;
-      totalDuration += (stat['total_duration'] as int?) ?? 0;
-      maxSpeed = maxSpeed > ((stat['max_speed'] as num?)?.toDouble() ?? 0) ? maxSpeed : ((stat['max_speed'] as num?)?.toDouble() ?? 0);
-      maxLeftLean = maxLeftLean > ((stat['max_left_lean'] as num?)?.toDouble() ?? 0) ? maxLeftLean : ((stat['max_left_lean'] as num?)?.toDouble() ?? 0);
-      maxRightLean = maxRightLean > ((stat['max_right_lean'] as num?)?.toDouble() ?? 0) ? maxRightLean : ((stat['max_right_lean'] as num?)?.toDouble() ?? 0);
-      rideCount += (stat['ride_count'] as int?) ?? 0;
-      if ((stat['avg_speed'] as num?)?.toDouble() != null && (stat['ride_count'] as int?) != null) {
-        totalSpeedSum += ((stat['avg_speed'] as num).toDouble() * (stat['ride_count'] as int));
+      final distance = (stat['total_distance'] as num?)?.toDouble() ?? 0;
+      final duration = (stat['total_duration'] as int?) ?? 0;
+      final avgSpeed = (stat['avg_speed'] as num?)?.toDouble() ?? 0;
+      final rides = (stat['ride_count'] as int?) ?? 0;
+
+      totalDistance += distance;
+      totalDuration += duration;
+      rideCount += rides;
+      maxSpeed = maxSpeed > ((stat['max_speed'] as num?)?.toDouble() ?? 0)
+          ? maxSpeed
+          : ((stat['max_speed'] as num?)?.toDouble() ?? 0);
+      maxLeftLean =
+          maxLeftLean > ((stat['max_left_lean'] as num?)?.toDouble() ?? 0)
+              ? maxLeftLean
+              : ((stat['max_left_lean'] as num?)?.toDouble() ?? 0);
+      maxRightLean =
+          maxRightLean > ((stat['max_right_lean'] as num?)?.toDouble() ?? 0)
+              ? maxRightLean
+              : ((stat['max_right_lean'] as num?)?.toDouble() ?? 0);
+
+      // 以时长为权重累加
+      if (duration > 0) {
+        weightedSpeedSum += avgSpeed * duration;
       }
     }
 
     return {
       'distance': totalDistance,
       'duration': totalDuration,
-      'avgSpeed': rideCount > 0 ? totalSpeedSum / rideCount : 0.0,
+      'avgSpeed': totalDuration > 0 ? weightedSpeedSum / totalDuration : 0.0,
       'maxSpeed': maxSpeed,
       'maxLeftLean': maxLeftLean,
       'maxRightLean': maxRightLean,
@@ -272,7 +320,8 @@ class DatabaseService {
   }
 
   /// 聚合骑行记录列表
-  static Map<String, dynamic> _aggregateRecords(List<Map<String, dynamic>> records) {
+  static Map<String, dynamic> _aggregateRecords(
+      List<Map<String, dynamic>> records) {
     if (records.isEmpty) {
       return {
         'distance': 0.0,
@@ -290,21 +339,36 @@ class DatabaseService {
     double maxSpeed = 0;
     double maxLeftLean = 0;
     double maxRightLean = 0;
-    double speedSum = 0;
+    // 以时长为权重计算平均速度，避免短途/长途次数平权导致结果偏差
+    double weightedSpeedSum = 0;
 
     for (final record in records) {
-      totalDistance += (record['distance'] as num?)?.toDouble() ?? 0;
-      totalDuration += (record['duration'] as int?) ?? 0;
-      maxSpeed = maxSpeed > ((record['max_speed'] as num?)?.toDouble() ?? 0) ? maxSpeed : ((record['max_speed'] as num?)?.toDouble() ?? 0);
-      maxLeftLean = maxLeftLean > ((record['max_left_lean'] as num?)?.toDouble() ?? 0) ? maxLeftLean : ((record['max_left_lean'] as num?)?.toDouble() ?? 0);
-      maxRightLean = maxRightLean > ((record['max_right_lean'] as num?)?.toDouble() ?? 0) ? maxRightLean : ((record['max_right_lean'] as num?)?.toDouble() ?? 0);
-      speedSum += (record['avg_speed'] as num?)?.toDouble() ?? 0;
+      final distance = (record['distance'] as num?)?.toDouble() ?? 0;
+      final duration = (record['duration'] as int?) ?? 0;
+      final avgSpeed = (record['avg_speed'] as num?)?.toDouble() ?? 0;
+
+      totalDistance += distance;
+      totalDuration += duration;
+      maxSpeed = maxSpeed > ((record['max_speed'] as num?)?.toDouble() ?? 0)
+          ? maxSpeed
+          : ((record['max_speed'] as num?)?.toDouble() ?? 0);
+      maxLeftLean =
+          maxLeftLean > ((record['max_left_lean'] as num?)?.toDouble() ?? 0)
+              ? maxLeftLean
+              : ((record['max_left_lean'] as num?)?.toDouble() ?? 0);
+      maxRightLean =
+          maxRightLean > ((record['max_right_lean'] as num?)?.toDouble() ?? 0)
+              ? maxRightLean
+              : ((record['max_right_lean'] as num?)?.toDouble() ?? 0);
+      if (duration > 0) {
+        weightedSpeedSum += avgSpeed * duration;
+      }
     }
 
     return {
       'distance': totalDistance,
       'duration': totalDuration,
-      'avgSpeed': records.isNotEmpty ? speedSum / records.length : 0.0,
+      'avgSpeed': totalDuration > 0 ? weightedSpeedSum / totalDuration : 0.0,
       'maxSpeed': maxSpeed,
       'maxLeftLean': maxLeftLean,
       'maxRightLean': maxRightLean,

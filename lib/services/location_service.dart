@@ -1,4 +1,5 @@
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// GPS定位服务
 class LocationService {
@@ -12,6 +13,40 @@ class LocationService {
   /// 请求定位权限
   static Future<LocationPermission> requestPermission() async {
     return await Geolocator.requestPermission();
+  }
+
+  /// 请求后台定位权限（Android 10+ / iOS）
+  /// 在骑行开始前调用，确保 APP 切后台时 GPS 仍然工作
+  static Future<bool> requestBackgroundPermission() async {
+    try {
+      // 先检查前台定位权限
+      final foregroundStatus = await Permission.location.status;
+      if (!foregroundStatus.isGranted) {
+        final result = await Permission.location.request();
+        if (!result.isGranted) return false;
+      }
+
+      // Android 10+ 需要单独申请后台定位权限
+      final backgroundStatus = await Permission.locationAlways.status;
+      if (!backgroundStatus.isGranted) {
+        final result = await Permission.locationAlways.request();
+        return result.isGranted;
+      }
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 检查是否有后台定位权限
+  static Future<bool> hasBackgroundPermission() async {
+    try {
+      final status = await Permission.locationAlways.status;
+      return status.isGranted;
+    } catch (e) {
+      return false;
+    }
   }
 
   /// 检查定位服务是否开启
