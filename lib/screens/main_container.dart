@@ -13,6 +13,7 @@ import '../widgets/bluetooth_alert_dialog.dart';
 import '../widgets/event_notification_dialog.dart';
 import '../widgets/top_navigation_bar.dart';
 import 'dashboard_screen.dart';
+import 'record_screen.dart';
 import 'logs_screen.dart';
 import 'bluetooth_scan_screen.dart';
 
@@ -33,6 +34,7 @@ class _MainContainerState extends State<MainContainer> {
 
   final List<Widget> _pages = const [
     DashboardScreen(),
+    RecordScreen(),
     LogsScreen(),
     BluetoothScanScreen(),
   ];
