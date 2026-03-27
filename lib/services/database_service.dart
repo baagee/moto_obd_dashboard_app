@@ -128,13 +128,99 @@ class DatabaseService {
     await db.delete('daily_stats');
   }
 
-  /// 删除骑行记录（级联删除事件）
+  /// 删除骑行记录（级联删除事件，并重算当天 daily_stats）
   static Future<int> deleteRidingRecord(int id) async {
     final db = await database;
-    return await db.delete(
+
+    // 1. 查出这条记录的日期（删除前先拿到 start_time）
+    final rows = await db.query(
+      'riding_records',
+      columns: ['start_time'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    String? dateStr;
+    if (rows.isNotEmpty) {
+      final startTime = rows.first['start_time'] as int;
+      final dt = DateTime.fromMillisecondsSinceEpoch(startTime);
+      dateStr =
+          '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    }
+
+    // 2. 删除记录（ON DELETE CASCADE 会自动删事件）
+    final result = await db.delete(
       'riding_records',
       where: 'id = ?',
       whereArgs: [id],
+    );
+
+    // 3. 重算当天 daily_stats
+    if (dateStr != null) {
+      await _recalcDailyStats(db, dateStr);
+    }
+
+    return result;
+  }
+
+  /// 根据 riding_records 重新聚合指定日期的 daily_stats
+  static Future<void> _recalcDailyStats(Database db, String dateStr) async {
+    // 查出当天所有剩余记录
+    final dayStart =
+        DateTime.parse('${dateStr}T00:00:00').millisecondsSinceEpoch;
+    final dayEnd = DateTime.parse('${dateStr}T23:59:59').millisecondsSinceEpoch;
+
+    final records = await db.query(
+      'riding_records',
+      where: 'start_time >= ? AND start_time <= ?',
+      whereArgs: [dayStart, dayEnd],
+    );
+
+    if (records.isEmpty) {
+      // 当天已无记录，直接删除 daily_stats 行
+      await db.delete('daily_stats', where: 'date = ?', whereArgs: [dateStr]);
+      return;
+    }
+
+    // 重新聚合
+    double totalDistance = 0;
+    int totalDuration = 0;
+    double weightedSpeed = 0;
+    double maxSpeed = 0;
+    double maxLeftLean = 0;
+    double maxRightLean = 0;
+
+    for (final r in records) {
+      final dist = (r['distance'] as num?)?.toDouble() ?? 0;
+      final dur = (r['duration'] as int?) ?? 0;
+      final avg = (r['avg_speed'] as num?)?.toDouble() ?? 0;
+      final ms = (r['max_speed'] as num?)?.toDouble() ?? 0;
+      final ml = (r['max_left_lean'] as num?)?.toDouble() ?? 0;
+      final mr = (r['max_right_lean'] as num?)?.toDouble() ?? 0;
+
+      totalDistance += dist;
+      weightedSpeed += avg * dur;
+      totalDuration += dur;
+      if (ms > maxSpeed) maxSpeed = ms;
+      if (ml > maxLeftLean) maxLeftLean = ml;
+      if (mr > maxRightLean) maxRightLean = mr;
+    }
+
+    final avgSpeed = totalDuration > 0 ? weightedSpeed / totalDuration : 0.0;
+
+    await db.update(
+      'daily_stats',
+      {
+        'total_distance': totalDistance,
+        'total_duration': totalDuration,
+        'avg_speed': avgSpeed,
+        'max_speed': maxSpeed,
+        'max_left_lean': maxLeftLean,
+        'max_right_lean': maxRightLean,
+        'ride_count': records.length,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'date = ?',
+      whereArgs: [dateStr],
     );
   }
 
@@ -319,63 +405,6 @@ class DatabaseService {
     };
   }
 
-  /// 聚合骑行记录列表
-  static Map<String, dynamic> _aggregateRecords(
-      List<Map<String, dynamic>> records) {
-    if (records.isEmpty) {
-      return {
-        'distance': 0.0,
-        'duration': 0,
-        'avgSpeed': 0.0,
-        'maxSpeed': 0.0,
-        'maxLeftLean': 0.0,
-        'maxRightLean': 0.0,
-        'rideCount': 0,
-      };
-    }
-
-    double totalDistance = 0;
-    int totalDuration = 0;
-    double maxSpeed = 0;
-    double maxLeftLean = 0;
-    double maxRightLean = 0;
-    // 以时长为权重计算平均速度，避免短途/长途次数平权导致结果偏差
-    double weightedSpeedSum = 0;
-
-    for (final record in records) {
-      final distance = (record['distance'] as num?)?.toDouble() ?? 0;
-      final duration = (record['duration'] as int?) ?? 0;
-      final avgSpeed = (record['avg_speed'] as num?)?.toDouble() ?? 0;
-
-      totalDistance += distance;
-      totalDuration += duration;
-      maxSpeed = maxSpeed > ((record['max_speed'] as num?)?.toDouble() ?? 0)
-          ? maxSpeed
-          : ((record['max_speed'] as num?)?.toDouble() ?? 0);
-      maxLeftLean =
-          maxLeftLean > ((record['max_left_lean'] as num?)?.toDouble() ?? 0)
-              ? maxLeftLean
-              : ((record['max_left_lean'] as num?)?.toDouble() ?? 0);
-      maxRightLean =
-          maxRightLean > ((record['max_right_lean'] as num?)?.toDouble() ?? 0)
-              ? maxRightLean
-              : ((record['max_right_lean'] as num?)?.toDouble() ?? 0);
-      if (duration > 0) {
-        weightedSpeedSum += avgSpeed * duration;
-      }
-    }
-
-    return {
-      'distance': totalDistance,
-      'duration': totalDuration,
-      'avgSpeed': totalDuration > 0 ? weightedSpeedSum / totalDuration : 0.0,
-      'maxSpeed': maxSpeed,
-      'maxLeftLean': maxLeftLean,
-      'maxRightLean': maxRightLean,
-      'rideCount': records.length,
-    };
-  }
-
   // ========== 开发调试工具 ==========
 
   /// 插入 Mock 骑行数据（仅用于开发测试）
@@ -395,20 +424,20 @@ class DatabaseService {
 
     final random = DateTime.now().millisecondsSinceEpoch % 100;
 
-    // 生成 5 条 mock 记录（最近 7 天内）
-    for (int i = 0; i < 5; i++) {
+    // 生成 9 条 mock 记录（最近 9 天内）
+    for (int i = 0; i < 9; i++) {
       final daysAgo = i;
       final startLoc = mockLocations[(random + i) % mockLocations.length];
       final endLoc = mockLocations[(random + i + 1) % mockLocations.length];
 
-      final startTime =
-          now.subtract(Duration(days: daysAgo, hours: 2, minutes: 10 + i * 5));
+      final startTime = now
+          .subtract(Duration(days: daysAgo * 2, hours: 2, minutes: 10 + i * 5));
       final endTime = startTime.add(Duration(minutes: 15 + i * 3));
       final duration = endTime.difference(startTime).inSeconds;
 
       final distance = 5.0 + i * 2.5; // 5km ~ 15km
       final avgSpeed = (distance / duration * 3600); // km/h
-      final maxSpeed = avgSpeed * 1.5;
+      final maxSpeed = avgSpeed * 3;
       final maxLeftLean = 20.0 + (random + i * 3) % 25;
       final maxRightLean = 18.0 + (random + i * 2) % 23;
 

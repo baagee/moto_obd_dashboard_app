@@ -21,6 +21,17 @@ class RecordScreen extends StatefulWidget {
 class _RecordScreenState extends State<RecordScreen> {
   int _selectedFilterIndex = 0; // 0=今天, 1=近7天, 2=近30天
 
+  List<RidingRecord> _getFilteredRecords(RidingRecordProvider provider) {
+    switch (_selectedFilterIndex) {
+      case 1:
+        return provider.weekRecords;
+      case 2:
+        return provider.monthRecords;
+      default:
+        return provider.todayRecords;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -54,7 +65,7 @@ class _RecordScreenState extends State<RecordScreen> {
                 currentFilterIndex: _selectedFilterIndex,
                 onFilterChanged: (index) =>
                     setState(() => _selectedFilterIndex = index),
-                totalCount: provider.records.length,
+                totalCount: _getFilteredRecords(provider).length,
                 onClearAll: _confirmClearAll,
                 onInsertMock: _insertMockData,
                 todayCount: provider.todayStats.rideCount,
@@ -85,7 +96,9 @@ class _RecordScreenState extends State<RecordScreen> {
           );
         }
 
-        if (provider.records.isEmpty) {
+        final records = _getFilteredRecords(provider);
+
+        if (records.isEmpty) {
           return const _EmptyState();
         }
 
@@ -98,9 +111,9 @@ class _RecordScreenState extends State<RecordScreen> {
           ),
           child: ListView.builder(
             padding: const EdgeInsets.all(8),
-            itemCount: provider.records.length,
+            itemCount: records.length,
             itemBuilder: (context, index) {
-              final record = provider.records[index];
+              final record = records[index];
               return SwipeableRecordCard(
                 record: record,
                 onViewEvents: () => _showEventsModal(record),

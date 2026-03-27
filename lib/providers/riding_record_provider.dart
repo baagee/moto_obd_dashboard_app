@@ -13,6 +13,30 @@ class RidingRecordProvider extends ChangeNotifier {
   bool _isLoading = false;
 
   List<RidingRecord> get records => _records;
+
+  /// 今天的记录
+  List<RidingRecord> get todayRecords {
+    final now = DateTime.now();
+    final todayStart =
+        DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    return _records.where((r) => r.startTime >= todayStart).toList();
+  }
+
+  /// 近 7 天的记录
+  List<RidingRecord> get weekRecords {
+    final cutoff =
+        DateTime.now().subtract(const Duration(days: 7)).millisecondsSinceEpoch;
+    return _records.where((r) => r.startTime >= cutoff).toList();
+  }
+
+  /// 近 30 天的记录
+  List<RidingRecord> get monthRecords {
+    final cutoff = DateTime.now()
+        .subtract(const Duration(days: 30))
+        .millisecondsSinceEpoch;
+    return _records.where((r) => r.startTime >= cutoff).toList();
+  }
+
   AggregationStats get todayStats => _todayStats;
   AggregationStats get weekStats => _weekStats;
   AggregationStats get monthStats => _monthStats;
