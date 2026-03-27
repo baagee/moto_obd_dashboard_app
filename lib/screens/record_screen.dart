@@ -504,7 +504,7 @@ class _TimeFilterChip extends StatelessWidget {
               '$count',
               style: TextStyle(
                 color: isActive ? activeColor : mutedColor,
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -515,7 +515,7 @@ class _TimeFilterChip extends StatelessWidget {
                 color: isActive
                     ? activeColor.withOpacity(0.8)
                     : mutedColor.withOpacity(0.6),
-                fontSize: 8,
+                fontSize: 10,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.3,
               ),

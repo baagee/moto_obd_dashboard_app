@@ -398,7 +398,7 @@ class _CompactFilterChip extends StatelessWidget {
               '$count',
               style: TextStyle(
                 color: isActive ? _color : AppTheme.textMuted,
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -407,7 +407,7 @@ class _CompactFilterChip extends StatelessWidget {
               _label,
               style: TextStyle(
                 color: isActive ? _color : AppTheme.textMuted,
-                fontSize: 8,
+                fontSize: 10,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.5,
               ),
