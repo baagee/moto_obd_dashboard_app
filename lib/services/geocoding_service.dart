@@ -29,7 +29,7 @@ class GeocodingService {
         'https://restapi.amap.com/v3/geocode/regeo'
         '?key=$_amapKey'
         '&location=${gcj[1]},${gcj[0]}'  // 高德格式：经度,纬度
-        '&poitype=&radius=100&extensions=base&roadlevel=0',
+        '&poitype=&radius=100&extensions=all&roadlevel=0',
       );
 
       final response = await http.get(url).timeout(const Duration(seconds: 5));
@@ -39,31 +39,61 @@ class GeocodingService {
       if (data['status'] != '1') return _formatCoordinate(latitude, longitude);
 
       final regeocode = data['regeocode'] as Map<String, dynamic>?;
-      final addressComponent = regeocode?['addressComponent'] as Map<String, dynamic>?;
+      if (regeocode == null) return _formatCoordinate(latitude, longitude);
 
-      if (addressComponent == null) return _formatCoordinate(latitude, longitude);
-
-      // 组合地址：区 + 街道/乡镇
-      final parts = <String>[];
-
-      final district = addressComponent['district'] as String?;
-      if (district != null && district.isNotEmpty && district != '[]') {
-        parts.add(district);
+      // 1. aois 第一条（面状区域，如建筑群/商圈，最语义化）
+      final aois = regeocode['aois'] as List<dynamic>?;
+      if (aois != null && aois.isNotEmpty) {
+        final name = (aois[0] as Map<String, dynamic>)['name'] as String?;
+        final distance = double.tryParse(
+                ((aois[0] as Map<String, dynamic>)['distance'] ?? '9999')
+                    .toString()) ??
+            9999;
+        if (name != null && name.isNotEmpty && distance < 500) return name;
       }
 
-      // 优先用 streetNumber（精确到街道），没有则用 township（乡镇）
-      final streetNumber = addressComponent['streetNumber'] as Map<String, dynamic>?;
-      final street = streetNumber?['street'] as String?;
-      if (street != null && street.isNotEmpty && street != '[]') {
-        parts.add(street);
-      } else {
+      // 2. pois 第一条（兴趣点，距离 < 300m 才采用，避免取到远处 POI）
+      final pois = regeocode['pois'] as List<dynamic>?;
+      if (pois != null && pois.isNotEmpty) {
+        final name = (pois[0] as Map<String, dynamic>)['name'] as String?;
+        final distance = double.tryParse(
+                ((pois[0] as Map<String, dynamic>)['distance'] ?? '9999')
+                    .toString()) ??
+            9999;
+        if (name != null && name.isNotEmpty && distance < 300) return name;
+      }
+
+      // 3. roads 第一条 + district（如"海淀区 唐家岭路"）
+      final roads = regeocode['roads'] as List<dynamic>?;
+      final addressComponent =
+          regeocode['addressComponent'] as Map<String, dynamic>?;
+      final district = addressComponent?['district'] as String?;
+      if (roads != null && roads.isNotEmpty) {
+        final roadName =
+            (roads[0] as Map<String, dynamic>)['name'] as String?;
+        if (roadName != null && roadName.isNotEmpty) {
+          final prefix =
+              (district != null && district.isNotEmpty && district != '[]')
+                  ? '$district '
+                  : '';
+          return '$prefix$roadName';
+        }
+      }
+
+      // 4. district + township 兜底
+      if (addressComponent != null) {
+        final parts = <String>[];
+        if (district != null && district.isNotEmpty && district != '[]') {
+          parts.add(district);
+        }
         final township = addressComponent['township'] as String?;
         if (township != null && township.isNotEmpty && township != '[]') {
           parts.add(township);
         }
+        if (parts.isNotEmpty) return parts.join(' ');
       }
 
-      return parts.isNotEmpty ? parts.join(' ') : _formatCoordinate(latitude, longitude);
+      return _formatCoordinate(latitude, longitude);
     } catch (e) {
       // 网络失败或解析失败，降级为坐标格式
       return _formatCoordinate(latitude, longitude);

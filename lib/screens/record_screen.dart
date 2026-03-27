@@ -98,7 +98,9 @@ class _RecordScreenState extends State<RecordScreen> {
               return SwipeableRecordCard(
                 record: record,
                 onViewEvents: () => _showEventsModal(record),
-                onDelete: () => _confirmDelete(record),
+                onDelete: () => context
+                    .read<RidingRecordProvider>()
+                    .deleteRecord(record.id!),
               );
             },
           ),
@@ -112,38 +114,6 @@ class _RecordScreenState extends State<RecordScreen> {
     final events = await provider.getEventsForRecord(record.id!);
     if (!mounted) return;
     RideEventListModal.show(context, events);
-  }
-
-  void _confirmDelete(RidingRecord record) {
-    CyberDialog.show(
-      context: context,
-      title: '确认删除',
-      icon: Icons.delete_outline,
-      accentColor: AppTheme.accentRed,
-      content: Text(
-        '确定要删除这条骑行记录吗？\n删除后无法恢复。',
-        textAlign: TextAlign.center,
-        style: AppTheme.labelMedium.copyWith(color: AppTheme.textSecondary),
-      ),
-      actions: [
-        CyberButton.secondary(
-          text: '取消',
-          onPressed: () => Navigator.of(context).pop(),
-          height: 32,
-          fontSize: 12,
-        ),
-        const SizedBox(width: 10),
-        CyberButton.danger(
-          text: '删除',
-          onPressed: () {
-            Navigator.of(context).pop();
-            context.read<RidingRecordProvider>().deleteRecord(record.id!);
-          },
-          height: 32,
-          fontSize: 12,
-        ),
-      ],
-    );
   }
 
   void _confirmClearAll() {
