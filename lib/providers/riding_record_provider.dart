@@ -1,16 +1,27 @@
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import '../models/obd_data.dart';
 import '../models/riding_record.dart';
 import '../services/database_service.dart';
 import '../services/geocoding_service.dart';
+import 'log_provider.dart';
+import 'loggable.dart';
 
 /// 骑行记录 Provider
 class RidingRecordProvider extends ChangeNotifier {
+  late final void Function(String source, LogType type, String message)
+      _logCallback;
+
   List<RidingRecord> _records = [];
   AggregationStats _todayStats = AggregationStats();
   AggregationStats _weekStats = AggregationStats();
   AggregationStats _monthStats = AggregationStats();
   bool _isLoading = false;
+  bool _isInitialized = false;
+
+  RidingRecordProvider({required LogProvider logProvider}) {
+    _logCallback = createLogger(logProvider);
+  }
 
   List<RidingRecord> get records => _records;
 
@@ -41,9 +52,11 @@ class RidingRecordProvider extends ChangeNotifier {
   AggregationStats get weekStats => _weekStats;
   AggregationStats get monthStats => _monthStats;
   bool get isLoading => _isLoading;
+  bool get isInitialized => _isInitialized;
 
   /// 初始化 - 加载所有记录和统计数据
-  Future<void> initialize() async {
+  Future<void> initialize({bool force = false}) async {
+    if (_isInitialized && !force) return;
     _isLoading = true;
     notifyListeners();
 
@@ -54,6 +67,7 @@ class RidingRecordProvider extends ChangeNotifier {
       _loadMonthStats(),
     ]);
 
+    _isInitialized = true;
     _isLoading = false;
     notifyListeners();
   }
@@ -138,6 +152,7 @@ class RidingRecordProvider extends ChangeNotifier {
       startPlaceName = await GeocodingService.getPlaceName(
         startLatitude,
         startLongitude,
+        logCallback: _logCallback,
       );
     }
 
@@ -146,6 +161,7 @@ class RidingRecordProvider extends ChangeNotifier {
       endPlaceName = await GeocodingService.getPlaceName(
         endLatitude,
         endLongitude,
+        logCallback: _logCallback,
       );
     }
 
@@ -184,7 +200,7 @@ class RidingRecordProvider extends ChangeNotifier {
         maxLeftLean, maxRightLean);
 
     // 重新加载
-    await initialize();
+    await initialize(force: true);
   }
 
   /// 更新每日统计

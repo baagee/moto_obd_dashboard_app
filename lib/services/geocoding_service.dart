@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../models/obd_data.dart';
 
 /// 逆地理编码服务 - 将坐标转换为地名（高德地图 HTTP API，国内可用）
 ///
@@ -14,32 +15,92 @@ class GeocodingService {
   /// https://lbs.amap.com/api/webservice/guide/api/georegeo
   static const String _amapKey = '99d4e91045213ccda8ebee56a8061eb2';
 
+  static const String _source = 'Geocoding';
+
   /// 根据坐标获取地名（高德逆地理编码）
-  static Future<String?> getPlaceName(double latitude, double longitude) async {
+  ///
+  /// [logCallback] 可选日志回调，传入后会输出请求/响应/错误等关键日志
+  static Future<String?> getPlaceName(
+    double latitude,
+    double longitude, {
+    void Function(String source, LogType type, String message)? logCallback,
+  }) async {
+    final coordStr =
+        '${latitude.toStringAsFixed(6)},${longitude.toStringAsFixed(6)}';
+
     // 未配置 Key 时返回坐标字符串（降级处理）
     if (_amapKey == 'YOUR_AMAP_WEB_API_KEY') {
+      logCallback?.call(
+        _source,
+        LogType.warning,
+        '高德 API Key 未配置，跳过逆地理编码，降级为坐标：$coordStr',
+      );
       return _formatCoordinate(latitude, longitude);
     }
+
+    logCallback?.call(
+      _source,
+      LogType.info,
+      '开始逆地理编码，WGS-84 坐标：$coordStr',
+    );
 
     try {
       // WGS-84 → GCJ-02 坐标转换（高德要求 GCJ-02）
       final gcj = _wgs84ToGcj02(latitude, longitude);
+      final gcjStr =
+          '${gcj[0].toStringAsFixed(6)},${gcj[1].toStringAsFixed(6)}';
+      logCallback?.call(
+        _source,
+        LogType.info,
+        'WGS-84→GCJ-02 转换完成：$gcjStr（纬度,经度），发起 HTTP 请求',
+      );
 
       final url = Uri.parse(
         'https://restapi.amap.com/v3/geocode/regeo'
         '?key=$_amapKey'
-        '&location=${gcj[1]},${gcj[0]}'  // 高德格式：经度,纬度
+        '&location=${gcj[1]},${gcj[0]}' // 高德格式：经度,纬度
         '&poitype=&radius=100&extensions=all&roadlevel=0',
       );
 
       final response = await http.get(url).timeout(const Duration(seconds: 5));
-      if (response.statusCode != 200) return _formatCoordinate(latitude, longitude);
+
+      logCallback?.call(
+        _source,
+        LogType.info,
+        'HTTP 响应 statusCode=${response.statusCode}，body 长度=${response.body.length}',
+      );
+
+      if (response.statusCode != 200) {
+        logCallback?.call(
+          _source,
+          LogType.error,
+          '逆地理编码请求失败，statusCode=${response.statusCode}，降级为坐标：$coordStr',
+        );
+        return _formatCoordinate(latitude, longitude);
+      }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['status'] != '1') return _formatCoordinate(latitude, longitude);
+      final apiStatus = data['status'];
+      final apiInfo = data['info'] ?? '';
+
+      if (apiStatus != '1') {
+        logCallback?.call(
+          _source,
+          LogType.error,
+          '高德 API 返回错误：status=$apiStatus，info=$apiInfo，降级为坐标：$coordStr',
+        );
+        return _formatCoordinate(latitude, longitude);
+      }
 
       final regeocode = data['regeocode'] as Map<String, dynamic>?;
-      if (regeocode == null) return _formatCoordinate(latitude, longitude);
+      if (regeocode == null) {
+        logCallback?.call(
+          _source,
+          LogType.warning,
+          '响应中 regeocode 字段为空，降级为坐标：$coordStr',
+        );
+        return _formatCoordinate(latitude, longitude);
+      }
 
       // 1. aois 第一条（面状区域，如建筑群/商圈，最语义化）
       final aois = regeocode['aois'] as List<dynamic>?;
@@ -49,7 +110,14 @@ class GeocodingService {
                 ((aois[0] as Map<String, dynamic>)['distance'] ?? '9999')
                     .toString()) ??
             9999;
-        if (name != null && name.isNotEmpty && distance < 500) return name;
+        if (name != null && name.isNotEmpty && distance < 500) {
+          logCallback?.call(
+            _source,
+            LogType.success,
+            '逆地理编码成功（aoi）：$name，距离 ${distance.toStringAsFixed(0)}m，原始坐标：$coordStr',
+          );
+          return name;
+        }
       }
 
       // 2. pois 第一条（兴趣点，距离 < 300m 才采用，避免取到远处 POI）
@@ -60,7 +128,14 @@ class GeocodingService {
                 ((pois[0] as Map<String, dynamic>)['distance'] ?? '9999')
                     .toString()) ??
             9999;
-        if (name != null && name.isNotEmpty && distance < 300) return name;
+        if (name != null && name.isNotEmpty && distance < 300) {
+          logCallback?.call(
+            _source,
+            LogType.success,
+            '逆地理编码成功（poi）：$name，距离 ${distance.toStringAsFixed(0)}m，原始坐标：$coordStr',
+          );
+          return name;
+        }
       }
 
       // 3. roads 第一条 + district（如"海淀区 唐家岭路"）
@@ -69,14 +144,19 @@ class GeocodingService {
           regeocode['addressComponent'] as Map<String, dynamic>?;
       final district = addressComponent?['district'] as String?;
       if (roads != null && roads.isNotEmpty) {
-        final roadName =
-            (roads[0] as Map<String, dynamic>)['name'] as String?;
+        final roadName = (roads[0] as Map<String, dynamic>)['name'] as String?;
         if (roadName != null && roadName.isNotEmpty) {
           final prefix =
               (district != null && district.isNotEmpty && district != '[]')
                   ? '$district '
                   : '';
-          return '$prefix$roadName';
+          final result = '$prefix$roadName';
+          logCallback?.call(
+            _source,
+            LogType.success,
+            '逆地理编码成功（road）：$result，原始坐标：$coordStr',
+          );
+          return result;
         }
       }
 
@@ -90,12 +170,37 @@ class GeocodingService {
         if (township != null && township.isNotEmpty && township != '[]') {
           parts.add(township);
         }
-        if (parts.isNotEmpty) return parts.join(' ');
+        if (parts.isNotEmpty) {
+          final result = parts.join(' ');
+          logCallback?.call(
+            _source,
+            LogType.success,
+            '逆地理编码成功（district+township）：$result，原始坐标：$coordStr',
+          );
+          return result;
+        }
       }
 
+      logCallback?.call(
+        _source,
+        LogType.warning,
+        '逆地理编码响应中未找到有效地名（aoi/poi/road/district 均不满足条件），降级为坐标：$coordStr',
+      );
+      return _formatCoordinate(latitude, longitude);
+    } on http.ClientException catch (e) {
+      logCallback?.call(
+        _source,
+        LogType.error,
+        '逆地理编码网络错误：${e.message}，坐标：$coordStr',
+      );
       return _formatCoordinate(latitude, longitude);
     } catch (e) {
       // 网络失败或解析失败，降级为坐标格式
+      logCallback?.call(
+        _source,
+        LogType.error,
+        '逆地理编码异常：$e，坐标：$coordStr',
+      );
       return _formatCoordinate(latitude, longitude);
     }
   }
@@ -115,30 +220,64 @@ class GeocodingService {
     double dLng = _transformLng(lng - 105.0, lat - 35.0);
 
     final radLat = lat / 180.0 * 3.14159265358979324;
-    double magic = 1 - ee * (1 - ee) * (1 - ee) * (radLat.abs() < 0.00001
-        ? 1
-        : (1 - ee * _sin2(radLat)));
+    double magic = 1 -
+        ee *
+            (1 - ee) *
+            (1 - ee) *
+            (radLat.abs() < 0.00001 ? 1 : (1 - ee * _sin2(radLat)));
     magic = magic < 0.0000001 ? 0.0000001 : magic;
-    final sqrtMagic = magic < 0 ? 0.0 : (magic < 0.0001 ? 0.01 : _mySqrt(magic));
-    dLat = dLat * 180.0 / ((a * (1 - ee)) / (magic * sqrtMagic) * 3.14159265358979324);
-    dLng = dLng * 180.0 / (a / sqrtMagic * _myCos(radLat) * 3.14159265358979324);
+    final sqrtMagic =
+        magic < 0 ? 0.0 : (magic < 0.0001 ? 0.01 : _mySqrt(magic));
+    dLat = dLat *
+        180.0 /
+        ((a * (1 - ee)) / (magic * sqrtMagic) * 3.14159265358979324);
+    dLng =
+        dLng * 180.0 / (a / sqrtMagic * _myCos(radLat) * 3.14159265358979324);
 
     return [lat + dLat, lng + dLng];
   }
 
   static double _transformLat(double x, double y) {
-    double ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * _mySqrt(x.abs());
-    ret += (20.0 * _mySin(6.0 * x * 3.14159265358979324) + 20.0 * _mySin(2.0 * x * 3.14159265358979324)) * 2.0 / 3.0;
-    ret += (20.0 * _mySin(y * 3.14159265358979324) + 40.0 * _mySin(y / 3.0 * 3.14159265358979324)) * 2.0 / 3.0;
-    ret += (160.0 * _mySin(y / 12.0 * 3.14159265358979324) + 320 * _mySin(y * 3.14159265358979324 / 30.0)) * 2.0 / 3.0;
+    double ret = -100.0 +
+        2.0 * x +
+        3.0 * y +
+        0.2 * y * y +
+        0.1 * x * y +
+        0.2 * _mySqrt(x.abs());
+    ret += (20.0 * _mySin(6.0 * x * 3.14159265358979324) +
+            20.0 * _mySin(2.0 * x * 3.14159265358979324)) *
+        2.0 /
+        3.0;
+    ret += (20.0 * _mySin(y * 3.14159265358979324) +
+            40.0 * _mySin(y / 3.0 * 3.14159265358979324)) *
+        2.0 /
+        3.0;
+    ret += (160.0 * _mySin(y / 12.0 * 3.14159265358979324) +
+            320 * _mySin(y * 3.14159265358979324 / 30.0)) *
+        2.0 /
+        3.0;
     return ret;
   }
 
   static double _transformLng(double x, double y) {
-    double ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * _mySqrt(x.abs());
-    ret += (20.0 * _mySin(6.0 * x * 3.14159265358979324) + 20.0 * _mySin(2.0 * x * 3.14159265358979324)) * 2.0 / 3.0;
-    ret += (20.0 * _mySin(x * 3.14159265358979324) + 40.0 * _mySin(x / 3.0 * 3.14159265358979324)) * 2.0 / 3.0;
-    ret += (150.0 * _mySin(x / 12.0 * 3.14159265358979324) + 300.0 * _mySin(x / 30.0 * 3.14159265358979324)) * 2.0 / 3.0;
+    double ret = 300.0 +
+        x +
+        2.0 * y +
+        0.1 * x * x +
+        0.1 * x * y +
+        0.1 * _mySqrt(x.abs());
+    ret += (20.0 * _mySin(6.0 * x * 3.14159265358979324) +
+            20.0 * _mySin(2.0 * x * 3.14159265358979324)) *
+        2.0 /
+        3.0;
+    ret += (20.0 * _mySin(x * 3.14159265358979324) +
+            40.0 * _mySin(x / 3.0 * 3.14159265358979324)) *
+        2.0 /
+        3.0;
+    ret += (150.0 * _mySin(x / 12.0 * 3.14159265358979324) +
+            300.0 * _mySin(x / 30.0 * 3.14159265358979324)) *
+        2.0 /
+        3.0;
     return ret;
   }
 
@@ -149,11 +288,12 @@ class GeocodingService {
     int sign = 1;
     for (int i = 1; i <= 10; i++) {
       result += sign * term;
-      term *= x * x / ((2 * i) * (2 * i + 1));
+      term = term * x * x / ((2 * i) * (2 * i + 1));
       sign = -sign;
     }
     return result;
   }
+
   static double _myCos(double x) => _mySin(x + 1.5707963267948966);
   static double _mySqrt(double x) {
     if (x <= 0) return 0;

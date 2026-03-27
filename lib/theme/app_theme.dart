@@ -25,10 +25,19 @@ class AppTheme {
   static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
   static const Color primary10 = Color(0x1A0DA6F2); // 0.1 opacity
 
+  static const Color primary70 = Color(0xB30DA6F2); // 0.7 opacity
+  static const Color primary15 = Color(0x260DA6F2); // 0.15 opacity
+
   static const Color accentCyan20 = Color(0x3300F2FF);
   static const Color accentOrange20 = Color(0x33FFAB40);
 
-  static const Color surface40 = Color(0x66162229);
+  static const Color accentGreen50 = Color(0x8000E676); // 0.5 opacity
+  static const Color accentGreen70 = Color(0xB300E676); // 0.7 opacity
+  static const Color accentRed50 = Color(0x80FF4D4D); // 0.5 opacity
+  static const Color accentRed70 = Color(0xB3FF4D4D); // 0.7 opacity
+
+  static const Color surface40 = Color(0x66162229); // 0.4 opacity
+  static const Color surface50 = Color(0x80162229); // 0.5 opacity
 
   static const Color backgroundDark30 = Color(0x4D0A1114);
   static const Color backgroundDark50 = Color(0x800A1114);
@@ -92,7 +101,6 @@ class AppTheme {
     color: primary,
   );
 
-
   /// 标签样式 - 中号带主色
   static const TextStyle labelMediumPrimary12 = TextStyle(
     fontSize: 12,
@@ -136,9 +144,9 @@ class AppTheme {
     double opacity = 0.2,
   }) {
     return BoxDecoration(
-      color: surface.withOpacity(0.5),
+      color: surface50,
       border: Border.all(
-        color: borderColor.withOpacity(opacity),
+        color: borderColor.withValues(alpha: opacity),
         width: 1,
       ),
       borderRadius: BorderRadius.circular(radiusCard),
@@ -158,10 +166,11 @@ class AppTheme {
   );
 
   // ========== 发光效果 ==========
-  static List<BoxShadow> glowShadow(Color color, {double blur = 15, double opacity = 0.2}) {
+  static List<BoxShadow> glowShadow(Color color,
+      {double blur = 15, double opacity = 0.2}) {
     return [
       BoxShadow(
-        color: color.withOpacity(opacity),
+        color: color.withValues(alpha: opacity),
         blurRadius: blur,
         spreadRadius: 0,
       ),

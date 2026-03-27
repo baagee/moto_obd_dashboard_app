@@ -1,15 +1,18 @@
+import 'riding_record.dart';
+
 /// 骑行事件类型枚举
 enum RidingEventType {
-  performanceBurst,    // 性能爆发
-  efficientCruising,   // 高效巡航
-  engineOverheating,   // 发动机较热
-  voltageAnomaly,      // 电压异常
-  longRiding,          // 持续长时间骑行
-  highEngineLoad,      // 发动机高负荷
-  engineWarmup,        // 引擎预热
+  performanceBurst, // 性能爆发
+  efficientCruising, // 高效巡航
+  engineOverheating, // 发动机较热
+  voltageAnomaly, // 电压异常
+  longRiding, // 持续长时间骑行
+  highEngineLoad, // 发动机高负荷
+  engineWarmup, // 引擎预热
   coldEnvironmentRisk, // 低温环境风险
-  extremeLean,         // 高速大倾角压弯
+  extremeLean, // 高速大倾角压弯
 }
+
 String getEventTypeDisplayName(RidingEventType type) {
   switch (type) {
     case RidingEventType.performanceBurst:
@@ -212,7 +215,7 @@ class RidingEvent {
   factory RidingEvent.extremeLean({
     required double vehicleSpeed,
     required double leanAngle,
-    required String direction,  // 'left' or 'right'
+    required String direction, // 'left' or 'right'
     DateTime? timestamp,
   }) {
     final angleThreshold = 20.0;
@@ -235,6 +238,19 @@ class RidingEvent {
         'angleThreshold': angleThreshold,
         'condition': 'speed >= 60 km/h && |leanAngle| >= 20°',
       },
+    );
+  }
+
+  /// 转换为数据库存储用的 [RidingRecordEvent]
+  RidingRecordEvent toRidingRecordEvent() {
+    return RidingRecordEvent(
+      type: type.toString(),
+      title: title,
+      description: description,
+      triggerValue: triggerValue,
+      threshold: threshold,
+      timestamp: timestamp.millisecondsSinceEpoch,
+      additionalData: additionalData.isEmpty ? null : additionalData,
     );
   }
 

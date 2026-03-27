@@ -490,17 +490,7 @@ class RidingStatsProvider extends ChangeNotifier {
     final endPoint = _gpsTrack.isNotEmpty ? _gpsTrack.last : null;
 
     // 转换事件
-    final events = _eventHistory
-        .map((e) => RidingRecordEvent(
-              type: e.type.toString(),
-              title: e.title,
-              description: e.description,
-              triggerValue: e.triggerValue,
-              threshold: e.threshold,
-              timestamp: e.timestamp.millisecondsSinceEpoch,
-              additionalData: e.additionalData,
-            ))
-        .toList();
+    final events = _eventHistory.map((e) => e.toRidingRecordEvent()).toList();
 
     // 优先使用 GPS 计算的距离，否则用 OBD 车速积分
     double distance;

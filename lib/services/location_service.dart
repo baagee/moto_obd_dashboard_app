@@ -1,6 +1,14 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+/// 定位权限检查结果
+enum LocationPermissionStatus {
+  granted,         // 已授权（前台）
+  deniedForever,   // 永久拒绝，需引导去设置页
+  denied,          // 被拒绝（可再次请求）
+  serviceDisabled, // 系统定位服务未开启
+}
+
 /// GPS定位服务
 class LocationService {
   /// 检查定位权限
@@ -13,6 +21,49 @@ class LocationService {
   /// 请求定位权限
   static Future<LocationPermission> requestPermission() async {
     return await Geolocator.requestPermission();
+  }
+
+  /// APP 启动时检查并请求前台定位权限（与蓝牙权限检查时机一致）
+  ///
+  /// 返回 [LocationPermissionStatus] 供调用方决定是否弹窗提示：
+  /// - [LocationPermissionStatus.granted] — 已有权限，无需弹窗
+  /// - [LocationPermissionStatus.serviceDisabled] — 系统定位服务关闭，引导开启
+  /// - [LocationPermissionStatus.deniedForever] — 永久拒绝，引导去设置
+  /// - [LocationPermissionStatus.denied] — 被拒绝（用户手动点拒绝），提示说明
+  static Future<LocationPermissionStatus> checkAndRequestOnLaunch() async {
+    try {
+      // 1. 检查系统定位服务是否开启
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        return LocationPermissionStatus.serviceDisabled;
+      }
+
+      // 2. 检查当前权限状态
+      var permission = await Geolocator.checkPermission();
+
+      // 3. 未请求过则发起请求
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        return LocationPermissionStatus.deniedForever;
+      }
+
+      if (permission == LocationPermission.denied) {
+        return LocationPermissionStatus.denied;
+      }
+
+      // whileInUse 或 always 均视为已授权
+      return LocationPermissionStatus.granted;
+    } catch (e) {
+      return LocationPermissionStatus.denied;
+    }
+  }
+
+  /// 打开系统设置页（引导用户手动开启定位权限）
+  static Future<void> openSettings() async {
+    await Geolocator.openLocationSettings();
   }
 
   /// 请求后台定位权限（Android 10+ / iOS）

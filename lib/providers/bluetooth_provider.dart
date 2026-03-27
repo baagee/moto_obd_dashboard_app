@@ -5,6 +5,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
 import '../constants/bluetooth_constants.dart';
 import '../models/bluetooth_device.dart';
 import '../models/obd_data.dart';
+import '../services/audio_service.dart';
 import '../services/bluetooth_service.dart' as app_bluetooth;
 import '../services/device_storage_service.dart';
 import '../services/obd_service.dart';
@@ -42,6 +43,9 @@ class BluetoothProvider extends ChangeNotifier {
   Timer? _scanTimer;
   Timer? _rssiMonitorTimer;
 
+  // 音频服务
+  AudioService? _audioService;
+
   // 日志回调
   late final void Function(String source, LogType type, String message)
       _logCallback;
@@ -59,11 +63,13 @@ class BluetoothProvider extends ChangeNotifier {
   BluetoothDeviceModel? get connectedDevice => _connectedDevice;
   BluetoothDeviceModel? get lastConnectedDevice => _lastConnectedDevice;
 
-  /// 构造函数 - 通过依赖注入接收 OBDDataProvider 和 LogProvider
+  /// 构造函数 - 通过依赖注入接收 OBDDataProvider、LogProvider 和 AudioService
   BluetoothProvider({
     required OBDDataProvider obdDataProvider,
     required LogProvider logProvider,
-  }) : _obdDataProvider = obdDataProvider {
+    AudioService? audioService,
+  })  : _obdDataProvider = obdDataProvider,
+        _audioService = audioService {
     // 初始化日志回调
     _logCallback = createLogger(logProvider);
 
@@ -430,6 +436,9 @@ class BluetoothProvider extends ChangeNotifier {
       }
       // 初始化 ELM327
       await _obdService?.initialize();
+
+      // 播放设备连接成功提示音（异步，不阻塞流程）
+      unawaited(_audioService?.playAsset('assets/audio/device_connected.mp3'));
 
       // 启动 OBD 轮询
       _obdService?.startPolling();
