@@ -260,7 +260,7 @@ class SwipeableRecordCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 28, color: color.withOpacity(0.6)),
+          Icon(icon, size: 28, color: color.withOpacity(0.5)),
           const SizedBox(width: 3),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

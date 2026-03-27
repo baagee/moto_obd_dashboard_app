@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/riding_record_provider.dart';
@@ -7,6 +8,7 @@ import '../widgets/swipeable_record_card.dart';
 import '../widgets/ride_event_list_modal.dart';
 import '../widgets/cyber_dialog.dart';
 import '../widgets/cyber_button.dart';
+import '../services/database_service.dart';
 
 /// 骑行记录页面
 class RecordScreen extends StatefulWidget {
@@ -54,6 +56,10 @@ class _RecordScreenState extends State<RecordScreen> {
                     setState(() => _selectedFilterIndex = index),
                 totalCount: provider.records.length,
                 onClearAll: _confirmClearAll,
+                onInsertMock: _insertMockData,
+                todayCount: provider.todayStats.rideCount,
+                weekCount: provider.weekStats.rideCount,
+                monthCount: provider.monthStats.rideCount,
               );
             },
           ),
@@ -147,6 +153,19 @@ class _RecordScreenState extends State<RecordScreen> {
       ],
     );
   }
+
+  void _insertMockData() async {
+    await DatabaseService.insertMockRidingRecords();
+    if (!mounted) return;
+    await context.read<RidingRecordProvider>().initialize();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('✅ 已插入 5 条测试数据'),
+        backgroundColor: AppTheme.accentGreen,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -158,12 +177,20 @@ class _RecordCompactHeader extends StatelessWidget {
   final ValueChanged<int> onFilterChanged;
   final int totalCount;
   final VoidCallback onClearAll;
+  final VoidCallback onInsertMock;
+  final int todayCount;
+  final int weekCount;
+  final int monthCount;
 
   const _RecordCompactHeader({
     required this.currentFilterIndex,
     required this.onFilterChanged,
     required this.totalCount,
     required this.onClearAll,
+    required this.onInsertMock,
+    required this.todayCount,
+    required this.weekCount,
+    required this.monthCount,
   });
 
   @override
@@ -210,18 +237,21 @@ class _RecordCompactHeader extends StatelessWidget {
                 children: [
                   _TimeFilterChip(
                     label: '今天',
+                    count: todayCount,
                     isActive: currentFilterIndex == 0,
                     onTap: () => onFilterChanged(0),
                   ),
                   const SizedBox(width: 8),
                   _TimeFilterChip(
                     label: '近一周',
+                    count: weekCount,
                     isActive: currentFilterIndex == 1,
                     onTap: () => onFilterChanged(1),
                   ),
                   const SizedBox(width: 8),
                   _TimeFilterChip(
                     label: '近一月',
+                    count: monthCount,
                     isActive: currentFilterIndex == 2,
                     onTap: () => onFilterChanged(2),
                   ),
@@ -232,34 +262,77 @@ class _RecordCompactHeader extends StatelessWidget {
 
           const SizedBox(width: 12),
 
-          // 右侧：清空按钮（与 LOGS 页面风格一致）
-          GestureDetector(
-            onTap: onClearAll,
-            child: Container(
-              height: 24,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppTheme.radiusButton),
-                border: Border.all(color: AppTheme.accentRed.withOpacity(0.5)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.delete_outline,
-                      color: AppTheme.accentRed.withOpacity(0.7), size: 12),
-                  const SizedBox(width: 4),
-                  Text(
-                    '清空',
-                    style: TextStyle(
-                      color: AppTheme.accentRed.withOpacity(0.7),
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
+          // 右侧：操作按钮组
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 插入测试数据按钮（仅 debug 包可见）
+              if (kDebugMode)
+                ...([
+                  GestureDetector(
+                    onTap: onInsertMock,
+                    child: Container(
+                      height: 24,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        borderRadius:
+                            BorderRadius.circular(AppTheme.radiusButton),
+                        border: Border.all(
+                            color: AppTheme.accentGreen.withOpacity(0.5)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_circle_outline,
+                              color: AppTheme.accentGreen.withOpacity(0.7),
+                              size: 12),
+                          const SizedBox(width: 4),
+                          Text(
+                            '测试数据',
+                            style: TextStyle(
+                              color: AppTheme.accentGreen.withOpacity(0.7),
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
+                  const SizedBox(width: 8),
+                ]),
+              // 清空按钮
+              GestureDetector(
+                onTap: onClearAll,
+                child: Container(
+                  height: 24,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusButton),
+                    border:
+                        Border.all(color: AppTheme.accentRed.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.delete_outline,
+                          color: AppTheme.accentRed.withOpacity(0.7), size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        '清空',
+                        style: TextStyle(
+                          color: AppTheme.accentRed.withOpacity(0.7),
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -381,43 +454,60 @@ class _EmptyState extends StatelessWidget {
 
 class _TimeFilterChip extends StatelessWidget {
   final String label;
+  final int count;
   final bool isActive;
   final VoidCallback onTap;
 
   const _TimeFilterChip({
     required this.label,
+    required this.count,
     required this.isActive,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final activeColor = AppTheme.primary;
+    final mutedColor = AppTheme.textMuted;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-      splashColor: AppTheme.primary.withOpacity(0.2),
-      highlightColor: AppTheme.primary.withOpacity(0.1),
+      splashColor: activeColor.withOpacity(0.2),
+      highlightColor: activeColor.withOpacity(0.1),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: isActive
-              ? AppTheme.primary.withOpacity(0.15)
-              : Colors.transparent,
+          color: isActive ? activeColor.withOpacity(0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
           border: Border.all(
-            color: isActive
-                ? AppTheme.primary
-                : AppTheme.textMuted.withOpacity(0.3),
+            color: isActive ? activeColor : mutedColor.withOpacity(0.3),
             width: 1,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? AppTheme.primary : AppTheme.textMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$count',
+              style: TextStyle(
+                color: isActive ? activeColor : mutedColor,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive
+                    ? activeColor.withOpacity(0.8)
+                    : mutedColor.withOpacity(0.6),
+                fontSize: 8,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -521,7 +611,7 @@ class _StatsCard extends StatelessWidget {
           Positioned(
             right: 4,
             bottom: 2,
-            child: Icon(icon, size: 30, color: color.withOpacity(0.08)),
+            child: Icon(icon, size: 40, color: color.withOpacity(0.15)),
           ),
           // 前景内容
           Column(

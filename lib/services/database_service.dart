@@ -375,4 +375,153 @@ class DatabaseService {
       'rideCount': records.length,
     };
   }
+
+  // ========== 开发调试工具 ==========
+
+  /// 插入 Mock 骑行数据（仅用于开发测试）
+  static Future<void> insertMockRidingRecords() async {
+    final db = await database;
+    final now = DateTime.now();
+
+    // 北京坐标范围（海淀区、朝阳区常见地点）
+    final mockLocations = [
+      {'lat': 40.0546, 'lng': 116.2920, 'name': '万家灯火大厦'},
+      {'lat': 39.9827, 'lng': 116.3129, 'name': '中关村'},
+      {'lat': 39.9075, 'lng': 116.3972, 'name': '天安门'},
+      {'lat': 40.0081, 'lng': 116.3279, 'name': '鸟巢'},
+      {'lat': 39.9849, 'lng': 116.4786, 'name': 'CBD'},
+      {'lat': 39.9289, 'lng': 116.3883, 'name': '什刹海'},
+    ];
+
+    final random = DateTime.now().millisecondsSinceEpoch % 100;
+
+    // 生成 5 条 mock 记录（最近 7 天内）
+    for (int i = 0; i < 5; i++) {
+      final daysAgo = i;
+      final startLoc = mockLocations[(random + i) % mockLocations.length];
+      final endLoc = mockLocations[(random + i + 1) % mockLocations.length];
+
+      final startTime =
+          now.subtract(Duration(days: daysAgo, hours: 2, minutes: 10 + i * 5));
+      final endTime = startTime.add(Duration(minutes: 15 + i * 3));
+      final duration = endTime.difference(startTime).inSeconds;
+
+      final distance = 5.0 + i * 2.5; // 5km ~ 15km
+      final avgSpeed = (distance / duration * 3600); // km/h
+      final maxSpeed = avgSpeed * 1.5;
+      final maxLeftLean = 20.0 + (random + i * 3) % 25;
+      final maxRightLean = 18.0 + (random + i * 2) % 23;
+
+      final recordId = await db.insert('riding_records', {
+        'start_time': startTime.millisecondsSinceEpoch,
+        'end_time': endTime.millisecondsSinceEpoch,
+        'start_latitude': startLoc['lat'],
+        'start_longitude': startLoc['lng'],
+        'start_place_name': startLoc['name'],
+        'end_latitude': endLoc['lat'],
+        'end_longitude': endLoc['lng'],
+        'end_place_name': endLoc['name'],
+        'distance': distance,
+        'avg_speed': avgSpeed,
+        'duration': duration,
+        'max_speed': maxSpeed,
+        'max_left_lean': maxLeftLean,
+        'max_right_lean': maxRightLean,
+        'created_at': startTime.millisecondsSinceEpoch,
+      });
+
+      // 插入 1-3 个骑行事件
+      final eventCount = 1 + (i % 3);
+      for (int j = 0; j < eventCount; j++) {
+        final eventTime =
+            startTime.add(Duration(minutes: 3 + j * 4)).millisecondsSinceEpoch;
+        final eventTypes = ['speed', 'lean', 'rpm'];
+        final type = eventTypes[j % eventTypes.length];
+
+        String title = '';
+        String description = '';
+        double triggerValue = 0;
+        double threshold = 0;
+
+        switch (type) {
+          case 'speed':
+            triggerValue = 90 + j * 10;
+            threshold = 80;
+            title = '速度过快';
+            description = '当前速度 ${triggerValue.toInt()} km/h';
+            break;
+          case 'lean':
+            triggerValue = 35 + j * 5;
+            threshold = 30;
+            title = '倾角过大';
+            description = '左倾 ${triggerValue.toInt()}°';
+            break;
+          case 'rpm':
+            triggerValue = 8500 + j * 200;
+            threshold = 8000;
+            title = '转速过高';
+            description = '当前转速 ${triggerValue.toInt()} RPM';
+            break;
+        }
+
+        await db.insert('riding_events', {
+          'record_id': recordId,
+          'type': type,
+          'title': title,
+          'description': description,
+          'trigger_value': triggerValue,
+          'threshold': threshold,
+          'timestamp': eventTime,
+        });
+      }
+
+      // 更新 daily_stats
+      final dateStr =
+          '${startTime.year}-${startTime.month.toString().padLeft(2, '0')}-${startTime.day.toString().padLeft(2, '0')}';
+      final existing = await db
+          .query('daily_stats', where: 'date = ?', whereArgs: [dateStr]);
+
+      if (existing.isEmpty) {
+        await db.insert('daily_stats', {
+          'date': dateStr,
+          'total_distance': distance,
+          'total_duration': duration,
+          'avg_speed': avgSpeed,
+          'max_speed': maxSpeed,
+          'max_left_lean': maxLeftLean,
+          'max_right_lean': maxRightLean,
+          'ride_count': 1,
+          'updated_at': DateTime.now().millisecondsSinceEpoch,
+        });
+      } else {
+        final old = existing.first;
+        await db.update(
+          'daily_stats',
+          {
+            'total_distance': (old['total_distance'] as num) + distance,
+            'total_duration': (old['total_duration'] as int) + duration,
+            'avg_speed':
+                ((old['avg_speed'] as num) * (old['ride_count'] as int) +
+                        avgSpeed) /
+                    ((old['ride_count'] as int) + 1),
+            'max_speed': ((old['max_speed'] as num) > maxSpeed)
+                ? old['max_speed']
+                : maxSpeed,
+            'max_left_lean': ((old['max_left_lean'] as num) > maxLeftLean)
+                ? old['max_left_lean']
+                : maxLeftLean,
+            'max_right_lean': ((old['max_right_lean'] as num) > maxRightLean)
+                ? old['max_right_lean']
+                : maxRightLean,
+            'ride_count': (old['ride_count'] as int) + 1,
+            'updated_at': DateTime.now().millisecondsSinceEpoch,
+          },
+          where: 'date = ?',
+          whereArgs: [dateStr],
+        );
+      }
+    }
+
+    print('[Mock] 已插入 5 条骑行记录到数据库');
+  }
 }
