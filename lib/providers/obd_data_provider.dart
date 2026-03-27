@@ -62,15 +62,11 @@ class OBDDataProvider extends ChangeNotifier {
   List<int> _velocityHistory = List.generate(maxDataPoints, (_) => 0);
   List<int> _pressureHistory = List.generate(maxDataPoints, (_) => 0);
 
-  // 连接状态
-  bool _isDeviceConnected = false;
-
   // Getter
   OBDData get data => _data; // cur data
   List<int> get rpmHistory => _rpmHistory;
   List<int> get velocityHistory => _velocityHistory;
   List<int> get pressureHistory => _pressureHistory;
-  bool get isDeviceConnected => _isDeviceConnected;
 
   OBDDataProvider() {
     // 不再启动定时器，不生成 Mock 数据
@@ -131,7 +127,6 @@ class OBDDataProvider extends ChangeNotifier {
 
   /// 重置数据为默认值（设备断开时调用）
   void resetData() {
-    _isDeviceConnected = false;
     _rpmHistory = List.generate(maxDataPoints, (_) => 0);
     _velocityHistory = List.generate(maxDataPoints, (_) => 0);
     _pressureHistory = List.generate(maxDataPoints, (_) => 0);
@@ -155,7 +150,6 @@ class OBDDataProvider extends ChangeNotifier {
 
   /// 设置连接状态
   void setDeviceConnected(bool connected) {
-    _isDeviceConnected = connected;
     if (!connected) {
       resetData();
     }

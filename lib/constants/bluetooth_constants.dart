@@ -19,15 +19,12 @@ class BluetoothConstants {
   /// 蓝牙设备连接超时时间
   /// 发起连接请求后超过此时间未成功建立连接则视为连接失败
   static const Duration connectionTimeout = Duration(seconds: 2);
-  static const Duration connectWaitCallbackTimeout = Duration(seconds: 1);
 
-  /// ELM327 初始化命令发送间隔（毫秒）
-  /// 初始化过程中发送 AT 命令之间的间隔时间，间隔过短可能导致响应错乱
-  static const Duration obdCommandInterval = Duration(milliseconds: 200);
+  /// ELM327 单条 AT 命令响应超时时间（响应驱动模式的兜底）
+  static const Duration obdCommandResponseTimeout = Duration(milliseconds: 500);
 
-  /// ELM327 复位后初始化等待时间
-  /// ATZ 复位命令发送后等待 ELM327 芯片初始化完成的时间
-  static const Duration elm327InitWait = Duration(milliseconds: 1000);
+  /// ATZ 复位命令响应超时时间（复位比普通命令慢）
+  static const Duration elm327ResetResponseTimeout = Duration(milliseconds: 1000);
 
   // ==================== 自动重连相关 ====================
 

@@ -58,8 +58,10 @@ class OBDService {
     _writeCharacteristic = characteristic;
   }
 
-  /// 初始化 ELM327 适配器
-  Future<void> initialize() async {
+  /// 初始化 ELM327 适配器（响应驱动模式）
+  ///
+  /// [notifyStream] 来自 notifyCharacteristic.lastValueStream，用于等待设备响应
+  Future<void> initialize(Stream<List<int>> notifyStream) async {
     if (_writeCharacteristic == null) {
       logCallback?.call('ELM327', LogType.error, '写入特征未设置');
       throw Exception('写入特征未设置');
@@ -67,27 +69,63 @@ class OBDService {
 
     logCallback?.call('ELM327', LogType.info, '开始初始化 ELM327...');
 
-    // ATZ 复位
-    sendCommand("ATZ");
-    await Future.delayed(BluetoothConstants.elm327InitWait);
+    // ATZ 复位，等待 "ELM327" 字样出现（复位响应比普通命令慢）
+    final atzOk = await _sendAndWaitResponse(
+      command: "ATZ",
+      expected: "ELM327",
+      notifyStream: notifyStream,
+      timeout: BluetoothConstants.elm327ResetResponseTimeout,
+    );
+    if (!atzOk) {
+      logCallback?.call('ELM327', LogType.warning, 'ATZ 响应超时，继续初始化...');
+    }
 
-    // ATE0 关闭回显
-    sendCommand("ATE0");
-    await Future.delayed(BluetoothConstants.obdCommandInterval);
-
-    // ATL0 关闭行尾
-    sendCommand("ATL0");
-    await Future.delayed(BluetoothConstants.obdCommandInterval);
-
-    // ATH0 关闭头信息
-    sendCommand("ATH0");
-    await Future.delayed(BluetoothConstants.obdCommandInterval);
-
-    // ATSP0 自动协议
-    sendCommand("ATSP0");
-    await Future.delayed(BluetoothConstants.obdCommandInterval);
+    // 逐条发送 AT 命令，等待 "OK" 响应
+    for (final cmd in ["ATE0", "ATL0", "ATH0", "ATSP0"]) {
+      final ok = await _sendAndWaitResponse(
+        command: cmd,
+        expected: "OK",
+        notifyStream: notifyStream,
+        timeout: BluetoothConstants.obdCommandResponseTimeout,
+      );
+      if (!ok) {
+        logCallback?.call('ELM327', LogType.warning, '$cmd 响应超时，继续...');
+      }
+    }
 
     logCallback?.call('ELM327', LogType.success, 'ELM327 初始化完成');
+  }
+
+  /// 发送命令并等待设备响应关键字
+  ///
+  /// 收到含 [expected] 的响应立即返回 true；超时返回 false（程序继续，不抛异常）
+  Future<bool> _sendAndWaitResponse({
+    required String command,
+    required String expected,
+    required Stream<List<int>> notifyStream,
+    Duration timeout = const Duration(milliseconds: 500),
+  }) async {
+    final completer = Completer<bool>();
+    StreamSubscription<List<int>>? sub;
+
+    sub = notifyStream.listen((bytes) {
+      if (completer.isCompleted) return;
+      final resp = utf8.decode(bytes, allowMalformed: true).trim().toUpperCase();
+      if (resp.contains(expected.toUpperCase())) {
+        completer.complete(true);
+      }
+    });
+
+    sendCommand(command);
+
+    // 超时兜底，防止卡死
+    Future<void>.delayed(timeout).then((_) {
+      if (!completer.isCompleted) completer.complete(false);
+    });
+
+    final result = await completer.future;
+    await sub.cancel();
+    return result;
   }
 
   /// 解析 OBD 响应
