@@ -248,20 +248,27 @@ class RidingStatsProvider extends ChangeNotifier {
     _sampler.addSample('temp', data.coolantTemp.toDouble());
     _sampler.addSample('voltage', data.voltage);
     _sampler.addSample('load', data.load.toDouble());
-    _sampler.addSample('lean', data.leanAngle.toDouble());
     _sampler.addSample('intakeTemp', data.intakeTemp.toDouble());
     _sampler.addSample('throttle', data.throttle.toDouble());
+    const int maxSpeed = 3;
+    // 倾角只在车速 >= maxSpeed km/h 时统计，过滤低速/静止时的传感器噪声
+    if (data.speed >= maxSpeed) {
+      _sampler.addSample('lean', data.leanAngle.toDouble());
+    }
 
     // 实时更新全程统计数据
     final speed = data.speed.toDouble();
     if (speed > _maxSpeed) _maxSpeed = speed;
 
-    final leanAngle = data.leanAngle.toDouble();
-    final leanDirection = data.leanDirection.toLowerCase();
-    if (leanDirection == 'left' && leanAngle > _maxLeftLean) {
-      _maxLeftLean = leanAngle;
-    } else if (leanDirection == 'right' && leanAngle > _maxRightLean) {
-      _maxRightLean = leanAngle;
+    // 最大倾角只在车速 >= maxSpeed km/h 时统计，过滤低速/静止时的传感器噪声
+    if (data.speed >= maxSpeed) {
+      final leanAngle = data.leanAngle.toDouble();
+      final leanDirection = data.leanDirection.toLowerCase();
+      if (leanDirection == 'left' && leanAngle > _maxLeftLean) {
+        _maxLeftLean = leanAngle;
+      } else if (leanDirection == 'right' && leanAngle > _maxRightLean) {
+        _maxRightLean = leanAngle;
+      }
     }
 
     // 累积速度和计数（用于计算全程平均速度）

@@ -508,10 +508,7 @@ class _TimeFilterChip extends StatelessWidget {
             const SizedBox(width: 3),
             Text(
               label,
-              style: TextStyle(
-                color: isActive
-                    ? activeColor.withOpacity(0.8)
-                    : mutedColor.withOpacity(0.6),
+              style: TextStyle(color: isActive ? activeColor : mutedColor,
                 fontSize: 10,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.3,

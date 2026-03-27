@@ -12,14 +12,18 @@ class BluetoothConstants {
 
   /// 自动重连前等待扫描发现设备的时间
   /// 连接断开后等待扫描找到目标设备的时间，确保设备在可见范围内
-  static const Duration scanWaitTimeout = Duration(milliseconds: 3300);
+  static const Duration scanWaitTimeout = Duration(milliseconds: 3100);
 
   // ==================== 蓝牙连接相关 ====================
 
   /// 蓝牙设备连接超时时间
   /// 发起连接请求后超过此时间未成功建立连接则视为连接失败
   static const Duration connectionTimeout = Duration(seconds: 2);
-  static const Duration connectWaitCallbackTimeout = Duration(seconds: 1);
+
+  /// 等待连接回调的超时时间
+  /// 必须 > connectionTimeout(2s)，确保 BLE 握手回调有足够时间触发后再判断结果
+  static const Duration connectWaitCallbackTimeout =
+      Duration(milliseconds: 2100);
 
   /// ELM327 初始化命令发送间隔（毫秒）
   /// 初始化过程中发送 AT 命令之间的间隔时间，间隔过短可能导致响应错乱
