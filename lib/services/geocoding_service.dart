@@ -215,6 +215,11 @@ class GeocodingService {
 
   /// WGS-84 转 GCJ-02（火星坐标）
   /// 高德/腾讯地图使用 GCJ-02 坐标系，GPS 原始数据是 WGS-84
+  /// 返回 [lat, lng] GCJ-02 坐标
+  static List<double> wgs84ToGcj02(double lat, double lng) {
+    return _wgs84ToGcj02(lat, lng);
+  }
+
   static List<double> _wgs84ToGcj02(double lat, double lng) {
     const a = 6378245.0;
     const ee = 0.00669342162296594323;

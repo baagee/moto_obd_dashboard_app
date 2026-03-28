@@ -7,6 +7,7 @@ import '../models/obd_data.dart';
 import '../models/riding_event.dart' as stats;
 import '../models/riding_record.dart';
 import '../services/audio_service.dart';
+import '../services/database_service.dart';
 import '../services/location_service.dart';
 import 'log_provider.dart';
 import 'loggable.dart';
@@ -70,6 +71,14 @@ class RidingStatsProvider extends ChangeNotifier {
   double _totalGpsDistance = 0; // 米
   PositionData? _lastPosition;
 
+  // 轨迹点分批落库
+  static const Duration _waypointInterval = Duration(seconds: 2);
+  static const int _waypointBatchSize = 15;
+  Timer? _waypointTimer;
+  final List<Map<String, dynamic>> _pendingWaypoints = [];
+  int? _currentRecordId;
+  PositionData? _lastWaypointPosition; // 用于距离过滤
+
   // 全程统计数据（用于保存记录）
   double _maxSpeed = 0;
   double _maxLeftLean = 0;
@@ -92,7 +101,7 @@ class RidingStatsProvider extends ChangeNotifier {
   }
 
   /// 开始骑行
-  void startRide() {
+  void startRide() async {
     _isRiding = true;
     _rideStartTime = DateTime.now();
     _sampler.clear();
@@ -101,6 +110,9 @@ class RidingStatsProvider extends ChangeNotifier {
     _gpsTrack.clear();
     _totalGpsDistance = 0;
     _lastPosition = null;
+    _pendingWaypoints.clear();
+    _lastWaypointPosition = null;
+    _currentRecordId = null;
 
     // 重置全程统计数据
     _maxSpeed = 0;
@@ -109,21 +121,45 @@ class RidingStatsProvider extends ChangeNotifier {
     _totalSpeedSum = 0;
     _totalSampleCount = 0;
 
+    // 先插入占位记录，获取 record_id（供轨迹点关联）
+    try {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      _currentRecordId = await DatabaseService.insertRidingRecord({
+        'start_time': now,
+        'end_time': null,
+        'distance': 0,
+        'avg_speed': 0,
+        'duration': 0,
+        'max_speed': 0,
+        'max_left_lean': 0,
+        'max_right_lean': 0,
+        'created_at': now,
+      });
+      _logCallback?.call('Stats', LogType.info, '占位记录已插入，record_id=$_currentRecordId');
+    } catch (e) {
+      _logCallback?.call('Stats', LogType.warning, '占位记录插入失败: $e，轨迹点将无法落库');
+      // _currentRecordId 保持 null，_waypointTimer 启动但写库时跳过
+    }
+
     // 启动降频采样定时器
     _startSampling();
 
     // 启动 GPS 追踪
     _startGpsTracking();
 
+    // 启动轨迹点采集定时器
+    _startWaypointTimer();
+
     _logCallback?.call('Stats', LogType.info, '开始骑行统计');
     notifyListeners();
   }
 
   /// 结束骑行
-  void endRide() {
+  void endRide() async {
     _isRiding = false;
     _stopSampling();
     _stopGpsTracking();
+    _stopWaypointTimer();
     GSX8SCalculator.reset();
 
     final duration = _rideStartTime != null
@@ -133,8 +169,64 @@ class RidingStatsProvider extends ChangeNotifier {
         '骑行结束，总时长: ${duration ~/ 60}分钟，总距离: ${(_totalGpsDistance / 1000).toStringAsFixed(2)} km');
     notifyListeners();
 
+    // 将剩余未落库的轨迹点（尾巴批次）落库
+    await _flushPendingWaypoints();
+
     // 保存骑行记录
     _saveRidingRecord(duration);
+  }
+
+  /// 启动轨迹点采集定时器
+  void _startWaypointTimer() {
+    _waypointTimer?.cancel();
+    _waypointTimer = Timer.periodic(_waypointInterval, (_) => _collectWaypoint());
+  }
+
+  /// 停止轨迹点采集定时器
+  void _stopWaypointTimer() {
+    _waypointTimer?.cancel();
+    _waypointTimer = null;
+  }
+
+  /// 采集当前轨迹点（每 2 秒调用一次）
+  void _collectWaypoint() {
+    if (!_isRiding || _lastPosition == null || _currentRecordId == null) return;
+
+    final pos = _lastPosition!;
+
+    // 距离过滤：与上一个轨迹点距离 < 3m 视为静止，不记录
+    if (_lastWaypointPosition != null) {
+      final dist = _calculateDistance(_lastWaypointPosition!, pos);
+      if (dist < 3.0) return;
+    }
+
+    _lastWaypointPosition = pos;
+    final speed = _obdDataProvider.data.speed.toDouble();
+
+    _pendingWaypoints.add({
+      'latitude': pos.latitude,
+      'longitude': pos.longitude,
+      'speed': speed,
+      'timestamp': pos.timestamp.millisecondsSinceEpoch,
+    });
+
+    // 达到批次阈值时落库
+    if (_pendingWaypoints.length >= _waypointBatchSize) {
+      _flushPendingWaypoints();
+    }
+  }
+
+  /// 将 _pendingWaypoints 批量写入数据库
+  Future<void> _flushPendingWaypoints() async {
+    if (_pendingWaypoints.isEmpty || _currentRecordId == null) return;
+    final batch = List<Map<String, dynamic>>.from(_pendingWaypoints);
+    _pendingWaypoints.clear();
+    try {
+      await DatabaseService.insertWaypoints(_currentRecordId!, batch);
+      _logCallback?.call('Stats', LogType.info, '已落库 ${batch.length} 个轨迹点');
+    } catch (e) {
+      _logCallback?.call('Stats', LogType.error, '轨迹点落库失败: $e');
+    }
   }
 
   /// 启动降频采样
@@ -494,11 +586,18 @@ class RidingStatsProvider extends ChangeNotifier {
     if (_maxSpeed == 0) {
       _logCallback?.call('Stats', LogType.warning,
           '骑行记录已丢弃（最大速度为 0，判定为未实际行驶，时长=${duration}s）');
+      // 若有占位记录，删除之（避免留下空壳记录）
+      if (_currentRecordId != null) {
+        try { await DatabaseService.deleteRidingRecord(_currentRecordId!); } catch (_) {}
+      }
       return;
     }
     if (duration < 30 && distanceMeters < 20) {
       _logCallback?.call('Stats', LogType.warning,
           '骑行记录已丢弃（时长=${duration}s, 距离=${distanceMeters.toStringAsFixed(1)}m，未达到最小阈值）');
+      if (_currentRecordId != null) {
+        try { await DatabaseService.deleteRidingRecord(_currentRecordId!); } catch (_) {}
+      }
       return;
     }
 
@@ -510,7 +609,6 @@ class RidingStatsProvider extends ChangeNotifier {
     final maxRightLean = _maxRightLean;
 
     // 从 GPS 轨迹中取起点（第一个点）和终点（最后一个点）
-    // GPS 轨迹在 startRide 时清空，第一个点就是真实起点
     final startPoint = _gpsTrack.isNotEmpty ? _gpsTrack.first : null;
     final endPoint = _gpsTrack.isNotEmpty ? _gpsTrack.last : null;
 
@@ -520,27 +618,51 @@ class RidingStatsProvider extends ChangeNotifier {
     // 优先使用 GPS 计算的距离，否则用 OBD 车速积分
     double distance;
     if (_totalGpsDistance > 0) {
-      distance = _totalGpsDistance / 1000; // 转换为公里
+      distance = _totalGpsDistance / 1000;
     } else {
-      // 回退：平均速度(km/h) * 时长(h)
       distance = avgSpeed * (duration / 3600);
     }
 
-    _ridingRecordProvider!.saveRidingRecord(
-      startTime: _rideStartTime!.millisecondsSinceEpoch,
-      endTime: DateTime.now().millisecondsSinceEpoch,
-      duration: duration,
-      distance: distance,
-      avgSpeed: avgSpeed,
-      maxSpeed: maxSpeed,
-      maxLeftLean: maxLeftLean,
-      maxRightLean: maxRightLean,
-      events: events,
-      startLatitude: startPoint?.latitude,
-      startLongitude: startPoint?.longitude,
-      endLatitude: endPoint?.latitude,
-      endLongitude: endPoint?.longitude,
-    );
+    // 如果有占位记录，使用 updateRidingRecord 补全统计字段
+    if (_currentRecordId != null) {
+      try {
+        await _ridingRecordProvider!.saveRidingRecordWithId(
+          recordId: _currentRecordId!,
+          startTime: _rideStartTime!.millisecondsSinceEpoch,
+          endTime: DateTime.now().millisecondsSinceEpoch,
+          duration: duration,
+          distance: distance,
+          avgSpeed: avgSpeed,
+          maxSpeed: maxSpeed,
+          maxLeftLean: maxLeftLean,
+          maxRightLean: maxRightLean,
+          events: events,
+          startLatitude: startPoint?.latitude,
+          startLongitude: startPoint?.longitude,
+          endLatitude: endPoint?.latitude,
+          endLongitude: endPoint?.longitude,
+        );
+      } catch (e) {
+        _logCallback?.call('Stats', LogType.error, '更新骑行记录失败: $e');
+      }
+    } else {
+      // 降级：占位记录插入失败时，走原来的 insertRidingRecord 路径
+      _ridingRecordProvider!.saveRidingRecord(
+        startTime: _rideStartTime!.millisecondsSinceEpoch,
+        endTime: DateTime.now().millisecondsSinceEpoch,
+        duration: duration,
+        distance: distance,
+        avgSpeed: avgSpeed,
+        maxSpeed: maxSpeed,
+        maxLeftLean: maxLeftLean,
+        maxRightLean: maxRightLean,
+        events: events,
+        startLatitude: startPoint?.latitude,
+        startLongitude: startPoint?.longitude,
+        endLatitude: endPoint?.latitude,
+        endLongitude: endPoint?.longitude,
+      );
+    }
   }
 
   @override
@@ -550,6 +672,7 @@ class RidingStatsProvider extends ChangeNotifier {
     // endRide() 应由业务层（蓝牙断开）主动调用
     _stopSampling();
     _stopGpsTracking();
+    _stopWaypointTimer();
     super.dispose();
   }
 }

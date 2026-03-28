@@ -139,6 +139,47 @@ class RidingRecord {
   }
 }
 
+/// 骑行轨迹点数据模型
+class RidingWaypoint {
+  final int? id;
+  final int recordId;
+  final double latitude;  // WGS-84 纬度
+  final double longitude; // WGS-84 经度
+  final double speed;     // km/h
+  final int timestamp;    // 毫秒时间戳
+
+  RidingWaypoint({
+    this.id,
+    required this.recordId,
+    required this.latitude,
+    required this.longitude,
+    required this.speed,
+    required this.timestamp,
+  });
+
+  factory RidingWaypoint.fromMap(Map<String, dynamic> map) {
+    return RidingWaypoint(
+      id: map['id'] as int?,
+      recordId: map['record_id'] as int,
+      latitude: (map['latitude'] as num).toDouble(),
+      longitude: (map['longitude'] as num).toDouble(),
+      speed: (map['speed'] as num?)?.toDouble() ?? 0,
+      timestamp: map['timestamp'] as int,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      if (id != null) 'id': id,
+      'record_id': recordId,
+      'latitude': latitude,
+      'longitude': longitude,
+      'speed': speed,
+      'timestamp': timestamp,
+    };
+  }
+}
+
 /// 骑行事件数据模型（用于存储到数据库）
 class RidingRecordEvent {
   final int? id;

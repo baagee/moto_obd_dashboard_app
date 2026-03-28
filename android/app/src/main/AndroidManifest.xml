@@ -55,6 +55,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- 高德地图 API Key（Android 端地图/定位 SDK 鉴权） -->
+        <meta-data
+            android:name="com.amap.api.v2.apikey"
+            android:value="99d4e91045213ccda8ebee56a8061eb2"/>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

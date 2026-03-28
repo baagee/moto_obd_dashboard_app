@@ -127,6 +127,80 @@ class RidingRecordProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 获取指定骑行记录的轨迹点列表
+  Future<List<RidingWaypoint>> getWaypointsForRecord(int recordId) async {
+    final maps = await DatabaseService.getWaypointsByRecordId(recordId);
+    return maps.map((m) => RidingWaypoint.fromMap(m)).toList();
+  }
+
+  /// 保存骑行记录（有预建占位 record 时调用，更新已有记录）
+  Future<void> saveRidingRecordWithId({
+    required int recordId,
+    required int startTime,
+    required int endTime,
+    required int duration,
+    required double distance,
+    required double avgSpeed,
+    required double maxSpeed,
+    required double maxLeftLean,
+    required double maxRightLean,
+    required List<RidingRecordEvent> events,
+    double? startLatitude,
+    double? startLongitude,
+    double? endLatitude,
+    double? endLongitude,
+  }) async {
+    // 逆地理编码
+    String? startPlaceName;
+    if (startLatitude != null && startLongitude != null) {
+      startPlaceName = await GeocodingService.getPlaceName(
+        startLatitude,
+        startLongitude,
+        logCallback: _logCallback,
+      );
+    }
+    String? endPlaceName;
+    if (endLatitude != null && endLongitude != null) {
+      endPlaceName = await GeocodingService.getPlaceName(
+        endLatitude,
+        endLongitude,
+        logCallback: _logCallback,
+      );
+    }
+
+    // 用 updateRidingRecord 补全统计字段
+    await DatabaseService.updateRidingRecord(recordId, {
+      'end_time': endTime,
+      'start_latitude': startLatitude,
+      'start_longitude': startLongitude,
+      'start_place_name': startPlaceName,
+      'end_latitude': endLatitude,
+      'end_longitude': endLongitude,
+      'end_place_name': endPlaceName,
+      'distance': distance,
+      'avg_speed': avgSpeed,
+      'duration': duration,
+      'max_speed': maxSpeed,
+      'max_left_lean': maxLeftLean,
+      'max_right_lean': maxRightLean,
+    });
+
+    // 保存事件
+    if (events.isNotEmpty) {
+      await DatabaseService.insertRidingEvents(
+        recordId,
+        events.map((e) => e.toMap()).toList(),
+      );
+    }
+
+    // 更新每日统计
+    await _updateDailyStats(endTime, distance, duration, avgSpeed, maxSpeed,
+        maxLeftLean, maxRightLean);
+
+    // 重新加载
+    await initialize(force: true);
+  }
+
   /// 保存骑行记录（骑行结束时调用）
   ///
   /// [startLatitude]/[startLongitude] - 骑行起点坐标（由调用方传入，在 startRide 时获取）

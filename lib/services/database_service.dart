@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -5,7 +6,7 @@ import 'package:path/path.dart';
 class DatabaseService {
   static Database? _database;
   static const String _dbName = 'obd_dashboard.db';
-  static const int _dbVersion = 1;
+  static const int _dbVersion = 2;
 
   /// 获取数据库实例
   static Future<Database> get database async {
@@ -23,6 +24,7 @@ class DatabaseService {
       path,
       version: _dbVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -82,12 +84,47 @@ class DatabaseService {
       )
     ''');
 
+    // 轨迹点表
+    await db.execute('''
+      CREATE TABLE riding_waypoints (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        record_id INTEGER NOT NULL,
+        latitude  REAL    NOT NULL,
+        longitude REAL    NOT NULL,
+        speed     REAL    DEFAULT 0,
+        timestamp INTEGER NOT NULL,
+        FOREIGN KEY (record_id) REFERENCES riding_records(id) ON DELETE CASCADE
+      )
+    ''');
+
     // 创建索引
     await db.execute(
         'CREATE INDEX idx_riding_records_start_time ON riding_records(start_time)');
     await db.execute(
         'CREATE INDEX idx_riding_events_record_id ON riding_events(record_id)');
     await db.execute('CREATE INDEX idx_daily_stats_date ON daily_stats(date)');
+    await db.execute(
+        'CREATE INDEX idx_waypoints_record_id ON riding_waypoints(record_id)');
+  }
+
+  /// 数据库升级
+  static Future<void> _onUpgrade(
+      Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS riding_waypoints (
+          id        INTEGER PRIMARY KEY AUTOINCREMENT,
+          record_id INTEGER NOT NULL,
+          latitude  REAL    NOT NULL,
+          longitude REAL    NOT NULL,
+          speed     REAL    DEFAULT 0,
+          timestamp INTEGER NOT NULL,
+          FOREIGN KEY (record_id) REFERENCES riding_records(id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_waypoints_record_id ON riding_waypoints(record_id)');
+    }
   }
 
   // ========== 骑行记录 CRUD ==========
@@ -405,6 +442,45 @@ class DatabaseService {
     };
   }
 
+  // ========== 轨迹点 CRUD ==========
+
+  /// 批量插入轨迹点
+  static Future<void> insertWaypoints(
+      int recordId, List<Map<String, dynamic>> waypoints) async {
+    final db = await database;
+    final batch = db.batch();
+    for (final wp in waypoints) {
+      final data = Map<String, dynamic>.from(wp);
+      data['record_id'] = recordId;
+      batch.insert('riding_waypoints', data);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// 查询指定骑行记录的所有轨迹点（按 timestamp 升序）
+  static Future<List<Map<String, dynamic>>> getWaypointsByRecordId(
+      int recordId) async {
+    final db = await database;
+    return await db.query(
+      'riding_waypoints',
+      where: 'record_id = ?',
+      whereArgs: [recordId],
+      orderBy: 'timestamp ASC',
+    );
+  }
+
+  /// 更新骑行记录（骑行结束时补全统计字段）
+  static Future<int> updateRidingRecord(
+      int id, Map<String, dynamic> data) async {
+    final db = await database;
+    return await db.update(
+      'riding_records',
+      data,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   // ========== 开发调试工具 ==========
 
   /// 插入 Mock 骑行数据（仅用于开发测试）
@@ -458,6 +534,47 @@ class DatabaseService {
         'max_right_lean': maxRightLean,
         'created_at': startTime.millisecondsSinceEpoch,
       });
+
+      // 生成模拟轨迹点（起终点间直线插值 + 随机偏移）
+      final waypointCount = duration ~/ 2; // 2秒采集一次
+      if (waypointCount >= 2) {
+        final startLat = (startLoc['lat'] as double);
+        final startLng = (startLoc['lng'] as double);
+        final endLat = (endLoc['lat'] as double);
+        final endLng = (endLoc['lng'] as double);
+        final rng = Random(recordId);
+
+        final List<Map<String, dynamic>> waypoints = [];
+        for (int w = 0; w < waypointCount; w++) {
+          final t = w / (waypointCount - 1);
+          final lat = startLat +
+              (endLat - startLat) * t +
+              (rng.nextDouble() - 0.5) * 0.002;
+          final lng = startLng +
+              (endLng - startLng) * t +
+              (rng.nextDouble() - 0.5) * 0.002;
+          // 速度模拟：中间段稍快，首尾稍慢
+          final speedFactor =
+              0.5 + 1.0 * (t < 0.1 || t > 0.9 ? t.clamp(0.0, 0.1) * 5 : 1.0);
+          final speed = avgSpeed * speedFactor;
+          final ts = startTime.millisecondsSinceEpoch + (w * 2000);
+          waypoints.add({
+            'latitude': lat,
+            'longitude': lng,
+            'speed': speed,
+            'timestamp': ts,
+          });
+        }
+
+        final wpBatch = db.batch();
+        for (final wp in waypoints) {
+          wpBatch.insert('riding_waypoints', {
+            ...wp,
+            'record_id': recordId,
+          });
+        }
+        await wpBatch.commit(noResult: true);
+      }
 
       // 插入 1-3 个骑行事件
       final eventCount = 1 + (i % 3);

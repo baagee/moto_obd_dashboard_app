@@ -10,8 +10,6 @@
 - 骑行事件（超速、极限压弯等）在触发坐标处显示 Marker
 - 地图下方叠加关键统计数据卡片
 
-> **2026-03-27 变更**：去掉实时倾角维度——`riding_waypoints` 表不再记录 `lean_angle`，Phase 3 中"倾角热力着色切换"功能同步取消。
-
 ---
 
 <!-- anchor:background -->
@@ -38,9 +36,9 @@
 
 ### 3.1 数据采集（Phase 1）
 
-- **R1**：骑行过程中，每 **3 秒**采集一个 GPS 点（纬度、经度、当时速度），存入 `riding_waypoints` 表
+- **R1**：骑行过程中，每 **2 秒**采集一个 GPS 点（纬度、经度、当时速度），存入 `riding_waypoints` 表
 - **R2**：轨迹点与 `riding_records.id` 关联，删除骑行记录时**级联删除**轨迹点
-- **R3**：轨迹点过滤：继承现有漂移过滤逻辑（单次距离 ≥ 200m 或速度 ≥ 180km/h 的点不存储）
+- **R3**：轨迹点过滤：继承现有漂移过滤逻辑
 - **R4**：Mock 测试数据生成时同步生成模拟轨迹点（基于两点之间的直线插值 + 轻微偏移）
 
 ### 3.2 轨迹展示页面（Phase 2）
@@ -49,15 +47,13 @@
 - **R6**：地图使用高德地图 SDK（`amap_flutter_map`），显示标准地图
 - **R7**：轨迹以 **Polyline** 展示，速度渐变着色（方案 A，见 §4.5）
 - **R8**：起点 Marker（绿色旗子图标）、终点 Marker（红色旗子图标）
-- **R9**：骑行事件（极限压弯、超速等）在对应轨迹位置显示 Marker，点击展示事件简介弹窗
+- **R9**：骑行事件（极限压弯、高效巡航等）在对应轨迹位置显示 Marker，点击展示事件简介弹窗
 - **R10**：地图自动 `fitBounds` 到整条轨迹范围
-- **R11**：地图下方固定显示统计摘要卡片（距离、时长、极速、最大倾角）
+- **R11**：地图下方固定显示统计摘要卡片（距离、时长、极速、均速）
 
 ### 3.3 增强功能（Phase 3，可选）
 
 - **R12**：轨迹下方速度折线图（X 轴时间，Y 轴速度 km/h），使用现有 `fl_chart`
-
-> ~~**R13**：倾角热力着色模式切换~~ — 已取消，不记录实时倾角数据。
 
 ---
 
@@ -99,7 +95,7 @@ amap_flutter_map: ^3.0.0   # 高德地图展示（不含定位）
 |------|---------|------|
 | `lib/services/database_service.dart` | 修改 | 新增 `riding_waypoints` 表建表、`insertWaypoints()`、`getWaypointsByRecordId()`、`updateRidingRecord()`；`_dbVersion` 升为 2，添加 `onUpgrade` |
 | `lib/models/riding_record.dart` | 修改 | 新增 `RidingWaypoint` 数据类（id, recordId, latitude, longitude, speed, timestamp） |
-| `lib/providers/riding_stats_provider.dart` | 修改 | 骑行开始时先插入占位记录获取 `_currentRecordId`；新增 `_waypointTimer`（3秒）分批落库；骑行结束时 `updateRidingRecord()` 补全统计字段 |
+| `lib/providers/riding_stats_provider.dart` | 修改 | 骑行开始时先插入占位记录获取 `_currentRecordId`；新增 `_waypointTimer`（**2秒**）、`_pendingWaypoints`，每 **15** 条分批落库；骑行结束时 `updateRidingRecord()` 补全统计字段 |
 | `lib/screens/riding_track_screen.dart` | 新增 | 骑行轨迹全屏地图页面（`StatefulWidget`） |
 | `lib/widgets/track_stats_card.dart` | 新增 | 地图下方统计摘要卡片（复用 App 深色主题样式） |
 | `lib/screens/record_screen.dart` | 修改 | 骑行记录卡片新增"轨迹"按钮，路由到 `RidingTrackScreen` |
@@ -113,11 +109,11 @@ amap_flutter_map: ^3.0.0   # 高德地图展示（不含定位）
   → DatabaseService.insertRidingRecord({ start_time, end_time: null, ... })
   → 拿到 _currentRecordId
 
-骑行中 _waypointTimer 每 3 秒
+骑行中 _waypointTimer 每 **2 秒**
   → 取当前 OBDDataProvider.speed
   → 取 _lastPosition（最新 GPS 点）
-  → 若满足过滤条件（距上一点 > 5m），加入 _pendingWaypoints
-  → 若 _pendingWaypoints.length >= 100：
+  → 若满足过滤条件（距上一点 > 3m），加入 _pendingWaypoints
+  → 若 _pendingWaypoints.length >= **15**：
       DatabaseService.insertWaypoints(_currentRecordId, batch)
       _pendingWaypoints.clear()
 
@@ -125,7 +121,7 @@ amap_flutter_map: ^3.0.0   # 高德地图展示（不含定位）
   → 剩余 _pendingWaypoints 落库（尾巴批次）
   → DatabaseService.updateRidingRecord(_currentRecordId, {
       end_time, distance, avg_speed, max_speed,
-      max_left_lean, max_right_lean, start/end 坐标及地名
+      start/end 坐标及地名
     })
 ```
 
@@ -195,13 +191,15 @@ List<Polyline> _buildGradientPolylines(List<RidingWaypoint> waypoints) {
 
 `riding_events` 表目前无 GPS 坐标字段。方案：
 
-**方案 A（推荐，零成本）**：通过事件 `timestamp` 在 `riding_waypoints` 中找最近时间点的坐标。
+**方案 A（推荐，零成本）**：通过事件 `timestamp` 在 `riding_waypoints` 中找最近时间点的坐标。GPS 信号中断或无匹配轨迹点时，**不展示该 Marker**（静默忽略）。
 
 ```dart
 // 伪代码
 final eventTs = event.timestamp;
+if (waypoints.isEmpty) return null; // 无轨迹点时跳过
 final nearest = waypoints.reduce((a, b) =>
   (a.timestamp - eventTs).abs() < (b.timestamp - eventTs).abs() ? a : b);
+// nearest 存在则返回坐标，否则 return null 不绘制 Marker
 ```
 
 **方案 B**：`riding_events` 表新增 `latitude`、`longitude` 字段，事件触发时直接记录坐标（改动较大，暂不采用）。
@@ -240,14 +238,14 @@ List<RidingWaypoint> _sampleWaypoints(List<RidingWaypoint> all, double zoom) {
 1. `DatabaseService`：`_dbVersion` → 2，新增 `onUpgrade`，建 `riding_waypoints` 表，新增 `insertWaypoints()`、`getWaypointsByRecordId()`、`updateRidingRecord()`
 2. `RidingRecord` 模型：新增 `RidingWaypoint` 数据类
 3. `GeocodingService`：`_wgs84ToGcj02()` 改为公开方法 `wgs84ToGcj02()`
-4. `RidingStatsProvider`：骑行开始时先插入占位记录；新增 `_waypointTimer`（3秒）、`_pendingWaypoints`，每 100 条分批落库；骑行结束时 `updateRidingRecord()` 补全所有统计字段
+4. `RidingStatsProvider`：骑行开始时先插入占位记录；新增 `_waypointTimer`（**2秒**）、`_pendingWaypoints`，每 **15** 条分批落库；骑行结束时 `updateRidingRecord()` 补全所有统计字段
 5. `insertMockRidingRecords()`：为每条 mock 记录生成模拟轨迹点（两点直线插值 + 随机偏移）
 
 ### Phase 2 — 展示层（预计 2-3 天）
 
 1. 安装 `amap_flutter_map`，配置 Android/iOS Key（复用 `geocoding_service.dart` 中的 `_amapKey`）
 2. 新建 `RidingTrackScreen`：加载轨迹点 → 坐标系转换 → 按缩放级别抽稀 → 生成渐变 Polyline → 起终点 Marker → fitBounds → 监听 `onCameraMove` 动态重采样
-3. 新建 `TrackStatsCard`：底部统计摘要（距离/时长/极速/最大倾角）
+3. 新建 `TrackStatsCard`：底部统计摘要（距离/时长/极速/均速）
 4. `record_screen.dart`：骑行卡片新增"轨迹"按钮，判断轨迹点数量 ≥ 2 才可点击
 
 ### Phase 3 — 增强（可选，后续迭代）
@@ -266,4 +264,4 @@ List<RidingWaypoint> _sampleWaypoints(List<RidingWaypoint> all, double zoom) {
 | 轨迹点每次骑行 300-2400 条，长期使用后存储膨胀 | 存储空间 | 每条记录约 40 字节 × 600 点 = 24KB，100 次骑行 ≈ 2.4MB，可接受；后续可加清理策略 |
 | 高德 API Key 硬编码在源码中 | 安全风险（现有问题，非本次新增）| 建议抽取到 `.env` 或混淆；本次不在范围内 |
 | 骑行中 `_waypointTimer` 频率与 GPS 实际更新频率不同步 | 轨迹点坐标重复 | 记录点时检查与上一个点距离 > 5m 才存储，避免静止时积累重复点 |
-| App 被系统回收导致轨迹数据丢失 | 长途骑行数据丢失 | 分批落库（每 100 点写一次 DB），最多丢失 5 分钟数据 |
+| App 被系统回收导致轨迹数据丢失 | 长途骑行数据丢失 | 分批落库（每 **15** 点写一次 DB，2秒间隔），最多丢失约 **30 秒**数据 |

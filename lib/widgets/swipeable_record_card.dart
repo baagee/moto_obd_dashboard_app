@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/riding_record.dart';
+import '../screens/riding_track_screen.dart';
 import '../theme/app_theme.dart';
 import 'cyber_dialog.dart';
 import 'cyber_button.dart';
@@ -145,7 +146,8 @@ class SwipeableRecordCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                  border: Border.all(color: accent.withValues(alpha: 0.4), width: 1),
+                  border: Border.all(
+                      color: accent.withValues(alpha: 0.4), width: 1),
                 ),
                 child: Text(
                   _intensityLabel,
@@ -168,6 +170,7 @@ class SwipeableRecordCard extends StatelessWidget {
                   ),
                 ),
               ),
+              // 查看事件按钮
               GestureDetector(
                 onTap: onViewEvents,
                 child: Container(
@@ -176,8 +179,8 @@ class SwipeableRecordCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                    border:
-                        Border.all(color: accent.withValues(alpha: 0.35), width: 1),
+                    border: Border.all(
+                        color: accent.withValues(alpha: 0.35), width: 1),
                   ),
                   child: Text(
                     '查看事件',
@@ -193,30 +196,38 @@ class SwipeableRecordCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          // ── 第二行：地点（左）+ 4项统计（右）──
+          // ── 第二行：地点（左，可点击进入轨迹）+ 4项统计（右）──
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 地点（flex 3）
+              // 地点（flex 3）—点击进入轨迹页
               Expanded(
                 flex: 3,
-                child: Row(
-                  children: [
-                    Icon(Icons.location_on_outlined,
-                        size: 14, color: AppTheme.textMuted.withValues(alpha: 0.7)),
-                    const SizedBox(width: 3),
-                    Expanded(
-                      child: Text(
-                        '${record.startPlaceName ?? '未知'} → ${record.endPlaceName ?? '未知'}',
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => RidingTrackScreen(record: record),
                     ),
-                  ],
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.map_outlined,
+                          size: 14,
+                          color: AppTheme.accentGreen.withValues(alpha: 0.7)),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          '${record.startPlaceName ?? '未知'} → ${record.endPlaceName ?? '未知'}',
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
