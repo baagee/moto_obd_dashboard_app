@@ -181,6 +181,11 @@ class RidingStatsProvider extends ChangeNotifier {
     _positionSubscription = null;
   }
 
+  /// GPS 过滤常量
+  static const double _maxReasonableSpeedMs = 69.44; // 250 km/h，摩托车极速上限
+  static const int _maxGpsGapSeconds = 30; // GPS 失联超过此时长视为异常跳跃
+  static const double _minMoveDistance = 3.0; // 小于 3m 视为静止噪声，不累加
+
   /// GPS 位置更新处理
   void _onPositionUpdate(PositionData position) {
     if (!_isRiding) return;
@@ -195,21 +200,27 @@ class RidingStatsProvider extends ChangeNotifier {
 
     if (_lastPosition != null) {
       final distance = _calculateDistance(_lastPosition!, position);
-      final timeDiff =
-          position.timestamp.difference(_lastPosition!.timestamp).inSeconds;
+      final timeDiffMs = position.timestamp
+          .difference(_lastPosition!.timestamp)
+          .inMilliseconds;
+      final timeDiffSec = timeDiffMs / 1000.0;
 
-      // 计算瞬时速度（m/s）
-      final speed = timeDiff > 0 ? (distance / timeDiff) : 0;
+      // 计算瞬时速度（m/s），使用毫秒精度避免 < 1s 时除零
+      final speed = timeDiffMs > 0 ? (distance / timeDiffSec) : 0.0;
 
-      // 智能过滤：
-      // 1. 距离 < 200m（放宽阈值，容忍高速场景下的延迟采样）
-      // 2. 速度 < 50m/s (180km/h，过滤异常漂移)
-      if (distance < 200 && speed < 50) {
-        _totalGpsDistance += distance;
-      } else {
-        // 记录过滤日志（用于诊断）
+      if (distance < _minMoveDistance) {
+        // 静止噪声：忽略，不计入里程
+      } else if (timeDiffSec > _maxGpsGapSeconds) {
+        // GPS 失联后大跳跃：跳过此段，避免里程虚增
         _logCallback?.call('GPS', LogType.warning,
-            '过滤异常采样点: ${distance.toStringAsFixed(1)}m, ${(speed * 3.6).toStringAsFixed(1)}km/h');
+            'GPS 信号中断 ${timeDiffSec.toStringAsFixed(0)}s 后重连，跳过此段 ${distance.toStringAsFixed(0)}m');
+      } else if (speed > _maxReasonableSpeedMs) {
+        // 速度超出摩托车极限：GPS 漂移，过滤
+        _logCallback?.call('GPS', LogType.warning,
+            '过滤 GPS 漂移: ${distance.toStringAsFixed(1)}m, ${(speed * 3.6).toStringAsFixed(1)}km/h');
+      } else {
+        // 正常采样：累加里程
+        _totalGpsDistance += distance;
       }
     }
     _lastPosition = position;

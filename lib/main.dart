@@ -39,9 +39,13 @@ void main() {
         ChangeNotifierProvider<NavigationProvider>(
           create: (_) => NavigationProvider(),
         ),
-        // 音频服务 Provider
-        ChangeNotifierProvider<AudioService>(
-          create: (_) => AudioService(),
+        // 音频服务 Provider（依赖 LogProvider）
+        ChangeNotifierProxyProvider<LogProvider, AudioService>(
+          create: (context) => AudioService(
+            logProvider: context.read<LogProvider>(),
+          ),
+          update: (context, logProvider, previous) =>
+              previous ?? AudioService(logProvider: logProvider),
         ),
 
         // 传感器 Provider - 管理倾角传感器（依赖 OBDDataProvider + LogProvider）
