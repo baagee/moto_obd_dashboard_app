@@ -79,7 +79,8 @@ class CombinedGaugePainter extends CustomPainter {
       return (rpm / normalMax) * normalRatio * pi;
     } else {
       const double extendedMax = 12000 - 4000;
-      return normalRatio * pi + ((rpm - normalMax) / extendedMax) * (1 - normalRatio) * pi;
+      return normalRatio * pi +
+          ((rpm - normalMax) / extendedMax) * (1 - normalRatio) * pi;
     }
   }
 
@@ -95,7 +96,8 @@ class CombinedGaugePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     // 使用宽度和高度中较小的值作为基准
-    final radius = (size.width < size.height ? size.width : size.height) / 2 - 10;
+    final radius =
+        (size.width < size.height ? size.width : size.height) / 2 - 10;
 
     // 绘制背景
     _drawBackground(canvas, center, radius);
@@ -124,18 +126,48 @@ class CombinedGaugePainter extends CustomPainter {
   }
 
   void _drawBackground(Canvas canvas, Offset center, double radius) {
-    // 背景渐变
+    // 背景渐变：深空黑 → 深蓝石板
     final gradient = RadialGradient(
       colors: [
-        AppTheme.backgroundDark,
-        AppTheme.slateGray.withValues(alpha: 0.5),
+        AppTheme.deepSpace,
+        AppTheme.slateGray.withValues(alpha: 0.3),
       ],
     );
-
     final paint = Paint()
-      ..shader = gradient.createShader(Rect.fromCircle(center: center, radius: radius + 20));
-
+      ..shader = gradient
+          .createShader(Rect.fromCircle(center: center, radius: radius + 20));
     canvas.drawCircle(center, radius + 20, paint);
+
+    // 装饰同心圆环（5层，从外到内）：模拟图片中的线框科技感
+    // 外圈青色，内圈品红，高透明度确保可见
+    final ringDefs = [
+      (radius + 18, AppTheme.accentCyan.withValues(alpha: 0.45), 1.5),
+      (radius + 10, AppTheme.accentCyan.withValues(alpha: 0.25), 0.8),
+      (radius + 4, AppTheme.neonPink.withValues(alpha: 0.50), 1.2),
+      (radius - 6, AppTheme.neonPink.withValues(alpha: 0.20), 0.6),
+      (radius - 14, AppTheme.accentCyan.withValues(alpha: 0.15), 0.5),
+    ];
+    for (final def in ringDefs) {
+      final (r, c, w) = def;
+      canvas.drawCircle(
+        center,
+        r,
+        Paint()
+          ..color = c
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = w,
+      );
+    }
+    // 品红 glow 圈（始终可见，不随速度变化）
+    canvas.drawCircle(
+      center,
+      radius + 4,
+      Paint()
+        ..color = AppTheme.neonPink.withValues(alpha: 0.18)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+    );
 
     // 超速红色闪烁效果
     if (speed >= flashThreshold) {
@@ -170,7 +202,7 @@ class CombinedGaugePainter extends CustomPainter {
     final paint = Paint()
       ..color = AppTheme.slateGray
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
+      ..strokeWidth = 27 // 加粗0.5倍 (18 * 1.5)
       ..strokeCap = StrokeCap.round;
 
     // 上半圆背景
@@ -208,29 +240,29 @@ class CombinedGaugePainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
-      ..strokeCap = StrokeCap.butt;  // 平头样式，避免与对向弧冲突
+      ..strokeWidth = 27 // 加粗0.5倍 (18 * 1.5)
+      ..strokeCap = StrokeCap.butt; // 平头样式，避免与对向弧冲突
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       pi,
-      sweepAngle,  // 顺时针，经过上方
+      sweepAngle, // 顺时针，经过上方
       false,
       paint,
     );
 
-    // 发光效果
+    // 发光效果（加强 glow）
     final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.4)
+      ..color = color.withValues(alpha: 0.55)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 36  // 加粗0.5倍 (24 * 1.5)
-      ..strokeCap = StrokeCap.butt  // 平头样式
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      ..strokeWidth = 40
+      ..strokeCap = StrokeCap.butt
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       pi,
-      sweepAngle,  // 顺时针，经过上方
+      sweepAngle, // 顺时针，经过上方
       false,
       glowPaint,
     );
@@ -239,42 +271,42 @@ class CombinedGaugePainter extends CustomPainter {
   void _drawSpeedProgress(Canvas canvas, Offset center, double radius) {
     final sweepAngle = _speedToAngle(speed.toDouble());
 
-    // 阶段颜色 - 青色(正常) → 紫色(警告) → 红色(危险)
+    // 阶段颜色 - 霓虹青(正常) → 橙色(警告) → 品红(危险)
     Color color;
     if (speed <= warnSpeed) {
-      color = AppTheme.accentCyan; // 青色 - 正常
+      color = AppTheme.neonCyan; // 霓虹青 - 正常
     } else if (speed <= dangerSpeed) {
       color = AppTheme.accentPurple; // 紫色 - 警告
     } else {
-      color = AppTheme.accentRed; // 红色 - 危险
+      color = AppTheme.neonPink; // 品红 - 危险
     }
 
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 27  // 加粗0.5倍 (18 * 1.5)
-      ..strokeCap = StrokeCap.butt;  // 平头样式，避免与对向弧冲突
+      ..strokeWidth = 27 // 加粗0.5倍 (18 * 1.5)
+      ..strokeCap = StrokeCap.butt; // 平头样式，避免与对向弧冲突
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       pi,
-      -sweepAngle,  // 逆时针
+      -sweepAngle, // 逆时针
       false,
       paint,
     );
 
-    // 发光效果
+    // 发光效果（加强 glow）
     final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.4)
+      ..color = color.withValues(alpha: 0.55)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 36  // 加粗0.5倍 (24 * 1.5)
-      ..strokeCap = StrokeCap.butt  // 平头样式
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      ..strokeWidth = 40
+      ..strokeCap = StrokeCap.butt
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       pi,
-      -sweepAngle,  // 逆时针
+      -sweepAngle, // 逆时针
       false,
       glowPaint,
     );
@@ -308,16 +340,16 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 水滴形状：从尖端到圆心处的圆润头部
     final pointerPath = Path()
-    // 从尖端开始
+      // 从尖端开始
       ..moveTo(tipX, tipY)
-    // 左侧曲线延伸到头部
+      // 左侧曲线延伸到头部
       ..quadraticBezierTo(
         center.dx + headRadius * cos(angle - pi / 2) * 0.5,
         center.dy + headRadius * sin(angle - pi / 2) * 0.5,
         center.dx + headRadius * cos(angle - pi / 2),
         center.dy + headRadius * sin(angle - pi / 2),
       )
-    // 头部半圆
+      // 头部半圆
       ..arcToPoint(
         Offset(
           center.dx + headRadius * cos(angle + pi / 2),
@@ -326,7 +358,7 @@ class CombinedGaugePainter extends CustomPainter {
         radius: Radius.circular(headRadius),
         clockwise: true,
       )
-    // 右侧曲线延伸到尖端
+      // 右侧曲线延伸到尖端
       ..quadraticBezierTo(
         center.dx + headRadius * cos(angle + pi / 2) * 0.5,
         center.dy + headRadius * sin(angle + pi / 2) * 0.5,
@@ -339,16 +371,15 @@ class CombinedGaugePainter extends CustomPainter {
     canvas.drawPath(pointerPath, pointerPaint);
 
     // 绘制指针中心亮点
-    final dotPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.8);
+    final dotPaint = Paint()..color = Colors.white.withValues(alpha: 0.8);
     canvas.drawCircle(center, headRadius * 0.5, dotPaint);
   }
 
   void _drawSpeedPointer(Canvas canvas, Offset center, double radius) {
     if (speed <= 0) return;
 
-    // 固定颜色 - 品红色，与数字青色区分
-    const color = AppTheme.accentPink;
+    // 固定颜色 - 品红，与 RPM 橙色区分
+    const color = AppTheme.neonPink;
 
     // 使用非线性映射计算角度（逆时针）
     final sweepAngle = _speedToAngle(speed.toDouble());
@@ -372,16 +403,16 @@ class CombinedGaugePainter extends CustomPainter {
 
     // 水滴形状：从尖端到圆心处的圆润头部
     final pointerPath = Path()
-    // 从尖端开始
+      // 从尖端开始
       ..moveTo(tipX, tipY)
-    // 左侧曲线延伸到头部
+      // 左侧曲线延伸到头部
       ..quadraticBezierTo(
         center.dx + headRadius * cos(angle - pi / 2) * 0.5,
         center.dy + headRadius * sin(angle - pi / 2) * 0.5,
         center.dx + headRadius * cos(angle - pi / 2),
         center.dy + headRadius * sin(angle - pi / 2),
       )
-    // 头部半圆
+      // 头部半圆
       ..arcToPoint(
         Offset(
           center.dx + headRadius * cos(angle + pi / 2),
@@ -390,7 +421,7 @@ class CombinedGaugePainter extends CustomPainter {
         radius: Radius.circular(headRadius),
         clockwise: true,
       )
-    // 右侧曲线延伸到尖端
+      // 右侧曲线延伸到尖端
       ..quadraticBezierTo(
         center.dx + headRadius * cos(angle + pi / 2) * 0.5,
         center.dy + headRadius * sin(angle + pi / 2) * 0.5,
@@ -403,8 +434,7 @@ class CombinedGaugePainter extends CustomPainter {
     canvas.drawPath(pointerPath, pointerPaint);
 
     // 绘制指针中心亮点
-    final dotPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.8);
+    final dotPaint = Paint()..color = Colors.white.withValues(alpha: 0.8);
     canvas.drawCircle(center, headRadius * 0.5, dotPaint);
   }
 
@@ -412,7 +442,7 @@ class CombinedGaugePainter extends CustomPainter {
     final tickPaint = Paint()
       ..color = AppTheme.accentCyan
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;  // 加粗 (原3)
+      ..strokeWidth = 4; // 加粗 (原3)
 
     final textStyle = TextStyle(
       color: AppTheme.textMuted,
@@ -421,7 +451,7 @@ class CombinedGaugePainter extends CustomPainter {
     );
 
     // 公共0刻度 - 在正下方（π角度）绘制一个共用的0刻度线和标签
-        {
+    {
       const zeroAngle = pi;
       final innerRadius = radius - 32;
       final outerRadius = radius - 22;
@@ -444,8 +474,10 @@ class CombinedGaugePainter extends CustomPainter {
       )..layout();
 
       final textRadius = radius - 52;
-      final textX = center.dx + textRadius * cos(zeroAngle) - textPainter.width / 2;
-      final textY = center.dy + textRadius * sin(zeroAngle) - textPainter.height / 2;
+      final textX =
+          center.dx + textRadius * cos(zeroAngle) - textPainter.width / 2;
+      final textY =
+          center.dy + textRadius * sin(zeroAngle) - textPainter.height / 2;
 
       textPainter.paint(canvas, Offset(textX, textY));
     }
@@ -453,7 +485,19 @@ class CombinedGaugePainter extends CustomPainter {
     // 上半圆刻度 (RPM) - 顺时针从π到2π，经过上方
     // 使用非线性映射：0-4000占前20%角度，4000-12000占后80%
     // 大刻度：0, 2, 4, 5k, 6k, 7k, 8k, 9k, 10k, 11k, 12k
-    final rpmMajorTicks = [0, 2000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000];
+    final rpmMajorTicks = [
+      0,
+      2000,
+      4000,
+      5000,
+      6000,
+      7000,
+      8000,
+      9000,
+      10000,
+      11000,
+      12000
+    ];
     for (final i in rpmMajorTicks) {
       // 顺时针：π → 3π/2 → 2π
       final sweepAngle = _rpmToAngle(i.toDouble());
@@ -495,14 +539,26 @@ class CombinedGaugePainter extends CustomPainter {
 
       final textRadius = radius - 52;
       final textX = center.dx + textRadius * cos(angle) - textPainter.width / 2;
-      final textY = center.dy + textRadius * sin(angle) - textPainter.height / 2;
+      final textY =
+          center.dy + textRadius * sin(angle) - textPainter.height / 2;
 
       textPainter.paint(canvas, Offset(textX, textY));
     }
 
     // 细粒度刻度 (RPM) - 根据区间变色
     // 小刻度：0-4000区间每1000一个(1000,3000)，4000+区间每500一个
-    final rpmFineTicks = [1000, 3000, 4500, 5500, 6500, 7500, 8500, 9500, 10500, 11500];
+    final rpmFineTicks = [
+      1000,
+      3000,
+      4500,
+      5500,
+      6500,
+      7500,
+      8500,
+      9500,
+      10500,
+      11500
+    ];
     for (final i in rpmFineTicks) {
       final sweepAngle = _rpmToAngle(i.toDouble());
       final angle = pi + sweepAngle;
@@ -578,7 +634,8 @@ class CombinedGaugePainter extends CustomPainter {
 
       final textRadius = radius - 52;
       final textX = center.dx + textRadius * cos(angle) - textPainter.width / 2;
-      final textY = center.dy + textRadius * sin(angle) - textPainter.height / 2;
+      final textY =
+          center.dy + textRadius * sin(angle) - textPainter.height / 2;
 
       textPainter.paint(canvas, Offset(textX, textY));
     }
@@ -660,14 +717,18 @@ class CombinedGaugePainter extends CustomPainter {
     );
 
     // Speed 在下半圆视觉中心：数值在 center 下方， 单位在数值更下方
-    // Speed 值
+    // Speed 数值
     final speedTextSpan = TextSpan(
       text: '$speed',
       style: TextStyle(
-        color: AppTheme.accentCyan,
+        color: AppTheme.neonCyan,
         fontSize: fontSize,
         fontWeight: FontWeight.bold,
         letterSpacing: -1,
+        shadows: [
+          Shadow(
+              color: AppTheme.neonCyan.withValues(alpha: 0.8), blurRadius: 10),
+        ],
       ),
     );
     final speedTextPainter = TextPainter(
@@ -728,7 +789,7 @@ class CombinedGaugePainter extends CustomPainter {
     _drawInvertedTrapezoidTempGauge(
       canvas: canvas,
       size: size,
-      x: size.width ,
+      x: size.width,
       y: radius * 0.23,
       radius: radius,
       value: intakeTemp,
@@ -754,7 +815,7 @@ class CombinedGaugePainter extends CustomPainter {
     required bool alignRight, // true=靠右对齐, false=靠左对齐
   }) {
     // 倒梯形尺寸 - 上宽下窄
-    final topWidth = radius * 0.5;    // 顶部宽
+    final topWidth = radius * 0.5; // 顶部宽
     final bottomWidth = radius * 0.125; // 底部窄
     final height = radius * 0.33;
 
@@ -770,7 +831,8 @@ class CombinedGaugePainter extends CustomPainter {
     final filledSegments = (fillRatio * tempSegmentCount).ceil();
 
     // 每个分段的高度（包含间隙）
-    final segmentHeight = (height - (tempSegmentCount - 1) * 2) / tempSegmentCount;
+    final segmentHeight =
+        (height - (tempSegmentCount - 1) * 2) / tempSegmentCount;
 
     // 根据对齐方式计算 x 坐标
     double getLeftX(double centerX, double width) {
@@ -783,10 +845,11 @@ class CombinedGaugePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final bgPath = Path()
-      ..moveTo(getLeftX(trapezoidCenter.dx, topWidth), topY)           // 左上
+      ..moveTo(getLeftX(trapezoidCenter.dx, topWidth), topY) // 左上
       ..lineTo(getLeftX(trapezoidCenter.dx, topWidth) + topWidth, topY) // 右上
-      ..lineTo(getLeftX(trapezoidCenter.dx, bottomWidth) + bottomWidth, bottomY) // 右下
-      ..lineTo(getLeftX(trapezoidCenter.dx, bottomWidth), bottomY)     // 左下
+      ..lineTo(getLeftX(trapezoidCenter.dx, bottomWidth) + bottomWidth,
+          bottomY) // 右下
+      ..lineTo(getLeftX(trapezoidCenter.dx, bottomWidth), bottomY) // 左下
       ..close();
 
     canvas.drawPath(bgPath, bgPaint);
@@ -803,8 +866,10 @@ class CombinedGaugePainter extends CustomPainter {
       final segmentEndRatio = (i + 1) / tempSegmentCount;
 
       // 根据归一化位置计算宽度，确保与背景槽斜率一致
-      final segTopWidth = bottomWidth + (topWidth - bottomWidth) * segmentEndRatio;
-      final segBottomWidth = bottomWidth + (topWidth - bottomWidth) * segmentStartRatio;
+      final segTopWidth =
+          bottomWidth + (topWidth - bottomWidth) * segmentEndRatio;
+      final segBottomWidth =
+          bottomWidth + (topWidth - bottomWidth) * segmentStartRatio;
 
       // 判断当前分段是否应该填充（从底部向上填充）
       final isFilled = i < filledSegments;
@@ -837,8 +902,10 @@ class CombinedGaugePainter extends CustomPainter {
 
       final segPath = Path()
         ..moveTo(getLeftX(trapezoidCenter.dx, segTopWidth), segTopY)
-        ..lineTo(getLeftX(trapezoidCenter.dx, segTopWidth) + segTopWidth, segTopY)
-        ..lineTo(getLeftX(trapezoidCenter.dx, segBottomWidth) + segBottomWidth, segBottomY)
+        ..lineTo(
+            getLeftX(trapezoidCenter.dx, segTopWidth) + segTopWidth, segTopY)
+        ..lineTo(getLeftX(trapezoidCenter.dx, segBottomWidth) + segBottomWidth,
+            segBottomY)
         ..lineTo(getLeftX(trapezoidCenter.dx, segBottomWidth), segBottomY)
         ..close();
 
@@ -860,7 +927,8 @@ class CombinedGaugePainter extends CustomPainter {
   }
 
   /// 绘制温度标签和数值
-  void _drawTempLabel(Canvas canvas, Offset center, double height, int value, String label, bool alignRight) {
+  void _drawTempLabel(Canvas canvas, Offset center, double height, int value,
+      String label, bool alignRight) {
     final labelStyle = AppTheme.labelMediumPrimary12;
     //  TextStyle(
     //       color: AppTheme.accentCyan.withValues(alpha: 0.99),
@@ -888,7 +956,8 @@ class CombinedGaugePainter extends CustomPainter {
 
     labelPainter.paint(
       canvas,
-      Offset(getLeftX(center.dx, labelPainter.width), center.dy - height / 2 - labelPainter.height - 4),
+      Offset(getLeftX(center.dx, labelPainter.width),
+          center.dy - height / 2 - labelPainter.height - 4),
     );
 
     // 绘制数值 - 维持在进度条下方
@@ -900,7 +969,8 @@ class CombinedGaugePainter extends CustomPainter {
 
     valuePainter.paint(
       canvas,
-      Offset(getLeftX(center.dx, valuePainter.width), center.dy + height / 2 + 4),
+      Offset(
+          getLeftX(center.dx, valuePainter.width), center.dy + height / 2 + 4),
     );
   }
 }

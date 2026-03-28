@@ -15,7 +15,11 @@ class SideStatsPanel extends StatelessWidget {
 
         return Container(
           padding: const EdgeInsets.all(6),
-          decoration: AppTheme.surfaceBorder(),
+          decoration: BoxDecoration(
+            color: AppTheme.deepSpace.withValues(alpha: 0.85),
+            border: Border.all(color: AppTheme.accentCyan.withValues(alpha: 0.18), width: 1),
+            borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -104,46 +108,6 @@ class SideStatsPanel extends StatelessWidget {
   }
 }
 
-/// 温度卡片
-class _TempCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-
-  const _TempCard({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: iconColor, size: 14),
-              const SizedBox(width: 4),
-              Text(label, style: AppTheme.labelMediumPrimary),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Text(value, style: AppTheme.valueMedium),
-        ],
-      ),
-    );
-  }
-}
-
 /// 进度条
 class _ProgressBar extends StatelessWidget {
   final IconData icon;
@@ -164,9 +128,10 @@ class _ProgressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(6),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
+      decoration: BoxDecoration(
+        color: AppTheme.deepSpace.withValues(alpha: 0.7),
+        border: Border.all(color: AppTheme.accentCyan.withValues(alpha: 0.10), width: 1),
+        borderRadius: const BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,9 +190,10 @@ class _LeanAngleIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(6),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
+      decoration: BoxDecoration(
+        color: AppTheme.deepSpace.withValues(alpha: 0.7),
+        border: Border.all(color: AppTheme.accentCyan.withValues(alpha: 0.10), width: 1),
+        borderRadius: const BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,9 +290,10 @@ class _PressureChart extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(6),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
+      decoration: BoxDecoration(
+        color: AppTheme.deepSpace.withValues(alpha: 0.7),
+        border: Border.all(color: AppTheme.accentCyan.withValues(alpha: 0.10), width: 1),
+        borderRadius: const BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -444,9 +411,10 @@ class _VoltageDisplay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(6),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
+      decoration: BoxDecoration(
+        color: AppTheme.deepSpace.withValues(alpha: 0.7),
+        border: Border.all(color: AppTheme.neonPink.withValues(alpha: 0.15), width: 1),
+        borderRadius: const BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

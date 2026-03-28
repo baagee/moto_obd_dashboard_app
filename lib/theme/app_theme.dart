@@ -5,8 +5,11 @@ class AppTheme {
   // ========== 基础颜色 ==========
   static const Color primary = Color(0xFF0DA6F2);
   static const Color backgroundDark = Color(0xFF0A1114);
+  static const Color deepSpace = Color(0xFF050A14);   // 更深的宇宙黑背景
   static const Color surface = Color(0xFF162229);
   static const Color accentCyan = Color(0xFF00F2FF);
+  static const Color neonCyan = Color(0xFF00F2FF);    // 霓虹青（同 accentCyan，语义别名）
+  static const Color neonPink = Color(0xFFFF2D78);    // 品红（比 accentPink 更亮）
   static const Color accentRed = Color(0xFFFF4D4D);
   static const Color accentOrange = Color(0xFFFFAB40);
   static const Color accentGreen = Color(0xFF00E676);
@@ -29,6 +32,10 @@ class AppTheme {
   static const Color primary15 = Color(0x260DA6F2); // 0.15 opacity
 
   static const Color accentCyan20 = Color(0x3300F2FF);
+  static const Color accentCyan10 = Color(0x1A00F2FF); // 6% 青
+  static const Color accentCyan05 = Color(0x0D00F2FF); // 3% 青（装饰圆用）
+  static const Color neonPink15 = Color(0x26FF2D78);   // 品红 15% 透明度
+  static const Color neonPink08 = Color(0x14FF2D78);   // 品红 8% 透明度
   static const Color accentOrange20 = Color(0x33FFAB40);
 
   static const Color accentGreen50 = Color(0x8000E676); // 0.5 opacity

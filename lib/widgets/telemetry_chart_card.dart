@@ -12,12 +12,12 @@ class TelemetryChartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<OBDDataProvider>(
       builder: (context, provider, child) {
-
         return Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: AppTheme.surface40,
-            border: Border.all(color: AppTheme.primary10),
+            color: AppTheme.deepSpace.withValues(alpha: 0.85),
+            border: Border.all(
+                color: AppTheme.accentCyan.withValues(alpha: 0.15), width: 1),
             borderRadius: BorderRadius.circular(AppTheme.radiusCard),
           ),
           child: Column(
@@ -32,7 +32,8 @@ class TelemetryChartCard extends StatelessWidget {
                     children: [
                       const _LegendDot(color: AppTheme.primary, label: '转速'),
                       const SizedBox(width: 10),
-                      const _LegendDot(color: AppTheme.accentCyan, label: '速度 (km/h)'),
+                      const _LegendDot(
+                          color: AppTheme.neonCyan, label: '速度 (km/h)'),
                     ],
                   ),
                 ],
@@ -65,7 +66,7 @@ class TelemetryChartCard extends StatelessWidget {
                     // 右侧Y轴（时速）
                     const _YAxisLabels(
                       labels: ['230', '173', '115', '58', '0'],
-                      color: AppTheme.accentCyan,
+                      color: AppTheme.neonCyan,
                       isLeft: false,
                     ),
                   ],
@@ -190,7 +191,7 @@ class TelemetryChartPainter extends CustomPainter {
       );
     }
 
-    // 绘制速度线条
+    // 绘制速度线条（改为品红虚线）
     if (velocityHistory.isNotEmpty) {
       _drawDashedLine(
         canvas,
@@ -199,14 +200,14 @@ class TelemetryChartPainter extends CustomPainter {
         padding,
         velocityHistory,
         230,
-        AppTheme.accentCyan,
+        AppTheme.neonCyan,
       );
     }
   }
 
   void _drawGridLines(Canvas canvas, double width, double height) {
     final gridPaint = Paint()
-      ..color = AppTheme.primary10
+      ..color = AppTheme.accentCyan.withValues(alpha: 0.06)
       ..strokeWidth = 1;
 
     // 水平网格线
@@ -230,7 +231,8 @@ class TelemetryChartPainter extends CustomPainter {
 
     for (int i = 0; i < data.length; i++) {
       final x = i * step;
-      final y = height - padding - ((data[i] / maxValue) * (height - 2 * padding));
+      final y =
+          height - padding - ((data[i] / maxValue) * (height - 2 * padding));
       points.add(Offset(x, y));
     }
 
@@ -251,8 +253,8 @@ class TelemetryChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          color.withOpacity(0.2),
-          color.withOpacity(0),
+          color.withValues(alpha: 0.25),
+          color.withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromLTWH(0, 0, width, height));
 
@@ -289,7 +291,8 @@ class TelemetryChartPainter extends CustomPainter {
 
     for (int i = 0; i < data.length; i++) {
       final x = i * step;
-      final y = height - padding - ((data[i] / maxValue) * (height - 2 * padding));
+      final y =
+          height - padding - ((data[i] / maxValue) * (height - 2 * padding));
       points.add(Offset(x, y));
     }
 
@@ -342,7 +345,8 @@ class TelemetryChartPainter extends CustomPainter {
   bool shouldRepaint(covariant TelemetryChartPainter oldDelegate) {
     // 优化：比较长度和最后一个元素，避免深度比较
     if (oldDelegate.rpmHistory.length != rpmHistory.length) return true;
-    if (oldDelegate.velocityHistory.length != velocityHistory.length) return true;
+    if (oldDelegate.velocityHistory.length != velocityHistory.length)
+      return true;
     // if (rpmHistory.isEmpty || velocityHistory.isEmpty) return false;
     return oldDelegate.rpmHistory.last != rpmHistory.last ||
         oldDelegate.velocityHistory.last != velocityHistory.last;
