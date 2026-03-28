@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import '../models/obd_data.dart';
 
@@ -142,7 +143,8 @@ class GeocodingService {
       final roads = regeocode['roads'] as List<dynamic>?;
       final addressComponent =
           regeocode['addressComponent'] as Map<String, dynamic>?;
-      final district = addressComponent?['district'] as String?;
+      final districtRaw = addressComponent?['district'];
+      final district = districtRaw is String ? districtRaw : null;
       if (roads != null && roads.isNotEmpty) {
         final roadName = (roads[0] as Map<String, dynamic>)['name'] as String?;
         if (roadName != null && roadName.isNotEmpty) {
@@ -166,7 +168,8 @@ class GeocodingService {
         if (district != null && district.isNotEmpty && district != '[]') {
           parts.add(district);
         }
-        final township = addressComponent['township'] as String?;
+        final townshipRaw = addressComponent['township'];
+        final township = townshipRaw is String ? townshipRaw : null;
         if (township != null && township.isNotEmpty && township != '[]') {
           parts.add(township);
         }
@@ -219,20 +222,18 @@ class GeocodingService {
     double dLat = _transformLat(lng - 105.0, lat - 35.0);
     double dLng = _transformLng(lng - 105.0, lat - 35.0);
 
-    final radLat = lat / 180.0 * 3.14159265358979324;
+    final radLat = lat / 180.0 * math.pi;
+    final sinRad = math.sin(radLat);
+    final sin2Rad = sinRad * sinRad;
     double magic = 1 -
         ee *
             (1 - ee) *
             (1 - ee) *
-            (radLat.abs() < 0.00001 ? 1 : (1 - ee * _sin2(radLat)));
-    magic = magic < 0.0000001 ? 0.0000001 : magic;
-    final sqrtMagic =
-        magic < 0 ? 0.0 : (magic < 0.0001 ? 0.01 : _mySqrt(magic));
-    dLat = dLat *
-        180.0 /
-        ((a * (1 - ee)) / (magic * sqrtMagic) * 3.14159265358979324);
-    dLng =
-        dLng * 180.0 / (a / sqrtMagic * _myCos(radLat) * 3.14159265358979324);
+            (radLat.abs() < 0.00001 ? 1 : (1 - ee * sin2Rad));
+    if (magic < 0.0000001) magic = 0.0000001;
+    final sqrtMagic = math.sqrt(magic);
+    dLat = dLat * 180.0 / ((a * (1 - ee)) / (magic * sqrtMagic) * math.pi);
+    dLng = dLng * 180.0 / (a / sqrtMagic * math.cos(radLat) * math.pi);
 
     return [lat + dLat, lng + dLng];
   }
@@ -243,17 +244,16 @@ class GeocodingService {
         3.0 * y +
         0.2 * y * y +
         0.1 * x * y +
-        0.2 * _mySqrt(x.abs());
-    ret += (20.0 * _mySin(6.0 * x * 3.14159265358979324) +
-            20.0 * _mySin(2.0 * x * 3.14159265358979324)) *
+        0.2 * math.sqrt(x.abs());
+    ret += (20.0 * math.sin(6.0 * x * math.pi) +
+            20.0 * math.sin(2.0 * x * math.pi)) *
         2.0 /
         3.0;
-    ret += (20.0 * _mySin(y * 3.14159265358979324) +
-            40.0 * _mySin(y / 3.0 * 3.14159265358979324)) *
+    ret += (20.0 * math.sin(y * math.pi) + 40.0 * math.sin(y / 3.0 * math.pi)) *
         2.0 /
         3.0;
-    ret += (160.0 * _mySin(y / 12.0 * 3.14159265358979324) +
-            320 * _mySin(y * 3.14159265358979324 / 30.0)) *
+    ret += (160.0 * math.sin(y / 12.0 * math.pi) +
+            320 * math.sin(y * math.pi / 30.0)) *
         2.0 /
         3.0;
     return ret;
@@ -265,40 +265,18 @@ class GeocodingService {
         2.0 * y +
         0.1 * x * x +
         0.1 * x * y +
-        0.1 * _mySqrt(x.abs());
-    ret += (20.0 * _mySin(6.0 * x * 3.14159265358979324) +
-            20.0 * _mySin(2.0 * x * 3.14159265358979324)) *
+        0.1 * math.sqrt(x.abs());
+    ret += (20.0 * math.sin(6.0 * x * math.pi) +
+            20.0 * math.sin(2.0 * x * math.pi)) *
         2.0 /
         3.0;
-    ret += (20.0 * _mySin(x * 3.14159265358979324) +
-            40.0 * _mySin(x / 3.0 * 3.14159265358979324)) *
+    ret += (20.0 * math.sin(x * math.pi) + 40.0 * math.sin(x / 3.0 * math.pi)) *
         2.0 /
         3.0;
-    ret += (150.0 * _mySin(x / 12.0 * 3.14159265358979324) +
-            300.0 * _mySin(x / 30.0 * 3.14159265358979324)) *
+    ret += (150.0 * math.sin(x / 12.0 * math.pi) +
+            300.0 * math.sin(x / 30.0 * math.pi)) *
         2.0 /
         3.0;
     return ret;
-  }
-
-  static double _sin2(double x) => _mySin(x) * _mySin(x);
-  static double _mySin(double x) {
-    double result = 0;
-    double term = x;
-    int sign = 1;
-    for (int i = 1; i <= 10; i++) {
-      result += sign * term;
-      term = term * x * x / ((2 * i) * (2 * i + 1));
-      sign = -sign;
-    }
-    return result;
-  }
-
-  static double _myCos(double x) => _mySin(x + 1.5707963267948966);
-  static double _mySqrt(double x) {
-    if (x <= 0) return 0;
-    double r = x;
-    for (int i = 0; i < 20; i++) r = (r + x / r) / 2;
-    return r;
   }
 }

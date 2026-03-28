@@ -476,8 +476,15 @@ class RidingStatsProvider extends ChangeNotifier {
   void _saveRidingRecord(int duration) async {
     if (_ridingRecordProvider == null || _rideStartTime == null) return;
 
-    // 最小阈值过滤：时长 < 30秒 且 距离 < 20米，视为无效骑行（误触/测试/dispose 遗留），丢弃
+    // 无效骑行过滤：以下任一条件满足则丢弃
+    //  1. 最大速度为 0（整个会话没有行驶，比如设备连接后立即断开）
+    //  2. 距离 < 20米 且 时长 < 30秒（短时误触/测试）
     final distanceMeters = _totalGpsDistance;
+    if (_maxSpeed == 0) {
+      _logCallback?.call('Stats', LogType.warning,
+          '骑行记录已丢弃（最大速度为 0，判定为未实际行驶，时长=${duration}s）');
+      return;
+    }
     if (duration < 30 && distanceMeters < 20) {
       _logCallback?.call('Stats', LogType.warning,
           '骑行记录已丢弃（时长=${duration}s, 距离=${distanceMeters.toStringAsFixed(1)}m，未达到最小阈值）');
