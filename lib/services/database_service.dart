@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -511,9 +511,11 @@ class DatabaseService {
       final endTime = startTime.add(Duration(minutes: 15 + i * 3));
       final duration = endTime.difference(startTime).inSeconds;
 
-      final distance = 5.0 + i * 2.5; // 5km ~ 15km
-      final avgSpeed = (distance / duration * 3600); // km/h
-      final maxSpeed = avgSpeed * 3;
+      final distance = 5.0 + i * 2.5; // 5km ~ 27.5km
+      // 直接给合理的骑行均速（35~65 km/h），不再从距离/时长反算
+      final avgSpeed = 35.0 + (i * 3.5 + random % 15);
+      // 极速独立设定（80~130 km/h），与均速解耦
+      final maxSpeed = 80.0 + (i * 6.0 + random % 30).toDouble().clamp(0, 50);
       final maxLeftLean = 20.0 + (random + i * 3) % 25;
       final maxRightLean = 18.0 + (random + i * 2) % 23;
 
@@ -542,7 +544,30 @@ class DatabaseService {
         final startLng = (startLoc['lng'] as double);
         final endLat = (endLoc['lat'] as double);
         final endLng = (endLoc['lng'] as double);
-        final rng = Random(recordId);
+        final rng = math.Random(recordId);
+
+        // 预生成平滑速度序列：以 maxSpeed 为峰值目标，低频正弦基底 + 随机游走扰动
+        final List<double> speeds = [];
+        double currentSpeed = avgSpeed * 0.5; // 起步较慢
+        for (int w = 0; w < waypointCount; w++) {
+          final t = w / (waypointCount - 1);
+          // 低频基底：以 avgSpeed 巡航，峰值可触及 maxSpeed
+          // sin 阶段模拟加速→巡航→减速，0.2*sin(3π) 叠加小波动
+          final cruiseFraction = avgSpeed / maxSpeed; // 巡航比（0.4~0.7 左右）
+          final base = maxSpeed *
+              (cruiseFraction *
+                      (0.6 + 0.4 * math.sin(t * math.pi).clamp(0.0, 1.0)) +
+                  0.15 * math.sin(t * math.pi * 3 + 0.5));
+          // 随机游走：每步最多 ±5 km/h，向 base 回归
+          final drift = (rng.nextDouble() - 0.5) * 10.0;
+          currentSpeed += (base - currentSpeed) * 0.15 + drift;
+          currentSpeed = currentSpeed.clamp(8.0, maxSpeed);
+          speeds.add(currentSpeed);
+        }
+        // 强制在中间某个点写入 maxSpeed，确保极速可见
+        final peakIdx =
+            (waypointCount * 0.45).toInt().clamp(0, waypointCount - 1);
+        speeds[peakIdx] = maxSpeed;
 
         final List<Map<String, dynamic>> waypoints = [];
         for (int w = 0; w < waypointCount; w++) {
@@ -553,15 +578,11 @@ class DatabaseService {
           final lng = startLng +
               (endLng - startLng) * t +
               (rng.nextDouble() - 0.5) * 0.002;
-          // 速度模拟：中间段稍快，首尾稍慢
-          final speedFactor =
-              0.5 + 1.0 * (t < 0.1 || t > 0.9 ? t.clamp(0.0, 0.1) * 5 : 1.0);
-          final speed = avgSpeed * speedFactor;
           final ts = startTime.millisecondsSinceEpoch + (w * 2000);
           waypoints.add({
             'latitude': lat,
             'longitude': lng,
-            'speed': speed,
+            'speed': speeds[w],
             'timestamp': ts,
           });
         }

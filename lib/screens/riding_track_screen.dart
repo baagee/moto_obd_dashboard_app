@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -10,7 +9,7 @@ import '../services/geocoding_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cyber_dialog.dart';
 import '../widgets/riding_event_item.dart';
-import '../widgets/track_stats_card.dart';
+import '../widgets/speed_chart.dart';
 
 /// 骑行轨迹全屏地图页面
 class RidingTrackScreen extends StatefulWidget {
@@ -21,6 +20,9 @@ class RidingTrackScreen extends StatefulWidget {
   @override
   State<RidingTrackScreen> createState() => _RidingTrackScreenState();
 }
+
+// 曲线图高度常量
+const double _kChartHeight = 90.0;
 
 class _RidingTrackScreenState extends State<RidingTrackScreen> {
   final MapController _mapController = MapController();
@@ -43,6 +45,9 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
 
   // 防抖定时器
   Timer? _debounceTimer;
+
+  // 速度曲线图游标（waypoint 原始索引）
+  int? _cursorIndex;
 
   @override
   void initState() {
@@ -229,20 +234,46 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
             child: _buildAppBar(context),
           ),
 
-          // ── 右侧统计竖列 ──
+          // ── 底部速度曲线图（全屏宽度） ──
+          if (!_isLoading && _allWaypoints.length >= 2)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: _kChartHeight,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.backgroundDark.withOpacity(0.82),
+                  border: const Border(
+                    top: BorderSide(color: Color(0x33FFFFFF), width: 0.5),
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                child: SpeedChart(
+                  waypoints: _allWaypoints,
+                  events: _events,
+                  recordMaxSpeed: widget.record.maxSpeed,
+                  cursorIndex: _cursorIndex,
+                  onCursorChanged: (idx) {
+                    setState(() => _cursorIndex = idx);
+                  },
+                ),
+              ),
+            ),
+          // ── 统计卡（右侧竖列，吸附屏幕右边，在折线图上方居中） ──
           Positioned(
-            right: 12,
+            right: 0,
             top: 0,
-            bottom: 0,
+            bottom: _kChartHeight,
             child: Center(
               child: _buildStatsColumn(),
             ),
           ),
-          // ── 轨迹点 badge（右下角） ──
+          // ── 轨迹点 badge（折线图左上角） ──
           if (!_isLoading && _allWaypoints.isNotEmpty)
             Positioned(
-              right: 12,
-              bottom: 16,
+              left: 8,
+              bottom: _kChartHeight + 8,
               child: _WaypointBadge(
                 count: _allWaypoints.length,
                 zoom: _currentZoom,
@@ -317,13 +348,22 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         },
       ),
       children: [
-        // 高德暗色夜间瓦片（style=6 为黑色路网，与 App 深色主题一致）
-        TileLayer(
-          urlTemplate:
-              'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
-          userAgentPackageName: 'com.example.obd_dashboard',
-          subdomains: const ['webst01', 'webst02', 'webst03', 'webst04'],
-          tileProvider: NetworkTileProvider(),
+        // 高德标准路网瓦片 + ColorFiltered 暗色处理（公开API无原生夜间模式）
+        ColorFiltered(
+          colorFilter: const ColorFilter.matrix([
+            // 反色 + 降饱和 + 色调偏蓝灰，模拟暗色地图
+            -0.6, 0, 0, 0, 180,
+            0, -0.6, 0, 0, 180,
+            0, 0, -0.6, 0, 200,
+            0, 0, 0, 1, 0,
+          ]),
+          child: TileLayer(
+            urlTemplate:
+                'https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+            userAgentPackageName: 'com.example.obd_dashboard',
+            subdomains: const ['webrd01', 'webrd02', 'webrd03', 'webrd04'],
+            tileProvider: NetworkTileProvider(),
+          ),
         ),
         // 速度渐变轨迹折线
         PolylineLayer(
@@ -355,6 +395,32 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
             ),
           ],
         ),
+        // 游标位置圆点（拖动速度曲线图时联动）
+        if (_cursorIndex != null && _cursorIndex! < _cachedGcjPoints.length)
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: _cachedGcjPoints[_cursorIndex!],
+                width: 20,
+                height: 20,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: const Color(0xFF00FF85), width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.5),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -473,16 +539,24 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     );
   }
 
-  /// 右侧竖列统计卡片
+  /// 统计卡（竖向，吸附屏幕右侧）
   Widget _buildStatsColumn() {
     final record = widget.record;
     return Container(
-      width: 90,
+      width: 88,
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundDark.withOpacity(0.82),
-        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-        border: Border.all(color: AppTheme.primary20),
+        color: AppTheme.backgroundDark.withOpacity(0.88),
+        // 只有左侧两个圆角，右侧贴边
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(AppTheme.radiusCard),
+          bottomLeft: Radius.circular(AppTheme.radiusCard),
+        ),
+        border: Border(
+          top: BorderSide(color: AppTheme.primary20),
+          left: BorderSide(color: AppTheme.primary20),
+          bottom: BorderSide(color: AppTheme.primary20),
+        ),
         boxShadow: [
           BoxShadow(
             color: AppTheme.primary.withOpacity(0.08),
@@ -493,6 +567,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _StatCell(
             icon: Icons.route,
@@ -582,24 +657,22 @@ class _StatCell extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 第一行：icon + 标签
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color.withOpacity(0.7), size: 14),
+              Icon(icon, color: color.withOpacity(0.7), size: 13),
               const SizedBox(width: 3),
               Text(
                 label,
                 style: const TextStyle(
                   color: AppTheme.textMuted,
-                  fontSize: 14,
+                  fontSize: 9,
                   letterSpacing: 0.4,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 1),
-          // 第二行：数值 + 单位
           RichText(
             text: TextSpan(
               children: [
@@ -634,7 +707,7 @@ class _StatDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 2),
       color: AppTheme.primary10,
     );
   }
