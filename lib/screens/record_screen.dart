@@ -36,7 +36,7 @@ class _RecordScreenState extends State<RecordScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RidingRecordProvider>().initialize();
+      context.read<RidingRecordProvider>().initialize(force: true);
     });
   }
 
@@ -105,8 +105,8 @@ class _RecordScreenState extends State<RecordScreen> {
         return Container(
           margin: const EdgeInsets.fromLTRB(12, 4, 12, 12),
           decoration: BoxDecoration(
-            color: AppTheme.surface.withOpacity(0.3),
-            border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+            color: AppTheme.surface40,
+            border: Border.all(color: AppTheme.primary10),
             borderRadius: BorderRadius.circular(AppTheme.radiusCard),
           ),
           child: ListView.builder(
@@ -170,7 +170,7 @@ class _RecordScreenState extends State<RecordScreen> {
   void _insertMockData() async {
     await DatabaseService.insertMockRidingRecords();
     if (!mounted) return;
-    await context.read<RidingRecordProvider>().initialize();
+    await context.read<RidingRecordProvider>().initialize(force: true);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('✅ 已插入 5 条测试数据'),
@@ -211,9 +211,9 @@ class _RecordCompactHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.5),
+        color: AppTheme.surface50,
         border: Border(
-          bottom: BorderSide(color: AppTheme.primary.withOpacity(0.2)),
+          bottom: BorderSide(color: AppTheme.primary20),
         ),
       ),
       child: Row(
@@ -226,7 +226,7 @@ class _RecordCompactHeader extends StatelessWidget {
               Text(
                 'RIDING RECORDS',
                 style: TextStyle(
-                  color: AppTheme.primary.withOpacity(0.6),
+                  color: AppTheme.primary60,
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
@@ -290,8 +290,7 @@ class _RecordCompactHeader extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius:
                             BorderRadius.circular(AppTheme.radiusButton),
-                        border: Border.all(
-                            color: AppTheme.accentGreen.withOpacity(0.5)),
+                        border: Border.all(color: AppTheme.accentGreen50),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -323,8 +322,7 @@ class _RecordCompactHeader extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(AppTheme.radiusButton),
-                    border:
-                        Border.all(color: AppTheme.accentRed.withOpacity(0.5)),
+                    border: Border.all(color: AppTheme.accentRed50),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -373,11 +371,10 @@ class _EmptyState extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppTheme.surface,
-              border: Border.all(
-                  color: AppTheme.primary.withOpacity(0.3), width: 1.5),
+              border: Border.all(color: AppTheme.primary30, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primary.withOpacity(0.15),
+                  color: AppTheme.primary15,
                   blurRadius: 20,
                   spreadRadius: 4,
                 ),
@@ -391,7 +388,7 @@ class _EmptyState extends StatelessWidget {
                   child: CircularProgressIndicator(
                     value: 0.75,
                     strokeWidth: 1,
-                    color: AppTheme.primary.withOpacity(0.2),
+                    color: AppTheme.primary20,
                     backgroundColor: Colors.transparent,
                   ),
                 ),
@@ -408,7 +405,7 @@ class _EmptyState extends StatelessWidget {
           Text(
             'NO RIDING RECORDS',
             style: TextStyle(
-              color: AppTheme.primary.withOpacity(0.7),
+              color: AppTheme.primary70,
               fontSize: 12,
               fontWeight: FontWeight.bold,
               letterSpacing: 3,
@@ -511,10 +508,7 @@ class _TimeFilterChip extends StatelessWidget {
             const SizedBox(width: 3),
             Text(
               label,
-              style: TextStyle(
-                color: isActive
-                    ? activeColor.withOpacity(0.8)
-                    : mutedColor.withOpacity(0.6),
+              style: TextStyle(color: isActive ? activeColor : mutedColor,
                 fontSize: 10,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.3,

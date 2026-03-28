@@ -181,6 +181,11 @@ class RidingStatsProvider extends ChangeNotifier {
     _positionSubscription = null;
   }
 
+  /// GPS 过滤常量
+  static const double _maxReasonableSpeedMs = 69.44; // 250 km/h，摩托车极速上限
+  static const int _maxGpsGapSeconds = 30; // GPS 失联超过此时长视为异常跳跃
+  static const double _minMoveDistance = 3.0; // 小于 3m 视为静止噪声，不累加
+
   /// GPS 位置更新处理
   void _onPositionUpdate(PositionData position) {
     if (!_isRiding) return;
@@ -195,21 +200,27 @@ class RidingStatsProvider extends ChangeNotifier {
 
     if (_lastPosition != null) {
       final distance = _calculateDistance(_lastPosition!, position);
-      final timeDiff =
-          position.timestamp.difference(_lastPosition!.timestamp).inSeconds;
+      final timeDiffMs = position.timestamp
+          .difference(_lastPosition!.timestamp)
+          .inMilliseconds;
+      final timeDiffSec = timeDiffMs / 1000.0;
 
-      // 计算瞬时速度（m/s）
-      final speed = timeDiff > 0 ? (distance / timeDiff) : 0;
+      // 计算瞬时速度（m/s），使用毫秒精度避免 < 1s 时除零
+      final speed = timeDiffMs > 0 ? (distance / timeDiffSec) : 0.0;
 
-      // 智能过滤：
-      // 1. 距离 < 200m（放宽阈值，容忍高速场景下的延迟采样）
-      // 2. 速度 < 50m/s (180km/h，过滤异常漂移)
-      if (distance < 200 && speed < 50) {
-        _totalGpsDistance += distance;
-      } else {
-        // 记录过滤日志（用于诊断）
+      if (distance < _minMoveDistance) {
+        // 静止噪声：忽略，不计入里程
+      } else if (timeDiffSec > _maxGpsGapSeconds) {
+        // GPS 失联后大跳跃：跳过此段，避免里程虚增
         _logCallback?.call('GPS', LogType.warning,
-            '过滤异常采样点: ${distance.toStringAsFixed(1)}m, ${(speed * 3.6).toStringAsFixed(1)}km/h');
+            'GPS 信号中断 ${timeDiffSec.toStringAsFixed(0)}s 后重连，跳过此段 ${distance.toStringAsFixed(0)}m');
+      } else if (speed > _maxReasonableSpeedMs) {
+        // 速度超出摩托车极限：GPS 漂移，过滤
+        _logCallback?.call('GPS', LogType.warning,
+            '过滤 GPS 漂移: ${distance.toStringAsFixed(1)}m, ${(speed * 3.6).toStringAsFixed(1)}km/h');
+      } else {
+        // 正常采样：累加里程
+        _totalGpsDistance += distance;
       }
     }
     _lastPosition = position;
@@ -248,20 +259,27 @@ class RidingStatsProvider extends ChangeNotifier {
     _sampler.addSample('temp', data.coolantTemp.toDouble());
     _sampler.addSample('voltage', data.voltage);
     _sampler.addSample('load', data.load.toDouble());
-    _sampler.addSample('lean', data.leanAngle.toDouble());
     _sampler.addSample('intakeTemp', data.intakeTemp.toDouble());
     _sampler.addSample('throttle', data.throttle.toDouble());
+    const int maxSpeed = 3;
+    // 倾角只在车速 >= maxSpeed km/h 时统计，过滤低速/静止时的传感器噪声
+    if (data.speed >= maxSpeed) {
+      _sampler.addSample('lean', data.leanAngle.toDouble());
+    }
 
     // 实时更新全程统计数据
     final speed = data.speed.toDouble();
     if (speed > _maxSpeed) _maxSpeed = speed;
 
-    final leanAngle = data.leanAngle.toDouble();
-    final leanDirection = data.leanDirection.toLowerCase();
-    if (leanDirection == 'left' && leanAngle > _maxLeftLean) {
-      _maxLeftLean = leanAngle;
-    } else if (leanDirection == 'right' && leanAngle > _maxRightLean) {
-      _maxRightLean = leanAngle;
+    // 最大倾角只在车速 >= maxSpeed km/h 时统计，过滤低速/静止时的传感器噪声
+    if (data.speed >= maxSpeed) {
+      final leanAngle = data.leanAngle.toDouble();
+      final leanDirection = data.leanDirection.toLowerCase();
+      if (leanDirection == 'left' && leanAngle > _maxLeftLean) {
+        _maxLeftLean = leanAngle;
+      } else if (leanDirection == 'right' && leanAngle > _maxRightLean) {
+        _maxRightLean = leanAngle;
+      }
     }
 
     // 累积速度和计数（用于计算全程平均速度）
@@ -469,8 +487,15 @@ class RidingStatsProvider extends ChangeNotifier {
   void _saveRidingRecord(int duration) async {
     if (_ridingRecordProvider == null || _rideStartTime == null) return;
 
-    // 最小阈值过滤：时长 < 30秒 且 距离 < 20米，视为无效骑行（误触/测试/dispose 遗留），丢弃
+    // 无效骑行过滤：以下任一条件满足则丢弃
+    //  1. 最大速度为 0（整个会话没有行驶，比如设备连接后立即断开）
+    //  2. 距离 < 20米 且 时长 < 30秒（短时误触/测试）
     final distanceMeters = _totalGpsDistance;
+    if (_maxSpeed == 0) {
+      _logCallback?.call('Stats', LogType.warning,
+          '骑行记录已丢弃（最大速度为 0，判定为未实际行驶，时长=${duration}s）');
+      return;
+    }
     if (duration < 30 && distanceMeters < 20) {
       _logCallback?.call('Stats', LogType.warning,
           '骑行记录已丢弃（时长=${duration}s, 距离=${distanceMeters.toStringAsFixed(1)}m，未达到最小阈值）');
@@ -490,17 +515,7 @@ class RidingStatsProvider extends ChangeNotifier {
     final endPoint = _gpsTrack.isNotEmpty ? _gpsTrack.last : null;
 
     // 转换事件
-    final events = _eventHistory
-        .map((e) => RidingRecordEvent(
-              type: e.type.toString(),
-              title: e.title,
-              description: e.description,
-              triggerValue: e.triggerValue,
-              threshold: e.threshold,
-              timestamp: e.timestamp.millisecondsSinceEpoch,
-              additionalData: e.additionalData,
-            ))
-        .toList();
+    final events = _eventHistory.map((e) => e.toRidingRecordEvent()).toList();
 
     // 优先使用 GPS 计算的距离，否则用 OBD 车速积分
     double distance;

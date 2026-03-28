@@ -39,13 +39,18 @@ void main() {
         ChangeNotifierProvider<NavigationProvider>(
           create: (_) => NavigationProvider(),
         ),
-        // 音频服务 Provider
-        ChangeNotifierProvider<AudioService>(
-          create: (_) => AudioService(),
+        // 音频服务 Provider（依赖 LogProvider）
+        ChangeNotifierProxyProvider<LogProvider, AudioService>(
+          create: (context) => AudioService(
+            logProvider: context.read<LogProvider>(),
+          ),
+          update: (context, logProvider, previous) =>
+              previous ?? AudioService(logProvider: logProvider),
         ),
 
         // 传感器 Provider - 管理倾角传感器（依赖 OBDDataProvider + LogProvider）
-        ChangeNotifierProxyProvider2<OBDDataProvider, LogProvider, SensorProvider>(
+        ChangeNotifierProxyProvider2<OBDDataProvider, LogProvider,
+            SensorProvider>(
           create: (context) => SensorProvider(
             obdDataProvider: context.read<OBDDataProvider>(),
             logProvider: context.read<LogProvider>(),
@@ -59,27 +64,36 @@ void main() {
         ),
 
         // ProxyProvider - 通过依赖注入创建 BluetoothProvider
-        // OBDDataProvider 和 LogProvider 会在创建时自动注入
-        ChangeNotifierProxyProvider2<OBDDataProvider, LogProvider, BluetoothProvider>(
+        // OBDDataProvider、LogProvider 和 AudioService 会在创建时自动注入
+        ChangeNotifierProxyProvider3<OBDDataProvider, LogProvider, AudioService,
+            BluetoothProvider>(
           create: (context) => BluetoothProvider(
             obdDataProvider: context.read<OBDDataProvider>(),
             logProvider: context.read<LogProvider>(),
+            audioService: context.read<AudioService>(),
           ),
-          update: (context, obdDataProvider, logProvider, previous) =>
-              previous ??
-              BluetoothProvider(
-                obdDataProvider: obdDataProvider,
-                logProvider: logProvider,
-              ),
+          update:
+              (context, obdDataProvider, logProvider, audioService, previous) =>
+                  previous ??
+                  BluetoothProvider(
+                    obdDataProvider: obdDataProvider,
+                    logProvider: logProvider,
+                    audioService: audioService,
+                  ),
         ),
 
-        // 骑行记录 Provider - 骑行数据持久化
-        ChangeNotifierProvider<RidingRecordProvider>(
-          create: (_) => RidingRecordProvider(),
+        // 骑行记录 Provider - 骑行数据持久化（依赖 LogProvider）
+        ChangeNotifierProxyProvider<LogProvider, RidingRecordProvider>(
+          create: (context) => RidingRecordProvider(
+            logProvider: context.read<LogProvider>(),
+          ),
+          update: (context, logProvider, previous) =>
+              previous ?? RidingRecordProvider(logProvider: logProvider),
         ),
 
         // 骑行统计 Provider - 管理事件检测和统计（依赖 OBDDataProvider + LogProvider + AudioService + RidingRecordProvider）
-        ChangeNotifierProxyProvider2<OBDDataProvider, LogProvider, RidingStatsProvider>(
+        ChangeNotifierProxyProvider2<OBDDataProvider, LogProvider,
+            RidingStatsProvider>(
           create: (context) => RidingStatsProvider(
             obdDataProvider: context.read<OBDDataProvider>(),
             logProvider: context.read<LogProvider>(),

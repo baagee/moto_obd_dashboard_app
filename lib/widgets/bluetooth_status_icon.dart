@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/bluetooth_provider.dart';
+import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 
 /// 蓝牙状态图标组件 - 根据蓝牙状态显示不同图标
-class BluetoothStatusIcon extends StatelessWidget {
+class BluetoothStatusIcon extends StatefulWidget {
   final double size;
   final VoidCallback? onTap;
 
@@ -13,6 +14,48 @@ class BluetoothStatusIcon extends StatelessWidget {
     this.size = 12,
     this.onTap,
   });
+
+  @override
+  State<BluetoothStatusIcon> createState() => _BluetoothStatusIconState();
+}
+
+class _BluetoothStatusIconState extends State<BluetoothStatusIcon>
+    with WidgetsBindingObserver {
+  /// 定位权限及服务状态：true=已授权且服务开启，false=其他
+  bool _locationGranted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshLocationStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// 监听 APP 生命周期变化
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // 当 APP 从后台恢复到前台时，刷新定位状态
+    if (state == AppLifecycleState.resumed) {
+      _refreshLocationStatus();
+    }
+  }
+
+  Future<void> _refreshLocationStatus() async {
+    final serviceEnabled = await LocationService.isLocationServiceEnabled();
+    final permissionGranted = await LocationService.checkPermission();
+    if (mounted) {
+      setState(() {
+        _locationGranted = serviceEnabled && permissionGranted;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,8 +100,14 @@ class BluetoothStatusIcon extends StatelessWidget {
           signalIcon = Icons.signal_cellular_off;
         }
 
+        // 定位图标颜色：已授权且服务开启=绿色，否则=橙色警告
+        final locationIconColor =
+            _locationGranted ? AppTheme.accentGreen : AppTheme.accentOrange;
+        final locationIcon =
+            _locationGranted ? Icons.location_on : Icons.location_off;
+
         return GestureDetector(
-          onTap: onTap,
+          onTap: widget.onTap,
           behavior: HitTestBehavior.opaque,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
@@ -75,13 +124,19 @@ class BluetoothStatusIcon extends StatelessWidget {
                 Icon(
                   bluetoothIcon,
                   color: bluetoothIconColor,
-                  size: size,
+                  size: widget.size,
                 ),
                 const SizedBox(width: 6),
                 Icon(
                   signalIcon,
                   color: signalIconColor,
-                  size: size,
+                  size: widget.size,
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  locationIcon,
+                  color: locationIconColor,
+                  size: widget.size,
                 ),
               ],
             ),

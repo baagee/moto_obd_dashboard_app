@@ -21,9 +21,13 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> with Automati
   @override
   void initState() {
     super.initState();
-    // 页面加载后自动开始扫描
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BluetoothProvider>().startScan();
+      final provider = context.read<BluetoothProvider>();
+      // APP 启动时已扫描过（有结果或正在扫描中），跳过重复扫描
+      // 用户可通过刷新按钮手动触发重新扫描
+      if (!provider.isScanning && provider.scannedDevices.isEmpty) {
+        provider.startScan();
+      }
     });
   }
 

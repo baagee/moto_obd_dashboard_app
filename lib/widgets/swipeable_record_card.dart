@@ -128,7 +128,7 @@ class SwipeableRecordCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
       decoration: BoxDecoration(
-        color: accent.withOpacity(0.06),
+        color: accent.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
         border: Border(
           left: BorderSide(color: accent, width: 3),
@@ -143,9 +143,9 @@ class SwipeableRecordCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.15),
+                  color: accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                  border: Border.all(color: accent.withOpacity(0.4), width: 1),
+                  border: Border.all(color: accent.withValues(alpha: 0.4), width: 1),
                 ),
                 child: Text(
                   _intensityLabel,
@@ -174,10 +174,10 @@ class SwipeableRecordCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: accent.withOpacity(0.1),
+                    color: accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                     border:
-                        Border.all(color: accent.withOpacity(0.35), width: 1),
+                        Border.all(color: accent.withValues(alpha: 0.35), width: 1),
                   ),
                   child: Text(
                     '查看事件',
@@ -203,7 +203,7 @@ class SwipeableRecordCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(Icons.location_on_outlined,
-                        size: 14, color: AppTheme.textMuted.withOpacity(0.7)),
+                        size: 14, color: AppTheme.textMuted.withValues(alpha: 0.7)),
                     const SizedBox(width: 3),
                     Expanded(
                       child: Text(
@@ -260,7 +260,7 @@ class SwipeableRecordCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 28, color: color.withOpacity(0.5)),
+          Icon(icon, size: 28, color: color.withValues(alpha: 0.5)),
           const SizedBox(width: 3),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -10,6 +10,8 @@ import '../services/audio_service.dart';
 import '../models/riding_event.dart';
 import '../models/event_voice_config.dart';
 import '../widgets/bluetooth_alert_dialog.dart';
+import '../widgets/location_alert_dialog.dart';
+import '../services/location_service.dart';
 import '../widgets/event_notification_dialog.dart';
 import '../widgets/top_navigation_bar.dart';
 import 'dashboard_screen.dart';
@@ -98,6 +100,11 @@ class _MainContainerState extends State<MainContainer> {
     await bluetoothProvider.initialize();
     _hasCheckedBluetooth = true;
     await _checkAndShowBluetoothDialog();
+
+    // 蓝牙检查完成后，检查定位权限
+    if (mounted) {
+      await _checkAndShowLocationDialog();
+    }
   }
 
   Future<void> _checkAndShowBluetoothDialog() async {
@@ -121,6 +128,32 @@ class _MainContainerState extends State<MainContainer> {
         context,
         onOpenSettings: () => bluetoothProvider.openSettings(),
       );
+    }
+  }
+
+  Future<void> _checkAndShowLocationDialog() async {
+    if (!mounted) return;
+    final status = await LocationService.checkAndRequestOnLaunch();
+    if (!mounted) return;
+    switch (status) {
+      case LocationPermissionStatus.granted:
+        // 已授权，无需弹窗
+        break;
+      case LocationPermissionStatus.serviceDisabled:
+        LocationAlertDialog.showServiceDisabledDialog(
+          context,
+          onOpenSettings: () => LocationService.openSettings(),
+        );
+        break;
+      case LocationPermissionStatus.deniedForever:
+        LocationAlertDialog.showPermissionDeniedForeverDialog(
+          context,
+          onOpenSettings: () => LocationService.openSettings(),
+        );
+        break;
+      case LocationPermissionStatus.denied:
+        LocationAlertDialog.showPermissionDeniedDialog(context);
+        break;
     }
   }
 

@@ -1,0 +1,25 @@
+flutter_native_splash:
+  # 背景色：纯黑，配合霓虹仪表盘风格
+  color: "#000000"
+
+  # 中心 Logo 图片（直接使用现有 icon.png）
+  image: assets/icon.png
+
+  # 全屏沉浸式（隐藏状态栏和导航栏）
+  fullscreen: true
+
+  # 应用品牌名显示（仅支持 Android 12+）
+  android_12:
+    color: "#000000"
+    image: assets/icon.png
+    # Android 12 图标背景色（图标本身是圆形裁剪的）
+    icon_background_color: "#000000"
+    # 状态栏/导航栏图标颜色：light（白色图标）
+    color_dark: "#000000"
+    image_dark: assets/icon.png
+    icon_background_color_dark: "#000000"
+
+  # iOS 同步配置
+  ios: true
+
+  # 状态栏图标颜色（light = 白色图标，适合黑色背景）
