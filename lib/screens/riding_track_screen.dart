@@ -260,14 +260,11 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
                 ),
               ),
             ),
-          // ── 统计卡（右侧竖列，吸附屏幕右边，在折线图上方居中） ──
+          // ── 统计卡（右侧竖列，吸附屏幕右边，紧贴折线图上方） ──
           Positioned(
             right: 0,
-            top: 0,
-            bottom: _kChartHeight,
-            child: Center(
-              child: _buildStatsColumn(),
-            ),
+            bottom: _kChartHeight + 8,
+            child: _buildStatsColumn(),
           ),
           // ── 轨迹点 badge（折线图左上角） ──
           if (!_isLoading && _allWaypoints.isNotEmpty)
