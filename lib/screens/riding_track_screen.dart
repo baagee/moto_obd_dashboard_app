@@ -39,6 +39,10 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
   // 当前缩放级别（用于抽稀）
   double _currentZoom = 14.0;
 
+  // Polyline 缓存（zoom 等级不变时直接复用，避免每帧重建）
+  List<Polyline> _cachedPolylines = [];
+  double _cachedPolylineZoom = -1;
+
   // 加载状态
   bool _isLoading = true;
   String? _errorMessage;
@@ -86,6 +90,9 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         _cachedGcjPoints = gcjPoints;
         _events = events;
         _isLoading = false;
+        // 数据更新后清空 polyline 缓存
+        _cachedPolylines = [];
+        _cachedPolylineZoom = -1;
       });
 
       // 自动 fitBounds
@@ -166,8 +173,12 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     }
   }
 
-  /// 生成速度渐变 Polyline 列表（使用缓存的 GCJ-02 坐标）
+  /// 生成速度渐变 Polyline 列表（结果按 zoom 等级缓存）
   List<Polyline> _buildGradientPolylines(double zoom) {
+    // zoom 等级未发生变化时直接返回缓存
+    if (_cachedPolylineZoom == zoom && _cachedPolylines.isNotEmpty) {
+      return _cachedPolylines;
+    }
     final sampledIdx = _sampleIndices(zoom);
     if (sampledIdx.length < 2) return [];
 
@@ -182,6 +193,8 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         strokeWidth: 4.0,
       ));
     }
+    _cachedPolylines = polylines;
+    _cachedPolylineZoom = zoom;
     return polylines;
   }
 
