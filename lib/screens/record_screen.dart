@@ -74,14 +74,28 @@ class _RecordScreenState extends State<RecordScreen> {
               );
             },
           ),
-          // 统计信息行
-          Consumer<RidingRecordProvider>(
-            builder: (context, provider, child) {
-              return _StatsRow(stats: _getCurrentStats(provider));
-            },
+          // 内容区：左侧统计面板（20%）+ 右侧记录列表（80%）
+          Expanded(
+            child: Consumer<RidingRecordProvider>(
+              builder: (context, provider, child) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 左侧约13%：5项聚合统计，固定不滚动
+                    Expanded(
+                      flex: 1,
+                      child: _StatsPanel(stats: _getCurrentStats(provider)),
+                    ),
+                    // 右侧约87%：骑行记录列表，独立滚动
+                    Expanded(
+                      flex: 7,
+                      child: _buildRecordsList(),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
-          // 骑行历史列表
-          Expanded(child: _buildRecordsList()),
         ],
       ),
     );
@@ -104,6 +118,7 @@ class _RecordScreenState extends State<RecordScreen> {
 
         return Container(
           margin: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             color: AppTheme.surface40,
             border: Border.all(color: AppTheme.primary10),
@@ -508,7 +523,8 @@ class _TimeFilterChip extends StatelessWidget {
             const SizedBox(width: 3),
             Text(
               label,
-              style: TextStyle(color: isActive ? activeColor : mutedColor,
+              style: TextStyle(
+                color: isActive ? activeColor : mutedColor,
                 fontSize: 10,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.3,
@@ -522,59 +538,13 @@ class _TimeFilterChip extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// 统计信息行（5个独立小卡片）
+// 统计面板（竖排，左侧20%区域）
 // ─────────────────────────────────────────────
 
-class _StatsRow extends StatelessWidget {
+class _StatsPanel extends StatelessWidget {
   final AggregationStats stats;
 
-  const _StatsRow({required this.stats});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-              child: _StatsCard(
-                  label: '距离',
-                  value: '${stats.distance.toStringAsFixed(1)} km',
-                  color: AppTheme.textPrimary,
-                  icon: Icons.route)),
-          const SizedBox(width: 6),
-          Expanded(
-              child: _StatsCard(
-                  label: '均速',
-                  value: '${stats.avgSpeed.toStringAsFixed(1)} km/h',
-                  color: AppTheme.accentCyan,
-                  icon: Icons.speed)),
-          const SizedBox(width: 6),
-          Expanded(
-              child: _StatsCard(
-                  label: '时长',
-                  value: stats.formattedDuration,
-                  color: AppTheme.accentGreen,
-                  icon: Icons.timer)),
-          const SizedBox(width: 6),
-          Expanded(
-              child: _StatsCard(
-                  label: '极速',
-                  value: '${stats.maxSpeed.toStringAsFixed(0)} km/h',
-                  color: AppTheme.accentOrange,
-                  icon: Icons.flash_on)),
-          const SizedBox(width: 6),
-          Expanded(
-              child: _StatsCard(
-                  label: '倾角',
-                  value: _getMaxLean(),
-                  color: AppTheme.accentPink,
-                  icon: Icons.rotate_right)),
-        ],
-      ),
-    );
-  }
+  const _StatsPanel({required this.stats});
 
   String _getMaxLean() {
     final left = stats.maxLeftLean;
@@ -582,6 +552,61 @@ class _StatsRow extends StatelessWidget {
     final maxLean = left > right ? left : right;
     final direction = left > right ? 'L' : 'R';
     return '${maxLean.toStringAsFixed(0)}°$direction';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 4, 12),
+      child: Column(
+        children: [
+          Expanded(
+            child: _StatsCard(
+              label: '距离',
+              value: '${stats.distance.toStringAsFixed(1)} km',
+              color: AppTheme.textPrimary,
+              icon: Icons.route,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: _StatsCard(
+              label: '均速',
+              value: '${stats.avgSpeed.toStringAsFixed(1)} km/h',
+              color: AppTheme.accentCyan,
+              icon: Icons.speed,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: _StatsCard(
+              label: '时长',
+              value: stats.formattedDuration,
+              color: AppTheme.accentGreen,
+              icon: Icons.timer,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: _StatsCard(
+              label: '极速',
+              value: '${stats.maxSpeed.toStringAsFixed(0)} km/h',
+              color: AppTheme.accentOrange,
+              icon: Icons.flash_on,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: _StatsCard(
+              label: '倾角',
+              value: _getMaxLean(),
+              color: AppTheme.accentPink,
+              icon: Icons.rotate_right,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -605,39 +630,49 @@ class _StatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.5),
         borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
         border: Border.all(color: AppTheme.primary20),
       ),
       child: Stack(
-        alignment: Alignment.center,
         children: [
-          // 背景图标（装饰性，低透明度）
+          // 背景图标（靠左居中，缩小到36）
           Positioned(
-            right: 4,
-            bottom: 2,
-            child: Icon(icon, size: 40, color: color.withOpacity(0.15)),
+            left: -4,
+            top: 0,
+            bottom: 0,
+            child: Icon(icon, size: 36, color: color.withOpacity(0.12)),
           ),
-          // 前景内容
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+          // 前景文字：Positioned.fill 保证宽度有约束，不会溢出
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 30),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                        color: AppTheme.textMuted, fontSize: 10),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),

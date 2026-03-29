@@ -200,9 +200,9 @@ class SwipeableRecordCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 地点（flex 3）—点击进入轨迹页
+              // 地点（flex 4）—点击进入轨迹页
               Expanded(
-                flex: 3,
+                flex: 4,
                 child: GestureDetector(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
