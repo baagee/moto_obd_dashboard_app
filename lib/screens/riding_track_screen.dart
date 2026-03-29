@@ -160,20 +160,22 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     return indices;
   }
 
-  /// 速度映射颜色（绿 → 橙 → 红 三段渐变）
+  /// 速度映射颜色（霓虹青 → 品红 → 粉红 三段渐变）
   Color _speedToColor(double speed) {
     if (speed <= 40) {
-      return const Color(0xFF00FF85);
+      return const Color(0xFF00F5FF); // 霓虹青
     } else if (speed <= 80) {
       final t = (speed - 40) / 40;
-      return Color.lerp(const Color(0xFF00FF85), const Color(0xFFFF8C00), t)!;
+      return Color.lerp(
+          const Color(0xFF00F5FF), const Color(0xFFFF00FF), t)!; // 青→品红
     } else {
       final t = ((speed - 80) / 40).clamp(0.0, 1.0);
-      return Color.lerp(const Color(0xFFFF8C00), const Color(0xFFFF3B50), t)!;
+      return Color.lerp(
+          const Color(0xFFFF00FF), const Color(0xFFFF2D87), t)!; // 品红→霓虹粉
     }
   }
 
-  /// 生成速度渐变 Polyline 列表（结果按 zoom 等级缓存）
+  /// 生成速度渐变 Polyline 列表（含 glow 叠层，结果按 zoom 等级缓存）
   List<Polyline> _buildGradientPolylines(double zoom) {
     // zoom 等级未发生变化时直接返回缓存
     if (_cachedPolylineZoom == zoom && _cachedPolylines.isNotEmpty) {
@@ -187,10 +189,19 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
       final i1 = sampledIdx[i];
       final i2 = sampledIdx[i + 1];
       final avgSpeed = (_allWaypoints[i1].speed + _allWaypoints[i2].speed) / 2;
+      final color = _speedToColor(avgSpeed);
+      final pts = [_cachedGcjPoints[i1], _cachedGcjPoints[i2]];
+      // 底层 glow：宽线低透明度，模拟霓虹发光晕
       polylines.add(Polyline(
-        points: [_cachedGcjPoints[i1], _cachedGcjPoints[i2]],
-        color: _speedToColor(avgSpeed),
-        strokeWidth: 4.0,
+        points: pts,
+        color: color.withOpacity(0.25),
+        strokeWidth: 10.0,
+      ));
+      // 上层主线：细线全亮度
+      polylines.add(Polyline(
+        points: pts,
+        color: color,
+        strokeWidth: 3.0,
       ));
     }
     _cachedPolylines = polylines;
@@ -358,7 +369,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         },
       ),
       children: [
-        // 高德标准路网瓦片 + ColorFiltered 暗色处理（公开API无原生夜间模式）
+        // 高德标准路网瓦片 + ColorFiltered 赛博朋克暗色处理
         ColorFiltered(
           colorFilter: const ColorFilter.matrix([
             // 反色 + 降饱和 + 色调偏蓝灰，模拟暗色地图
@@ -389,7 +400,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
               width: 20,
               height: 20,
               child: _TrackPin(
-                  color: const Color(0xFF00E676), icon: Icons.play_arrow),
+                  color: const Color(0xFF00F5FF), icon: Icons.play_arrow),
             ),
           ],
         ),
@@ -401,7 +412,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
               width: 20,
               height: 20,
               child:
-                  _TrackPin(color: const Color(0xFFFF4D4D), icon: Icons.stop),
+                  _TrackPin(color: const Color(0xFFFF2D87), icon: Icons.stop),
             ),
           ],
         ),

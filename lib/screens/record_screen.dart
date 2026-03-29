@@ -81,14 +81,14 @@ class _RecordScreenState extends State<RecordScreen> {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 左侧约13%：5项聚合统计，固定不滚动
+                    // 左侧约17%：5项聚合统计，固定不滚动
                     Expanded(
                       flex: 1,
                       child: _StatsPanel(stats: _getCurrentStats(provider)),
                     ),
-                    // 右侧约87%：骑行记录列表，独立滚动
+                    // 右侧约83%：骑行记录列表，独立滚动
                     Expanded(
-                      flex: 7,
+                      flex: 5,
                       child: _buildRecordsList(),
                     ),
                   ],
