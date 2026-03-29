@@ -24,8 +24,14 @@ class RidingTrackScreen extends StatefulWidget {
 // 曲线图高度常量
 const double _kChartHeight = 90.0;
 
+// 地图样式
+enum _MapStyle { dark, satellite }
+
 class _RidingTrackScreenState extends State<RidingTrackScreen> {
   final MapController _mapController = MapController();
+
+  // 地图样式
+  _MapStyle _mapStyle = _MapStyle.dark;
 
   // 所有轨迹点（加载后缓存）
   List<RidingWaypoint> _allWaypoints = [];
@@ -134,30 +140,82 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     );
   }
 
-  /// 根据缩放级别抽稀轨迹点（返回索引列表）
+  /// Douglas-Peucker 算法递归抽稀（epsilon 单位：度，约等于米/111000）
+  void _douglasPeucker(
+      List<int> indices, int start, int end, double epsilon, Set<int> result) {
+    if (end <= start + 1) return;
+
+    // 找距离基线（start→end）最远的点
+    final p1 = _cachedGcjPoints[indices[start]];
+    final p2 = _cachedGcjPoints[indices[end]];
+    double maxDist = 0;
+    int maxIdx = start;
+
+    for (int i = start + 1; i < end; i++) {
+      final p = _cachedGcjPoints[indices[i]];
+      final dist = _perpendicularDistance(p, p1, p2);
+      if (dist > maxDist) {
+        maxDist = dist;
+        maxIdx = i;
+      }
+    }
+
+    if (maxDist > epsilon) {
+      result.add(indices[maxIdx]);
+      _douglasPeucker(indices, start, maxIdx, epsilon, result);
+      _douglasPeucker(indices, maxIdx, end, epsilon, result);
+    }
+  }
+
+  /// 点到线段的垂线距离（经纬度近似）
+  double _perpendicularDistance(LatLng p, LatLng a, LatLng b) {
+    final dx = b.longitude - a.longitude;
+    final dy = b.latitude - a.latitude;
+    if (dx == 0 && dy == 0) {
+      return _latLngDist(p, a);
+    }
+    final t =
+        ((p.longitude - a.longitude) * dx + (p.latitude - a.latitude) * dy) /
+            (dx * dx + dy * dy);
+    final tc = t.clamp(0.0, 1.0);
+    final cx = a.longitude + tc * dx;
+    final cy = a.latitude + tc * dy;
+    final ddx = p.longitude - cx;
+    final ddy = p.latitude - cy;
+    return (ddx * ddx + ddy * ddy);
+  }
+
+  double _latLngDist(LatLng a, LatLng b) {
+    final dx = a.longitude - b.longitude;
+    final dy = a.latitude - b.latitude;
+    return dx * dx + dy * dy;
+  }
+
+  /// 根据缩放级别抽稀轨迹点（Douglas-Peucker，返回索引列表）
   List<int> _sampleIndices(double zoom) {
     final total = _allWaypoints.length;
     if (total == 0) return [];
+    if (total <= 2) return [0, total - 1];
 
-    int step;
-    if (zoom < 10) {
-      step = 20;
-    } else if (zoom < 13) {
-      step = 5;
-    } else if (zoom < 15) {
-      step = 2;
+    // epsilon 单位：度的平方（近似），zoom 越大精度越高
+    // zoom 15+ 约 0.5m 精度，zoom 10- 约 50m 精度
+    double epsilon;
+    if (zoom >= 15) {
+      epsilon = 2e-10; // 极高精度
+    } else if (zoom >= 13) {
+      epsilon = 1e-9;
+    } else if (zoom >= 10) {
+      epsilon = 1e-8;
     } else {
-      step = 1;
+      epsilon = 1e-7; // 低缩放时大量省略
     }
 
-    final indices = <int>[];
-    for (int i = 0; i < total; i += step) {
-      indices.add(i);
-    }
-    if (indices.isEmpty || indices.last != total - 1) {
-      indices.add(total - 1);
-    }
-    return indices;
+    final allIndices = List<int>.generate(total, (i) => i);
+    final result = <int>{0, total - 1};
+    _douglasPeucker(allIndices, 0, total - 1, epsilon, result);
+
+    final sorted = result.toList()..sort();
+    return sorted;
   }
 
   /// 速度映射颜色（霓虹青 → 品红 → 粉红 三段渐变）
@@ -175,10 +233,11 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     }
   }
 
-  /// 生成速度渐变 Polyline 列表（含 glow 叠层，结果按 zoom 等级缓存）
+  /// 生成速度渐变 Polyline 列表（含 glow 叠层，结果按 zoom 整数级缓存）
   List<Polyline> _buildGradientPolylines(double zoom) {
-    // zoom 等级未发生变化时直接返回缓存
-    if (_cachedPolylineZoom == zoom && _cachedPolylines.isNotEmpty) {
+    // zoom 取整后未变化时直接复用缓存
+    final zoomKey = zoom.floorToDouble();
+    if (_cachedPolylineZoom == zoomKey && _cachedPolylines.isNotEmpty) {
       return _cachedPolylines;
     }
     final sampledIdx = _sampleIndices(zoom);
@@ -205,7 +264,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
       ));
     }
     _cachedPolylines = polylines;
-    _cachedPolylineZoom = zoom;
+    _cachedPolylineZoom = zoomKey;
     return polylines;
   }
 
@@ -305,6 +364,36 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     );
   }
 
+  Widget _buildTileLayer() {
+    if (_mapStyle == _MapStyle.satellite) {
+      // 卫星实景底图（高德卫星瓦片）
+      return TileLayer(
+        urlTemplate:
+            'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
+        userAgentPackageName: 'com.example.obd_dashboard',
+        tileProvider: NetworkTileProvider(),
+      );
+    }
+
+    // 赛博朋克暗色路网底图
+    return ColorFiltered(
+      colorFilter: const ColorFilter.matrix([
+        // 反色 + 降饱和 + 色调偏蓝灰，模拟暗色地图
+        -0.6, 0, 0, 0, 180,
+        0, -0.6, 0, 0, 180,
+        0, 0, -0.6, 0, 200,
+        0, 0, 0, 1, 0,
+      ]),
+      child: TileLayer(
+        urlTemplate:
+            'https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+        userAgentPackageName: 'com.example.obd_dashboard',
+        subdomains: const ['webrd01', 'webrd02', 'webrd03', 'webrd04'],
+        tileProvider: NetworkTileProvider(),
+      ),
+    );
+  }
+
   Widget _buildMap() {
     if (_cachedGcjPoints.isEmpty) {
       return Center(
@@ -369,23 +458,8 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         },
       ),
       children: [
-        // 高德标准路网瓦片 + ColorFiltered 赛博朋克暗色处理
-        ColorFiltered(
-          colorFilter: const ColorFilter.matrix([
-            // 反色 + 降饱和 + 色调偏蓝灰，模拟暗色地图
-            -0.6, 0, 0, 0, 180,
-            0, -0.6, 0, 0, 180,
-            0, 0, -0.6, 0, 200,
-            0, 0, 0, 1, 0,
-          ]),
-          child: TileLayer(
-            urlTemplate:
-                'https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
-            userAgentPackageName: 'com.example.obd_dashboard',
-            subdomains: const ['webrd01', 'webrd02', 'webrd03', 'webrd04'],
-            tileProvider: NetworkTileProvider(),
-          ),
-        ),
+        // 底图（根据样式切换）
+        _buildTileLayer(),
         // 速度渐变轨迹折线
         PolylineLayer(
           polylines: _buildGradientPolylines(_currentZoom),
@@ -400,7 +474,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
               width: 20,
               height: 20,
               child: _TrackPin(
-                  color: const Color(0xFF00F5FF), icon: Icons.play_arrow),
+                  color: const Color(0xFF00F5FF), icon: Icons.flag_outlined),
             ),
           ],
         ),
@@ -411,8 +485,8 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
               point: _cachedGcjPoints.last,
               width: 20,
               height: 20,
-              child:
-                  _TrackPin(color: const Color(0xFFFF2D87), icon: Icons.stop),
+              child: _TrackPin(
+                  color: const Color(0xFFFF2D87), icon: Icons.sports_score),
             ),
           ],
         ),
@@ -505,6 +579,57 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
               ],
             ),
             const Spacer(),
+            // 地图样式切换按钮
+            GestureDetector(
+              onTap: () => setState(() {
+                _mapStyle = _mapStyle == _MapStyle.dark
+                    ? _MapStyle.satellite
+                    : _MapStyle.dark;
+                // 切换样式时清空 polyline 缓存
+                _cachedPolylines = [];
+                _cachedPolylineZoom = -1;
+              }),
+              child: Container(
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusButton),
+                  border: Border.all(
+                    color: _mapStyle == _MapStyle.satellite
+                        ? AppTheme.accentOrange.withOpacity(0.7)
+                        : AppTheme.primary.withOpacity(0.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _mapStyle == _MapStyle.satellite
+                          ? Icons.map_outlined
+                          : Icons.satellite_alt,
+                      size: 13,
+                      color: _mapStyle == _MapStyle.satellite
+                          ? AppTheme.accentOrange
+                          : AppTheme.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _mapStyle == _MapStyle.satellite ? '街道' : '卫星',
+                      style: TextStyle(
+                        color: _mapStyle == _MapStyle.satellite
+                            ? AppTheme.accentOrange
+                            : AppTheme.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             // 重新定位按钮
             GestureDetector(
               onTap: _fitBounds,

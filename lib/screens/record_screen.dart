@@ -649,7 +649,7 @@ class _StatsCard extends StatelessWidget {
           // 前景文字：Positioned.fill 保证宽度有约束，不会溢出
           Positioned.fill(
             child: Padding(
-              padding: const EdgeInsets.only(left: 30),
+              padding: const EdgeInsets.only(left: 36),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,

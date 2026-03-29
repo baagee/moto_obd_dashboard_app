@@ -73,7 +73,7 @@ class RidingStatsProvider extends ChangeNotifier {
   PositionData? _lastPosition;
 
   // 轨迹点分批落库
-  static const Duration _waypointInterval = Duration(seconds: 2);
+  static const Duration _waypointInterval = Duration(seconds: 1);
   static const int _waypointBatchSize = 15;
   Timer? _waypointTimer;
   final List<Map<String, dynamic>> _pendingWaypoints = [];
