@@ -165,6 +165,42 @@ class DatabaseService {
     await db.delete('daily_stats');
   }
 
+  /// 删除 30 天前的过期骑行记录及其 daily_stats
+  static Future<int> deleteExpiredRecords() async {
+    final db = await database;
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final cutoffMs = cutoff.millisecondsSinceEpoch;
+
+    // 1. 找出所有过期记录涉及的日期
+    final expiredRows = await db.query(
+      'riding_records',
+      columns: ['start_time'],
+      where: 'start_time < ?',
+      whereArgs: [cutoffMs],
+    );
+    final expiredDates = expiredRows
+        .map((r) {
+          final ms = r['start_time'] as int;
+          final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+          return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+        })
+        .toSet();
+
+    // 2. 删除对应 daily_stats（不重算，直接清除）
+    for (final date in expiredDates) {
+      await db.delete('daily_stats', where: 'date = ?', whereArgs: [date]);
+    }
+
+    // 3. 删除过期 riding_records（CASCADE 自动删 waypoints / ride_events）
+    final count = await db.delete(
+      'riding_records',
+      where: 'start_time < ?',
+      whereArgs: [cutoffMs],
+    );
+
+    return count;
+  }
+
   /// 删除骑行记录（级联删除事件，并重算当天 daily_stats）
   static Future<int> deleteRidingRecord(int id) async {
     final db = await database;
@@ -478,6 +514,18 @@ class DatabaseService {
       data,
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  /// 清理空壳骑行记录（end_time 为 null 且 distance=0，非当次骑行残留）
+  static Future<int> deleteOrphanRecords({int? excludeId}) async {
+    final db = await database;
+    return await db.delete(
+      'riding_records',
+      where: excludeId != null
+          ? 'end_time IS NULL AND distance = 0 AND id != ?'
+          : 'end_time IS NULL AND distance = 0',
+      whereArgs: excludeId != null ? [excludeId] : null,
     );
   }
 

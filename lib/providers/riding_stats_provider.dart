@@ -80,6 +80,10 @@ class RidingStatsProvider extends ChangeNotifier {
   int? _currentRecordId;
   PositionData? _lastWaypointPosition; // 用于距离过滤
 
+  // 骑行统计快照定时器（每 30s 持久化一次，防止闪退丢数据）
+  static const Duration _snapshotInterval = Duration(seconds: 30);
+  Timer? _snapshotTimer;
+
   // 全程统计数据（用于保存记录）
   double _maxSpeed = 0;
   double _maxLeftLean = 0;
@@ -187,6 +191,9 @@ class RidingStatsProvider extends ChangeNotifier {
     // 启动轨迹点采集定时器
     _startWaypointTimer();
 
+    // 启动统计快照定时器（每 30s 持久化一次防闪退丢数据）
+    _startSnapshotTimer();
+
     _logCallback?.call('Stats', LogType.info, '开始骑行统计');
     notifyListeners();
   }
@@ -197,6 +204,7 @@ class RidingStatsProvider extends ChangeNotifier {
     _stopSampling();
     _stopGpsTracking();
     _stopWaypointTimer();
+    _stopSnapshotTimer();
     GSX8SCalculator.reset();
 
     final duration = _rideStartTime != null
@@ -224,6 +232,42 @@ class RidingStatsProvider extends ChangeNotifier {
   void _stopWaypointTimer() {
     _waypointTimer?.cancel();
     _waypointTimer = null;
+  }
+
+  /// 启动统计快照定时器
+  void _startSnapshotTimer() {
+    _snapshotTimer?.cancel();
+    _snapshotTimer =
+        Timer.periodic(_snapshotInterval, (_) => _snapshotRidingStats());
+  }
+
+  /// 停止统计快照定时器
+  void _stopSnapshotTimer() {
+    _snapshotTimer?.cancel();
+    _snapshotTimer = null;
+  }
+
+  /// 将当前骑行统计快照写入 DB（防闪退丢数据）
+  Future<void> _snapshotRidingStats() async {
+    if (!_isRiding || _currentRecordId == null) return;
+    final avgSpeed =
+        _totalSampleCount > 0 ? _totalSpeedSum / _totalSampleCount : 0.0;
+    final distance = _totalGpsDistance > 0 ? _totalGpsDistance / 1000 : 0.0;
+    final duration = _rideStartTime != null
+        ? DateTime.now().difference(_rideStartTime!).inSeconds
+        : 0;
+    try {
+      await DatabaseService.updateRidingRecord(_currentRecordId!, {
+        'avg_speed': avgSpeed,
+        'max_speed': _maxSpeed,
+        'distance': distance,
+        'duration': duration,
+        'max_left_lean': _maxLeftLean,
+        'max_right_lean': _maxRightLean,
+      });
+    } catch (e) {
+      _logCallback?.call('Stats', LogType.warning, '统计快照写入失败: $e');
+    }
   }
 
   /// 采集当前轨迹点（每 2 秒调用一次）
@@ -716,6 +760,7 @@ class RidingStatsProvider extends ChangeNotifier {
     _stopSampling();
     _stopGpsTracking();
     _stopWaypointTimer();
+    _stopSnapshotTimer();
     super.dispose();
   }
 }

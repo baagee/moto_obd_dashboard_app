@@ -60,6 +60,10 @@ class RidingRecordProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
+    // 启动时清理 30 天前的过期记录 & 清理空壳残留记录
+    await DatabaseService.deleteExpiredRecords();
+    await DatabaseService.deleteOrphanRecords();
+
     await Future.wait([
       _loadRecords(),
       _loadTodayStats(),
