@@ -8,6 +8,7 @@ import '../models/riding_event.dart' as stats;
 import '../models/riding_record.dart';
 import '../services/audio_service.dart';
 import '../services/database_service.dart';
+import '../services/geocoding_service.dart';
 import '../services/location_service.dart';
 import 'log_provider.dart';
 import 'loggable.dart';
@@ -121,12 +122,47 @@ class RidingStatsProvider extends ChangeNotifier {
     _totalSpeedSum = 0;
     _totalSampleCount = 0;
 
-    // 先插入占位记录，获取 record_id（供轨迹点关联）
+    // 并行获取起点位置 + 逆地理编码，完成后再插入带完整起点信息的记录
     try {
       final now = DateTime.now().millisecondsSinceEpoch;
+      _logCallback?.call('Stats', LogType.info, '正在获取起点位置...');
+
+      // 最多等 10s（LocationService 内部已有 timeLimit）
+      final position = await LocationService.getCurrentPosition();
+
+      String? placeName;
+      double? startLat;
+      double? startLng;
+
+      if (position != null) {
+        startLat = position.latitude;
+        startLng = position.longitude;
+        _logCallback?.call(
+            'Stats', LogType.success, '起点位置已获取: $startLat, $startLng');
+
+        // 将第一个位置作为 gpsTrack 的起点兜底
+        if (_gpsTrack.isEmpty) {
+          _gpsTrack.add(PositionData.fromGeolocator(position));
+          _lastPosition = _gpsTrack.first;
+        }
+
+        // 逆地理编码获取地名
+        placeName = await GeocodingService.getPlaceName(
+          startLat,
+          startLng,
+          logCallback: _logCallback,
+        );
+        _logCallback?.call('Stats', LogType.info, '起点地名: ${placeName ?? '未知'}');
+      } else {
+        _logCallback?.call('Stats', LogType.warning, '起点位置获取失败，将以空坐标入库');
+      }
+
       _currentRecordId = await DatabaseService.insertRidingRecord({
         'start_time': now,
         'end_time': null,
+        'start_latitude': startLat,
+        'start_longitude': startLng,
+        'start_place_name': placeName,
         'distance': 0,
         'avg_speed': 0,
         'duration': 0,
@@ -135,9 +171,10 @@ class RidingStatsProvider extends ChangeNotifier {
         'max_right_lean': 0,
         'created_at': now,
       });
-      _logCallback?.call('Stats', LogType.info, '占位记录已插入，record_id=$_currentRecordId');
+      _logCallback?.call(
+          'Stats', LogType.info, '骑行记录已插入，record_id=$_currentRecordId');
     } catch (e) {
-      _logCallback?.call('Stats', LogType.warning, '占位记录插入失败: $e，轨迹点将无法落库');
+      _logCallback?.call('Stats', LogType.warning, '骑行记录插入失败: $e，轨迹点将无法落库');
       // _currentRecordId 保持 null，_waypointTimer 启动但写库时跳过
     }
 
@@ -179,7 +216,8 @@ class RidingStatsProvider extends ChangeNotifier {
   /// 启动轨迹点采集定时器
   void _startWaypointTimer() {
     _waypointTimer?.cancel();
-    _waypointTimer = Timer.periodic(_waypointInterval, (_) => _collectWaypoint());
+    _waypointTimer =
+        Timer.periodic(_waypointInterval, (_) => _collectWaypoint());
   }
 
   /// 停止轨迹点采集定时器
@@ -588,15 +626,20 @@ class RidingStatsProvider extends ChangeNotifier {
           '骑行记录已丢弃（最大速度为 0，判定为未实际行驶，时长=${duration}s）');
       // 若有占位记录，删除之（避免留下空壳记录）
       if (_currentRecordId != null) {
-        try { await DatabaseService.deleteRidingRecord(_currentRecordId!); } catch (_) {}
+        try {
+          await DatabaseService.deleteRidingRecord(_currentRecordId!);
+        } catch (_) {}
       }
       return;
     }
-    if (duration < 30 && distanceMeters < 20) {
+    // 行驶距离不足 20 米 → 丢弃（覆盖：原地怠速任意时长 / 短时误触）
+    if (distanceMeters < 20) {
       _logCallback?.call('Stats', LogType.warning,
-          '骑行记录已丢弃（时长=${duration}s, 距离=${distanceMeters.toStringAsFixed(1)}m，未达到最小阈值）');
+          '骑行记录已丢弃（距离=${distanceMeters.toStringAsFixed(1)}m < 20m，判定为未实际行驶）');
       if (_currentRecordId != null) {
-        try { await DatabaseService.deleteRidingRecord(_currentRecordId!); } catch (_) {}
+        try {
+          await DatabaseService.deleteRidingRecord(_currentRecordId!);
+        } catch (_) {}
       }
       return;
     }
