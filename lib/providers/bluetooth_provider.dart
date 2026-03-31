@@ -67,6 +67,9 @@ class BluetoothProvider extends ChangeNotifier {
   BluetoothDeviceModel? get connectedDevice => _connectedDevice;
   BluetoothDeviceModel? get lastConnectedDevice => _lastConnectedDevice;
 
+  /// ELM327 初始化成功回调（由 UI 层注册，用于弹 Toast）
+  void Function(String deviceName)? onDeviceConnected;
+
   /// 构造函数 - 通过依赖注入接收 OBDDataProvider、LogProvider、AudioService 和 SettingsProvider
   BluetoothProvider({
     required OBDDataProvider obdDataProvider,
@@ -192,16 +195,14 @@ class BluetoothProvider extends ChangeNotifier {
       if (foundDevice.isNotEmpty) {
         // 使用扫描到的设备（有 flutterDevice 引用）
         final device = foundDevice.first;
-        _logCallback(
-            'Bluetooth', LogType.info, '尝试自动连接上次设备: ${device.name}');
+        _logCallback('Bluetooth', LogType.info, '尝试自动连接上次设备: ${device.name}');
         await _attemptReconnect(device);
       } else {
         _logCallback('Bluetooth', LogType.warning,
             '未找到上次设备: ${_lastConnectedDevice!.name}，请手动重试');
       }
     } catch (e) {
-      _logCallback(
-          'Bluetooth', LogType.error, '自动重连上次设备异常: ${e.toString()}');
+      _logCallback('Bluetooth', LogType.error, '自动重连上次设备异常: ${e.toString()}');
     } finally {
       _isAutoReconnecting = false;
       notifyListeners();
@@ -476,6 +477,8 @@ class BluetoothProvider extends ChangeNotifier {
 
       // 播放设备连接成功提示音（异步，不阻塞流程）
       unawaited(_audioService?.playAsset('assets/audio/device_connected.mp3'));
+      // 通知 UI 层弹 Toast
+      onDeviceConnected?.call(device.name);
 
       // 启动 OBD 轮询
       _obdService?.startPolling();
@@ -551,8 +554,7 @@ class BluetoothProvider extends ChangeNotifier {
   /// 处理连接失败
   void _handleConnectionError(
       BluetoothDeviceModel device, int index, Object error) {
-    _logCallback(
-        'Bluetooth', LogType.error, '_handleConnectionError: $error');
+    _logCallback('Bluetooth', LogType.error, '_handleConnectionError: $error');
 
     // 连接失败时，重置设备状态为 disconnected
     if (index != -1) {
@@ -714,8 +716,7 @@ class BluetoothProvider extends ChangeNotifier {
     if (deviceToDisconnect?.flutterDevice != null) {
       try {
         await deviceToDisconnect!.flutterDevice!.disconnect();
-        _logCallback(
-            'Bluetooth', LogType.warning, '已断开与 $deviceName 的连接');
+        _logCallback('Bluetooth', LogType.warning, '已断开与 $deviceName 的连接');
       } catch (e) {
         _logCallback('Bluetooth', LogType.error, '断开连接失败: $e');
       }

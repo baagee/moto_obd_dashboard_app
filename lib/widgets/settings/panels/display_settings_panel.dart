@@ -4,6 +4,12 @@ import '../../../providers/settings_provider.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/cyber_button.dart';
 import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_toast.dart';
 import '../settings_fields.dart';
 
 /// 仪表盘显示量程设置面板
@@ -32,11 +38,6 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
       'maxSpeed': s.maxSpeed.toDouble(),
       'warnSpeed': s.warnSpeed.toDouble(),
       'dangerSpeed': s.dangerSpeed.toDouble(),
-      'flashThreshold': s.flashThreshold.toDouble(),
-      'maxCoolantTemp': s.maxCoolantTemp.toDouble(),
-      'coolantWarnTemp': s.coolantWarnTemp.toDouble(),
-      'maxIntakeTemp': s.maxIntakeTemp.toDouble(),
-      'intakeWarnTemp': s.intakeWarnTemp.toDouble(),
     };
   }
 
@@ -48,26 +49,8 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
       'settings_display_maxSpeed': (_draft['maxSpeed'] as double).toInt(),
       'settings_display_warnSpeed': (_draft['warnSpeed'] as double).toInt(),
       'settings_display_dangerSpeed': (_draft['dangerSpeed'] as double).toInt(),
-      'settings_display_flashThreshold':
-          (_draft['flashThreshold'] as double).toInt(),
-      'settings_display_maxCoolantTemp':
-          (_draft['maxCoolantTemp'] as double).toInt(),
-      'settings_display_coolantWarnTemp':
-          (_draft['coolantWarnTemp'] as double).toInt(),
-      'settings_display_maxIntakeTemp':
-          (_draft['maxIntakeTemp'] as double).toInt(),
-      'settings_display_intakeWarnTemp':
-          (_draft['intakeWarnTemp'] as double).toInt(),
     });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('仪表盘量程已保存，立即生效'),
-          backgroundColor: AppTheme.accentGreen,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    if (mounted) CyberToast.show(context, '仪表盘量程已保存，立即生效');
   }
 
   Future<void> _confirmReset() async {
@@ -219,62 +202,6 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
             divisions: 22,
             valueFormatter: (v) => '${v.toInt()} km/h',
             onChanged: (v) => setState(() => _draft['dangerSpeed'] = v),
-          ),
-          SettingsSliderField(
-            label: '超速闪烁阈值',
-            hint: '车速超过此值时仪表盘外圈触发闪烁警告',
-            value: _draft['flashThreshold'],
-            defaultValue: 100,
-            min: 60,
-            max: 300,
-            divisions: 24,
-            valueFormatter: (v) => '${v.toInt()} km/h',
-            onChanged: (v) => setState(() => _draft['flashThreshold'] = v),
-          ),
-
-          const SettingsDivider(),
-
-          // ── 温度进度条 ──
-          const SettingsSectionTitle('▸  温度进度条'),
-          SettingsSliderField(
-            label: '冷却水温最大值',
-            value: _draft['maxCoolantTemp'],
-            defaultValue: 120,
-            min: 80,
-            max: 150,
-            divisions: 14,
-            valueFormatter: (v) => '${v.toInt()} °C',
-            onChanged: (v) => setState(() => _draft['maxCoolantTemp'] = v),
-          ),
-          SettingsSliderField(
-            label: '冷却水温警告值（变橙/红）',
-            value: _draft['coolantWarnTemp'],
-            defaultValue: 100,
-            min: 60,
-            max: 140,
-            divisions: 16,
-            valueFormatter: (v) => '${v.toInt()} °C',
-            onChanged: (v) => setState(() => _draft['coolantWarnTemp'] = v),
-          ),
-          SettingsSliderField(
-            label: '进气温度最大值',
-            value: _draft['maxIntakeTemp'],
-            defaultValue: 80,
-            min: 40,
-            max: 120,
-            divisions: 16,
-            valueFormatter: (v) => '${v.toInt()} °C',
-            onChanged: (v) => setState(() => _draft['maxIntakeTemp'] = v),
-          ),
-          SettingsSliderField(
-            label: '进气温度警告值（变橙/红）',
-            value: _draft['intakeWarnTemp'],
-            defaultValue: 50,
-            min: 20,
-            max: 100,
-            divisions: 16,
-            valueFormatter: (v) => '${v.toInt()} °C',
-            onChanged: (v) => setState(() => _draft['intakeWarnTemp'] = v),
           ),
         ],
       ),

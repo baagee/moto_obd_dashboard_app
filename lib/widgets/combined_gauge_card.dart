@@ -23,17 +23,6 @@ class CombinedGaugeCard extends StatelessWidget {
     final warnSpeed = context.select<SettingsProvider, int>((s) => s.warnSpeed);
     final dangerSpeed =
         context.select<SettingsProvider, int>((s) => s.dangerSpeed);
-    final flashThreshold =
-        context.select<SettingsProvider, int>((s) => s.flashThreshold);
-    final maxCoolantTemp =
-        context.select<SettingsProvider, int>((s) => s.maxCoolantTemp);
-    final coolantWarnTemp =
-        context.select<SettingsProvider, int>((s) => s.coolantWarnTemp);
-    final maxIntakeTemp =
-        context.select<SettingsProvider, int>((s) => s.maxIntakeTemp);
-    final intakeWarnTemp =
-        context.select<SettingsProvider, int>((s) => s.intakeWarnTemp);
-
     return Container(
       padding: const EdgeInsets.all(8),
       child: LayoutBuilder(
@@ -52,11 +41,6 @@ class CombinedGaugeCard extends StatelessWidget {
               maxSpeed: maxSpeed,
               warnSpeed: warnSpeed,
               dangerSpeed: dangerSpeed,
-              flashThreshold: flashThreshold,
-              maxCoolantTemp: maxCoolantTemp,
-              coolantWarnTemp: coolantWarnTemp,
-              maxIntakeTemp: maxIntakeTemp,
-              intakeWarnTemp: intakeWarnTemp,
             ),
           );
         },
@@ -81,11 +65,11 @@ class CombinedGaugePainter extends CustomPainter {
   final int maxSpeed;
   final int warnSpeed;
   final int dangerSpeed;
-  final int flashThreshold;
-  final int maxCoolantTemp;
-  final int coolantWarnTemp;
-  final int maxIntakeTemp;
-  final int intakeWarnTemp;
+  // 温度/闪烁阈值固定常量（不再从设置读取）
+  static const int maxCoolantTemp = 120;
+  static const int coolantWarnTemp = 100;
+  static const int maxIntakeTemp = 80;
+  static const int intakeWarnTemp = 50;
 
   static const int tempSegmentCount = 6; // 温度进度条分段数（固定）
 
@@ -121,11 +105,6 @@ class CombinedGaugePainter extends CustomPainter {
     this.maxSpeed = 240,
     this.warnSpeed = 120,
     this.dangerSpeed = 180,
-    this.flashThreshold = 100,
-    this.maxCoolantTemp = 120,
-    this.coolantWarnTemp = 100,
-    this.maxIntakeTemp = 80,
-    this.intakeWarnTemp = 50,
   });
 
   @override
@@ -175,14 +154,7 @@ class CombinedGaugePainter extends CustomPainter {
           .createShader(Rect.fromCircle(center: center, radius: radius + 20));
 
     canvas.drawCircle(center, radius + 20, paint);
-
-    // 超速红色闪烁效果
-    if (speed >= flashThreshold) {
-      // _drawSpeedWarningGlow(canvas, center, radius);
-    }
   }
-
-  // codeflicker-fix: OPT-Issue-13/omvh7ni7j93qpiynr7sw — _drawSpeedWarningGlow 未被引用，已删除
 
   void _drawTickBackground(Canvas canvas, Offset center, double radius) {
     final paint = Paint()
@@ -742,11 +714,7 @@ class CombinedGaugePainter extends CustomPainter {
         oldDelegate.maxSpeed != maxSpeed ||
         oldDelegate.warnSpeed != warnSpeed ||
         oldDelegate.dangerSpeed != dangerSpeed ||
-        oldDelegate.flashThreshold != flashThreshold ||
-        oldDelegate.maxCoolantTemp != maxCoolantTemp ||
-        oldDelegate.coolantWarnTemp != coolantWarnTemp ||
-        oldDelegate.maxIntakeTemp != maxIntakeTemp ||
-        oldDelegate.intakeWarnTemp != intakeWarnTemp;
+        false;
   }
 
   /// 绘制倒梯形温度进度条

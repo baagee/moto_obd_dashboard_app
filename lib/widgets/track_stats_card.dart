@@ -100,7 +100,7 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 4),
         Text(label,
             style: const TextStyle(
-                color: AppTheme.textMuted, fontSize: 10, letterSpacing: 0.5)),
+                color: AppTheme.textMuted, fontSize: 11, letterSpacing: 0.5)),
         const SizedBox(height: 2),
         RichText(
           text: TextSpan(

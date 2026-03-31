@@ -14,6 +14,7 @@ import '../widgets/location_alert_dialog.dart';
 import '../services/location_service.dart';
 import '../widgets/event_notification_dialog.dart';
 import '../widgets/top_navigation_bar.dart';
+import '../widgets/cyber_toast.dart';
 import 'dashboard_screen.dart';
 import 'record_screen.dart';
 import 'logs_screen.dart';
@@ -50,6 +51,13 @@ class _MainContainerState extends State<MainContainer> {
         initialPage: context.read<NavigationProvider>().currentIndex);
     _initializeBluetooth();
     // codeflicker-fix: OPT-Issue-4/omvh7ni7j93qpiynr7sw
+    // 注册 ELM327 初始化成功回调
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<BluetoothProvider>().onDeviceConnected = (name) {
+        if (mounted) CyberToast.show(context, '$name 已连接，OBD 初始化完成');
+      };
+    });
   }
 
   Future<void> _initializeBluetooth() async {

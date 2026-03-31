@@ -4,6 +4,7 @@ import '../../../providers/settings_provider.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/cyber_button.dart';
 import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_toast.dart';
 import '../settings_fields.dart';
 
 /// 骑行事件设置面板
@@ -126,15 +127,7 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
       'settings_events_extremeLean_cooldown':
           (_draft['extremeLean_cooldown'] as double).toInt(),
     });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('骑行事件设置已保存'),
-          backgroundColor: AppTheme.accentGreen,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    if (mounted) CyberToast.show(context, '骑行事件设置已保存');
   }
 
   Future<void> _confirmReset() async {

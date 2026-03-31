@@ -8,6 +8,7 @@ import '../widgets/swipeable_record_card.dart';
 import '../widgets/ride_event_list_modal.dart';
 import '../widgets/cyber_dialog.dart';
 import '../widgets/cyber_button.dart';
+import '../widgets/cyber_toast.dart';
 import '../services/database_service.dart';
 
 /// 骑行记录页面
@@ -186,13 +187,7 @@ class _RecordScreenState extends State<RecordScreen> {
     await DatabaseService.insertMockRidingRecords();
     if (!mounted) return;
     await context.read<RidingRecordProvider>().initialize(force: true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('✅ 已插入 5 条测试数据'),
-        backgroundColor: AppTheme.accentGreen,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    CyberToast.show(context, '已插入 5 条测试数据');
   }
 }
 
@@ -657,14 +652,14 @@ class _StatsCard extends StatelessWidget {
                   Text(
                     label,
                     style: const TextStyle(
-                        color: AppTheme.textMuted, fontSize: 10),
+                        color: AppTheme.textMuted, fontSize: 13),
                   ),
                   const SizedBox(height: 1),
                   Text(
                     value,
                     style: TextStyle(
                       color: color,
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
                     overflow: TextOverflow.ellipsis,

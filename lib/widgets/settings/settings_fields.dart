@@ -365,28 +365,177 @@ class SettingsSliderField extends StatelessWidget {
               ),
             ],
           ),
-          // Slider（高度由 SliderTheme 控制）
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: AppTheme.primary,
-              inactiveTrackColor: AppTheme.primary.withValues(alpha: 0.2),
-              thumbColor: AppTheme.primary,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayColor: AppTheme.primary.withValues(alpha: 0.15),
-              trackHeight: 3,
-            ),
-            child: Slider(
-              value: value,
-              min: min,
-              max: max,
-              divisions: divisions,
-              onChanged: onChanged,
-            ),
+          // 赛博朋克分段式滑轨
+          _CyberSlider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
           ),
         ],
       ),
     );
   }
+}
+
+// ───────────────────────────────────────────────
+
+/// 赛博朋克风格滑轨
+/// 设计：细线轨道（激活/未激活双色）+ divisions 刻度短线 + 圆形滑块（外环 + 发光）
+class _CyberSlider extends StatefulWidget {
+  final double value;
+  final double min;
+  final double max;
+  final int? divisions;
+  final ValueChanged<double> onChanged;
+
+  const _CyberSlider({
+    required this.value,
+    required this.min,
+    required this.max,
+    this.divisions,
+    required this.onChanged,
+  });
+
+  @override
+  State<_CyberSlider> createState() => _CyberSliderState();
+}
+
+class _CyberSliderState extends State<_CyberSlider> {
+  void _handlePos(Offset local, double width) {
+    final ratio = (local.dx / width).clamp(0.0, 1.0);
+    double v = widget.min + ratio * (widget.max - widget.min);
+    if (widget.divisions != null && widget.divisions! > 0) {
+      final step = (widget.max - widget.min) / widget.divisions!;
+      v = (v / step).round() * step;
+    }
+    widget.onChanged(v.clamp(widget.min, widget.max));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final w = constraints.maxWidth;
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (d) => _handlePos(d.localPosition, w),
+        onHorizontalDragUpdate: (d) => _handlePos(d.localPosition, w),
+        child: SizedBox(
+          height: 24,
+          width: w,
+          child: CustomPaint(
+            painter: _CyberSliderPainter(
+              value: widget.value,
+              min: widget.min,
+              max: widget.max,
+              divisions: widget.divisions,
+            ),
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class _CyberSliderPainter extends CustomPainter {
+  final double value;
+  final double min;
+  final double max;
+  final int? divisions;
+
+  const _CyberSliderPainter({
+    required this.value,
+    required this.min,
+    required this.max,
+    this.divisions,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final ratio = ((value - min) / (max - min)).clamp(0.0, 1.0);
+    final cy = size.height / 2;
+    final activeX = ratio * size.width;
+
+    // ── 未激活轨道（全长细线）──
+    canvas.drawLine(
+      Offset(0, cy),
+      Offset(size.width, cy),
+      Paint()
+        ..color = AppTheme.primary.withValues(alpha: 0.18)
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // ── 激活轨道 ──
+    if (activeX > 0) {
+      canvas.drawLine(
+        Offset(0, cy),
+        Offset(activeX, cy),
+        Paint()
+          ..color = AppTheme.primary
+          ..strokeWidth = 2
+          ..strokeCap = StrokeCap.round
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+      );
+      canvas.drawLine(
+        Offset(0, cy),
+        Offset(activeX, cy),
+        Paint()
+          ..color = AppTheme.primary
+          ..strokeWidth = 2
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+
+    // ── 刻度短线（divisions 个间隔点）──
+    if (divisions != null && divisions! > 0) {
+      final tickPaint = Paint()
+        ..strokeWidth = 1
+        ..strokeCap = StrokeCap.round;
+      for (int i = 0; i <= divisions!; i++) {
+        final x = i / divisions! * size.width;
+        final isActive = x <= activeX;
+        tickPaint.color = isActive
+            ? AppTheme.primary.withValues(alpha: 0.6)
+            : AppTheme.primary.withValues(alpha: 0.2);
+        canvas.drawLine(Offset(x, cy - 4), Offset(x, cy + 4), tickPaint);
+      }
+    }
+
+    // ── 滑块：外环 + 发光 + 实心圆 + 内高光 ──
+    const r = 7.0;
+    final center = Offset(activeX, cy);
+
+    // 发光
+    canvas.drawCircle(
+      center,
+      r + 3,
+      Paint()
+        ..color = AppTheme.primary.withValues(alpha: 0.25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    // 深色背景圆
+    canvas.drawCircle(center, r, Paint()..color = const Color(0xFF0A1114));
+    // 外环
+    canvas.drawCircle(
+      center,
+      r,
+      Paint()
+        ..color = AppTheme.primary
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+    // 内实心圆
+    canvas.drawCircle(center, r * 0.45, Paint()..color = AppTheme.primary);
+  }
+
+  @override
+  bool shouldRepaint(_CyberSliderPainter old) =>
+      old.value != value ||
+      old.min != min ||
+      old.max != max ||
+      old.divisions != divisions;
 }
 
 // ───────────────────────────────────────────────
@@ -865,7 +1014,7 @@ class SettingsSectionTitle extends StatelessWidget {
         title,
         style: const TextStyle(
           color: AppTheme.primary,
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.5,
         ),

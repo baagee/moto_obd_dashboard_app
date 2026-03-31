@@ -5,6 +5,7 @@ import '../../../providers/settings_provider.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/cyber_button.dart';
 import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_toast.dart';
 import '../settings_fields.dart';
 
 /// 第三方服务设置面板（高德 API Key 配置）
@@ -29,15 +30,7 @@ class _ApiSettingsPanelState extends State<ApiSettingsPanel> {
 
   Future<void> _onSave() async {
     await context.read<SettingsProvider>().setAmapKey(_amapKey);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('API Key 已保存'),
-          backgroundColor: AppTheme.accentGreen,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    if (mounted) CyberToast.show(context, 'API Key 已保存');
   }
 
   Future<void> _confirmReset() async {

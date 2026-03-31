@@ -132,7 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           color: isSelected
                               ? AppTheme.primary
                               : AppTheme.textSecondary,
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight:
                               isSelected ? FontWeight.w600 : FontWeight.normal,
                         ),

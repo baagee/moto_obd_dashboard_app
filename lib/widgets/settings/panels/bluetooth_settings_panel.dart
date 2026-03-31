@@ -4,6 +4,11 @@ import '../../../providers/settings_provider.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/cyber_button.dart';
 import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_toast.dart';
 import '../settings_fields.dart';
 
 /// 蓝牙参数设置面板
@@ -52,15 +57,7 @@ class _BluetoothSettingsPanelState extends State<BluetoothSettingsPanel> {
       'settings_bluetooth_lowSpeedPidInterval':
           (_draft['lowSpeedInterval'] as double).toInt(),
     });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('蓝牙参数已保存（下次连接时生效）'),
-          backgroundColor: AppTheme.accentGreen,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    if (mounted) CyberToast.show(context, '蓝牙参数已保存（下次连接时生效）');
   }
 
   Future<void> _confirmReset() async {

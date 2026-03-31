@@ -262,11 +262,7 @@ class SettingsProvider extends ChangeNotifier {
   int get maxSpeed => _getInt('settings_display_maxSpeed', 240);
   int get warnSpeed => _getInt('settings_display_warnSpeed', 120);
   int get dangerSpeed => _getInt('settings_display_dangerSpeed', 180);
-  int get flashThreshold => _getInt('settings_display_flashThreshold', 100);
-  int get maxCoolantTemp => _getInt('settings_display_maxCoolantTemp', 120);
-  int get coolantWarnTemp => _getInt('settings_display_coolantWarnTemp', 100);
-  int get maxIntakeTemp => _getInt('settings_display_maxIntakeTemp', 80);
-  int get intakeWarnTemp => _getInt('settings_display_intakeWarnTemp', 50);
+
 
   Future<void> setMaxRpm(int v) => _setInt('settings_display_maxRpm', v);
   Future<void> setWarnRpm(int v) => _setInt('settings_display_warnRpm', v);
@@ -275,16 +271,7 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setWarnSpeed(int v) => _setInt('settings_display_warnSpeed', v);
   Future<void> setDangerSpeed(int v) =>
       _setInt('settings_display_dangerSpeed', v);
-  Future<void> setFlashThreshold(int v) =>
-      _setInt('settings_display_flashThreshold', v);
-  Future<void> setMaxCoolantTemp(int v) =>
-      _setInt('settings_display_maxCoolantTemp', v);
-  Future<void> setCoolantWarnTemp(int v) =>
-      _setInt('settings_display_coolantWarnTemp', v);
-  Future<void> setMaxIntakeTemp(int v) =>
-      _setInt('settings_display_maxIntakeTemp', v);
-  Future<void> setIntakeWarnTemp(int v) =>
-      _setInt('settings_display_intakeWarnTemp', v);
+
 
   // ===== 第三方服务 =====
 
@@ -390,11 +377,7 @@ class SettingsProvider extends ChangeNotifier {
       'settings_display_maxSpeed',
       'settings_display_warnSpeed',
       'settings_display_dangerSpeed',
-      'settings_display_flashThreshold',
-      'settings_display_maxCoolantTemp',
-      'settings_display_coolantWarnTemp',
-      'settings_display_maxIntakeTemp',
-      'settings_display_intakeWarnTemp',
+
     ],
     'api': [
       'settings_api_amapKey',

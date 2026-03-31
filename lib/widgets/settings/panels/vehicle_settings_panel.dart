@@ -4,6 +4,7 @@ import '../../../providers/settings_provider.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/cyber_button.dart';
 import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_toast.dart';
 import '../settings_fields.dart';
 
 /// 车辆参数设置面板
@@ -60,15 +61,7 @@ class _VehicleSettingsPanelState extends State<VehicleSettingsPanel> {
       'settings_vehicle_neutralRpmThreshold':
           (_draft['neutralRpmThreshold'] as double).toInt(),
     });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('车辆参数已保存'),
-          backgroundColor: AppTheme.accentGreen,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    if (mounted) CyberToast.show(context, '车辆参数已保存');
   }
 
   Future<void> _confirmReset() async {

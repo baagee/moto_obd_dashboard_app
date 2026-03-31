@@ -4,6 +4,7 @@ import '../../../providers/settings_provider.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/cyber_button.dart';
 import '../../../widgets/cyber_dialog.dart';
+import '../../../widgets/cyber_toast.dart';
 import '../settings_fields.dart';
 
 /// 高级设置面板（传感器 / GPS 参数）
@@ -51,15 +52,7 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
       'settings_advanced_maxEventHistory':
           (_draft['maxEventHistory'] as double).toInt(),
     });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('高级参数已保存'),
-          backgroundColor: AppTheme.accentGreen,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    if (mounted) CyberToast.show(context, '高级参数已保存');
   }
 
   Future<void> _confirmReset() async {
