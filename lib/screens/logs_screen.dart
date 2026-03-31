@@ -14,7 +14,8 @@ class LogsScreen extends StatefulWidget {
   State<LogsScreen> createState() => _LogsScreenState();
 }
 
-class _LogsScreenState extends State<LogsScreen> with AutomaticKeepAliveClientMixin {
+class _LogsScreenState extends State<LogsScreen>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -254,7 +255,9 @@ class _CompactHeader extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.delete_outline, color: AppTheme.accentRed.withOpacity(0.7), size: 12),
+                        Icon(Icons.delete_outline,
+                            color: AppTheme.accentRed.withOpacity(0.7),
+                            size: 12),
                         const SizedBox(width: 4),
                         Text(
                           '清空',
@@ -511,7 +514,9 @@ class _LogItem extends StatelessWidget {
                   style: TextStyle(
                     color: isWarning ? _color : AppTheme.textSecondary,
                     fontSize: 10,
-                    fontWeight: log.type == LogType.error ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: log.type == LogType.error
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
               ],

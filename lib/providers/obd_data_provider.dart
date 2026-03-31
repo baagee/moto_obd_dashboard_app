@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/obd_data.dart';
+import '../providers/settings_provider.dart';
 import '../utils/gear_util.dart';
 
 /// OBD数据提供者 - 管理真实 OBD 数据（无 Mock）
@@ -72,6 +73,14 @@ class OBDDataProvider extends ChangeNotifier {
   List<int> get pressureHistory => _pressureHistory;
   bool get isDeviceConnected => _isDeviceConnected;
 
+  SettingsProvider? _settingsProvider;
+
+  // codeflicker-fix: OPT-Issue-2/omvh7ni7j93qpiynr7sw
+  /// 更新 SettingsProvider 引用（由 main.dart ProxyProvider 在 settings 变化时调用）
+  void updateSettings(SettingsProvider? settings) {
+    _settingsProvider = settings;
+  }
+
   OBDDataProvider() {
     // 不再启动定时器，不生成 Mock 数据
   }
@@ -106,11 +115,16 @@ class OBDDataProvider extends ChangeNotifier {
     final currentSpeed = speed ?? _data.speed;
     final currentThrottle = throttle ?? _data.throttle;
     final currentLoad = load ?? _data.load;
+    // codeflicker-fix: OPT-Issue-2/omvh7ni7j93qpiynr7sw
+    final config = _settingsProvider != null
+        ? GearConfig.fromSettings(_settingsProvider!)
+        : GearConfig.defaults;
     final gear = GSX8SCalculator.calculateGear(
       rpm ?? _data.rpm,
       currentSpeed,
       throttle: currentThrottle,
       load: currentLoad,
+      config: config,
     );
 
     _data = _data.copyWith(

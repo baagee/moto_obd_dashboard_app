@@ -6,31 +6,28 @@ import '../models/obd_data.dart';
 /// 逆地理编码服务 - 将坐标转换为地名（高德地图 HTTP API，国内可用）
 ///
 /// 使用方式：
-///   1. 在 https://lbs.amap.com/ 注册开发者账号，申请 Web 服务 API Key
-///   2. 将 _amapKey 替换为你的 Key
+///   API Key 由 SettingsProvider 统一管理，通过 amapKey 参数传入。
+///   amapKey 为空时自动降级为坐标显示。
 ///
 /// 注意：高德坐标系为 GCJ-02，GPS 原始坐标为 WGS-84，需先转换
 class GeocodingService {
-  /// 高德 Web 服务 API Key（需替换为实际 Key）
-  /// 申请地址：https://lbs.amap.com/dev/key/app
-  /// https://lbs.amap.com/api/webservice/guide/api/georegeo
-  static const String _amapKey = '99d4e91045213ccda8ebee56a8061eb2';
-
   static const String _source = 'Geocoding';
 
   /// 根据坐标获取地名（高德逆地理编码）
   ///
+  /// [amapKey] 高德 Web 服务 API Key，由调用方从 SettingsProvider 传入；空字符串时降级为坐标显示
   /// [logCallback] 可选日志回调，传入后会输出请求/响应/错误等关键日志
   static Future<String?> getPlaceName(
     double latitude,
     double longitude, {
+    String amapKey = '',
     void Function(String source, LogType type, String message)? logCallback,
   }) async {
     final coordStr =
         '${latitude.toStringAsFixed(6)},${longitude.toStringAsFixed(6)}';
 
-    // 未配置 Key 时返回坐标字符串（降级处理）
-    if (_amapKey == 'YOUR_AMAP_WEB_API_KEY') {
+    // Key 为空时返回坐标字符串（降级处理）
+    if (amapKey.isEmpty) {
       logCallback?.call(
         _source,
         LogType.warning,
@@ -58,7 +55,7 @@ class GeocodingService {
 
       final url = Uri.parse(
         'https://restapi.amap.com/v3/geocode/regeo'
-        '?key=$_amapKey'
+        '?key=$amapKey'
         '&location=${gcj[1]},${gcj[0]}' // 高德格式：经度,纬度
         '&poitype=&radius=100&extensions=all&roadlevel=0',
       );

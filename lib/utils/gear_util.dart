@@ -1,24 +1,63 @@
+import '../providers/settings_provider.dart';
+
+/// 车辆传动参数配置对象
+///
+/// [theoreticalTotals] 为实例 getter，根据当前 gearRatios/primaryRatio/finalRatio
+/// 动态计算，避免原 static final 在类加载时固化导致参数注入无效的问题。
+class GearConfig {
+  final double primaryRatio;
+  final double finalRatio;
+  final double tireCircumference;
+  final List<double> gearRatios;
+  final int neutralSpeedThreshold;
+  final int neutralRpmThreshold;
+
+  const GearConfig({
+    required this.primaryRatio,
+    required this.finalRatio,
+    required this.tireCircumference,
+    required this.gearRatios,
+    required this.neutralSpeedThreshold,
+    required this.neutralRpmThreshold,
+  });
+
+  factory GearConfig.fromSettings(SettingsProvider s) => GearConfig(
+        primaryRatio: s.primaryRatio,
+        finalRatio: s.finalRatio,
+        tireCircumference: s.tireCircumference,
+        gearRatios: s.gearRatios,
+        neutralSpeedThreshold: s.neutralSpeedThreshold,
+        neutralRpmThreshold: s.neutralRpmThreshold,
+      );
+
+  /// GSX-8S 默认配置
+  static const GearConfig defaults = GearConfig(
+    primaryRatio: 1.675,
+    finalRatio: 2.764,
+    tireCircumference: 1.97857,
+    gearRatios: [3.071, 2.200, 1.700, 1.416, 1.230, 1.107],
+    neutralSpeedThreshold: 3,
+    neutralRpmThreshold: 1200,
+  );
+
+  /// 根据当前配置计算各档位理论传动比（实例 getter，随参数动态生成）
+  ///
+  /// ⚠️ 原 GSX8SCalculator._theoreticalTotals 为 static final，在类加载时固化，
+  /// 无法响应 GearConfig 注入。改为此处按需计算，每次 calculateGear 调用时传入。
+  List<double> get theoreticalTotals =>
+      gearRatios.map((g) => primaryRatio * g * finalRatio).toList();
+}
+
 class GSX8SCalculator {
-  // ==================== 配置参数 ====================
-  static const double primaryRatio = 1.675;
-  static const double finalRatio = 2.764;
-  static const double tireCircumference = 1.97857;
-  static const List<double> internalGearRatios = [
-    3.071, 2.200, 1.700, 1.416, 1.230, 1.107
-  ];
-
-  static final List<double> _theoreticalTotals =
-  internalGearRatios.map((g) => primaryRatio * g * finalRatio).toList();
-
   // ==================== 阈值优化 ====================
   // 采用非线性递减策略
   static const List<double> _gearThresholds = [
-    0.18,  // 1档: 传动比差异大，可严格
-    0.15,  // 2档
-    0.12,  // 3档
-    0.10,  // 4档
-    0.08,  // 5档: 传动比接近6档，加严区分度
-    0.12,  // 6档: 放宽阈值减少误判
+    0.18, // 1档: 传动比差异大，可严格
+    0.15, // 2档
+    0.12, // 3档
+    0.10, // 4档
+    0.08, // 5档: 传动比接近6档，加严区分度
+    0.12, // 6档: 放宽阈值减少误判
   ];
 
   // 半离合专用阈值（放宽）
@@ -32,17 +71,17 @@ class GSX8SCalculator {
   static bool _isInCreepMode = false; // 新增：半离合模式标记
 
   // ==================== 边界检测优化 ====================
-  static const int _neutralSpeedThreshold = 3;   // 降低到 3 km/h
-  static const int _neutralRpmThreshold = 1200;  // 降低到 1200 rpm
-  static const int _minValidSpeed = 5;           // 最低有效速度
-  static const int _minValidRpm = 1300;          // 最低有效转速
+  static const int _minValidSpeed = 5; // 最低有效速度
+  // codeflicker-fix: OPT-Issue-5/omvh7ni7j93qpiynr7sw — _minValidRpm 未被使用，已删除
 
   // ==================== 半离合检测 ====================
   static const int _creepMinSpeed = 3;
   static const int _creepMaxSpeed = 20;
   static const int _creepMaxThrottle = 35;
 
-  static bool _isCreepingState(int speed, int? throttle, int rpm, double scaledRatio) {
+  static bool _isCreepingState(
+      int speed, int? throttle, int rpm, double scaledRatio,
+      List<double> theoreticalTotals) {
     // 速度范围过滤
     if (speed < _creepMinSpeed || speed > _creepMaxSpeed) {
       _lastRatio = scaledRatio;
@@ -55,7 +94,7 @@ class GSX8SCalculator {
       return false;
     }
 
-    double maxTheoryRatio = _theoreticalTotals[0];
+    double maxTheoryRatio = theoreticalTotals[0];
 
     // 1. 传动比异常高（超过1档理论值 20%）
     bool ratioTooHigh = scaledRatio > maxTheoryRatio * 1.20;
@@ -77,10 +116,27 @@ class GSX8SCalculator {
   }
 
   // ==================== 核心计算逻辑 ====================
-  static int calculateGear(int rpm, int speed, {int? throttle, int? load}) {
+
+  /// 计算当前档位
+  ///
+  /// [config] 车辆传动配置，默认使用 [GearConfig.defaults]（GSX-8S 出厂参数）。
+  /// 调用处从 SettingsProvider 获取最新配置后传入：
+  /// ```dart
+  /// final config = GearConfig.fromSettings(context.read<SettingsProvider>());
+  /// final gear = GSX8SCalculator.calculateGear(rpm, speed, config: config);
+  /// ```
+  static int calculateGear(int rpm, int speed,
+      {int? throttle, int? load, GearConfig config = GearConfig.defaults}) {
+    // 通过 config.theoreticalTotals 获取动态计算的理论传动比列表
+    // ⚠️ 不再使用原来的 static final _theoreticalTotals，避免参数固化问题
+    final theoreticalTotals = config.theoreticalTotals;
+    final neutralSpeedThreshold = config.neutralSpeedThreshold;
+    final neutralRpmThreshold = config.neutralRpmThreshold;
+    final tireCircumference = config.tireCircumference;
+
     // ===== 阶段1: 边界条件判定 =====
     // 同时满足低速+低转才判定为空档
-    if (speed <= _neutralSpeedThreshold && rpm < _neutralRpmThreshold) {
+    if (speed <= neutralSpeedThreshold && rpm < neutralRpmThreshold) {
       _resetFilter();
       return 0;
     }
@@ -94,19 +150,21 @@ class GSX8SCalculator {
     double currentRatio = (rpm * 60 * tireCircumference) / (speed * 1000);
 
     // ===== 阶段3: 半离合检测 =====
-    _isInCreepMode = _isCreepingState(speed, throttle, rpm, currentRatio);
+    _isInCreepMode =
+        _isCreepingState(speed, throttle, rpm, currentRatio, theoreticalTotals);
 
     if (_isInCreepMode) {
       // 半离合状态：使用放宽阈值重新匹配
-      return _matchGearWithThreshold(currentRatio, _creepThreshold);
+      return _matchGearWithThreshold(
+          currentRatio, _creepThreshold, theoreticalTotals);
     }
 
     // ===== 阶段4: 正常档位匹配 =====
     int bestGear = 0;
     double minRelativeError = double.infinity;
 
-    for (int i = 0; i < _theoreticalTotals.length; i++) {
-      double theory = _theoreticalTotals[i];
+    for (int i = 0; i < theoreticalTotals.length; i++) {
+      double theory = theoreticalTotals[i];
       double relativeError = (currentRatio - theory).abs() / theory;
 
       if (relativeError < minRelativeError) {
@@ -122,7 +180,7 @@ class GSX8SCalculator {
       if (minRelativeError > threshold) {
         // 误差过大，但不立即返回0
         // 检查是否接近相邻档位（换挡过渡区）
-        if (_isNearShifting(currentRatio, bestGear)) {
+        if (_isNearShifting(currentRatio, bestGear, theoreticalTotals)) {
           return _smoothTransition(bestGear);
         }
 
@@ -138,12 +196,14 @@ class GSX8SCalculator {
   // ==================== 辅助方法 ====================
 
   /// 使用指定阈值匹配档位（半离合专用）
-  static int _matchGearWithThreshold(double ratio, double threshold) {
+  static int _matchGearWithThreshold(
+      double ratio, double threshold, List<double> theoreticalTotals) {
     int bestGear = 0;
     double minError = double.infinity;
 
-    for (int i = 0; i < _theoreticalTotals.length; i++) {
-      double error = (ratio - _theoreticalTotals[i]).abs() / _theoreticalTotals[i];
+    for (int i = 0; i < theoreticalTotals.length; i++) {
+      double error =
+          (ratio - theoreticalTotals[i]).abs() / theoreticalTotals[i];
       if (error < minError && error < threshold) {
         minError = error;
         bestGear = i + 1;
@@ -154,21 +214,22 @@ class GSX8SCalculator {
   }
 
   /// 检查是否在换挡过渡区（传动比介于两档之间）
-  static bool _isNearShifting(double ratio, int gear) {
+  static bool _isNearShifting(
+      double ratio, int gear, List<double> theoreticalTotals) {
     if (gear <= 0 || gear > 6) return false;
 
-    double currentTheory = _theoreticalTotals[gear - 1];
+    double currentTheory = theoreticalTotals[gear - 1];
 
     // 检查与相邻档位的距离
     if (gear > 1) {
-      double lowerTheory = _theoreticalTotals[gear - 2];  // 更高档位（传动比更小）
+      double lowerTheory = theoreticalTotals[gear - 2]; // 更高档位（传动比更小）
       if (ratio < currentTheory && ratio > lowerTheory) {
         return true;
       }
     }
 
     if (gear < 6) {
-      double upperTheory = _theoreticalTotals[gear];      // 更低档位（传动比更大）
+      double upperTheory = theoreticalTotals[gear]; // 更低档位（传动比更大）
       if (ratio > currentTheory && ratio < upperTheory) {
         return true;
       }
@@ -193,7 +254,7 @@ class GSX8SCalculator {
     // 5<->6档切换：需要更多稳定帧防止抖动
     if ((_lastValidGear == 5 && gear == 6) ||
         (_lastValidGear == 6 && gear == 5)) {
-      requiredFrames = 5;  // 5帧约250ms，比普通档位切换更慢确认
+      requiredFrames = 5; // 5帧约250ms，比普通档位切换更慢确认
     }
 
     if (gear != _pendingGear) {
@@ -214,7 +275,7 @@ class GSX8SCalculator {
     // - 5<->6档除外，即使相邻也必须等待稳定
     if ((_lastValidGear == 5 && gear == 6) ||
         (_lastValidGear == 6 && gear == 5)) {
-      return _lastValidGear;  // 保持稳定档位
+      return _lastValidGear; // 保持稳定档位
     }
 
     if ((_lastValidGear - gear).abs() == 1) {
@@ -237,14 +298,18 @@ class GSX8SCalculator {
   }
 
   // ==================== 调试接口 ====================
-  static Map<String, dynamic> getDebugInfo(int rpm, int speed) {
-    double ratio = (rpm * 60 * tireCircumference) / (speed * 1000);
+  static Map<String, dynamic> getDebugInfo(int rpm, int speed,
+      {GearConfig config = GearConfig.defaults}) {
+    final theoreticalTotals = config.theoreticalTotals;
+    double ratio =
+        (rpm * 60 * config.tireCircumference) / (speed * 1000);
     return {
       'currentRatio': ratio.toStringAsFixed(3),
       'isCreepMode': _isInCreepMode,
       'pendingGear': _pendingGear,
       'stableFrames': _stableFrames,
-      'theoreticalRatios': _theoreticalTotals.map((r) => r.toStringAsFixed(3)).toList(),
+      'theoreticalRatios':
+          theoreticalTotals.map((r) => r.toStringAsFixed(3)).toList(),
     };
   }
 }

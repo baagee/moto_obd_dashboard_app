@@ -6,11 +6,13 @@ import '../services/database_service.dart';
 import '../services/geocoding_service.dart';
 import 'log_provider.dart';
 import 'loggable.dart';
+import 'settings_provider.dart';
 
 /// 骑行记录 Provider
 class RidingRecordProvider extends ChangeNotifier {
   late final void Function(String source, LogType type, String message)
       _logCallback;
+  SettingsProvider? _settingsProvider;
 
   List<RidingRecord> _records = [];
   AggregationStats _todayStats = AggregationStats();
@@ -19,8 +21,16 @@ class RidingRecordProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isInitialized = false;
 
-  RidingRecordProvider({required LogProvider logProvider}) {
+  RidingRecordProvider({
+    required LogProvider logProvider,
+    SettingsProvider? settingsProvider,
+  }) : _settingsProvider = settingsProvider {
     _logCallback = createLogger(logProvider);
+  }
+
+  /// 注入 SettingsProvider（用于读取 amapKey 等配置）
+  void updateSettings(SettingsProvider settings) {
+    _settingsProvider = settings;
   }
 
   List<RidingRecord> get records => _records;
@@ -160,6 +170,7 @@ class RidingRecordProvider extends ChangeNotifier {
       startPlaceName = await GeocodingService.getPlaceName(
         startLatitude,
         startLongitude,
+        amapKey: _settingsProvider?.amapKey ?? '',
         logCallback: _logCallback,
       );
     }
@@ -168,6 +179,7 @@ class RidingRecordProvider extends ChangeNotifier {
       endPlaceName = await GeocodingService.getPlaceName(
         endLatitude,
         endLongitude,
+        amapKey: _settingsProvider?.amapKey ?? '',
         logCallback: _logCallback,
       );
     }
@@ -230,6 +242,7 @@ class RidingRecordProvider extends ChangeNotifier {
       startPlaceName = await GeocodingService.getPlaceName(
         startLatitude,
         startLongitude,
+        amapKey: _settingsProvider?.amapKey ?? '',
         logCallback: _logCallback,
       );
     }
@@ -239,6 +252,7 @@ class RidingRecordProvider extends ChangeNotifier {
       endPlaceName = await GeocodingService.getPlaceName(
         endLatitude,
         endLongitude,
+        amapKey: _settingsProvider?.amapKey ?? '',
         logCallback: _logCallback,
       );
     }

@@ -4,6 +4,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
 import '../constants/bluetooth_constants.dart';
 import '../models/obd_data.dart';
 import '../providers/obd_data_provider.dart';
+import '../providers/settings_provider.dart';
 
 /// OBD 数据解析结果
 class ObdParseResult {
@@ -39,19 +40,29 @@ class OBDService {
 
   fb.BluetoothCharacteristic? _writeCharacteristic;
   Timer? _pollingTimer;
-  bool _isPollingActive = false;  // 轮询是否处于活动状态
+  bool _isPollingActive = false; // 轮询是否处于活动状态
 
-  // 分级轮询常量 - 从 BluetoothConstants 引用
-  static const int pollingBaseInterval = BluetoothConstants.pollingBaseIntervalMs;
+  // 分级轮询常量 - 基础间隔固定 50ms，各频率倍率在 startPolling 时从 SettingsProvider 动态计算
+  static const int pollingBaseInterval =
+      BluetoothConstants.pollingBaseIntervalMs;
   static const List<String> highFreqPids = ['010D', '010C'];
   static const List<String> mediumFreqPids = ['0111', '010F', '010B'];
   static const List<String> lowFreqPids = ['0105', '0104', '0145', '0142'];
 
+  SettingsProvider? _settings;
+
+  // codeflicker-fix: OPT-Issue-9/omvh7ni7j93qpiynr7sw
   OBDService({
     required OBDDataProvider obdDataProvider,
-    void Function(String source, LogType type, String message)? logCallback,
+    this.logCallback,
+    SettingsProvider? settings,
   })  : _obdDataProvider = obdDataProvider,
-        logCallback = logCallback;
+        _settings = settings;
+
+  /// 更新 SettingsProvider 引用（由 BluetoothProvider 在 settings 变化时调用）
+  void updateSettings(SettingsProvider? settings) {
+    _settings = settings;
+  }
 
   /// 设置写入特征
   void setWriteCharacteristic(fb.BluetoothCharacteristic? characteristic) {
@@ -69,7 +80,10 @@ class OBDService {
 
     // ATZ 复位
     sendCommand("ATZ");
-    await Future.delayed(BluetoothConstants.elm327InitWait);
+    // codeflicker-fix: LOGIC-Issue-006/odko2evgylfq2rjqqr53
+    await Future.delayed(Duration(
+        milliseconds: _settings?.elm327InitWaitMs ??
+            BluetoothConstants.elm327InitWait.inMilliseconds));
 
     // ATE0 关闭回显
     sendCommand("ATE0");
@@ -121,7 +135,8 @@ class OBDService {
       case "0D": // 车速
         if (parts.length >= 3) {
           var speed = int.tryParse(parts[2], radix: 16) ?? 0;
-          speed = (speed * 1.08).toInt();
+          final factor = _settings?.speedCorrectionFactor ?? 1.08;
+          speed = (speed * factor).toInt();
           return ObdParseResult(speed: speed);
         }
         break;
@@ -145,7 +160,8 @@ class OBDService {
         break;
       case "0B": // 进气歧管压力
         if (parts.length >= 3) {
-          return ObdParseResult(pressure: int.tryParse(parts[2], radix: 16) ?? 0);
+          return ObdParseResult(
+              pressure: int.tryParse(parts[2], radix: 16) ?? 0);
         }
         break;
       case "04": // 引擎负荷 = A*100/255
@@ -205,20 +221,21 @@ class OBDService {
   void sendCommand(String command) {
     // 如果轮询未启动或写入特征为空，跳过发送
     if (_writeCharacteristic == null) {
-      logCallback?.call('OBD', LogType.warning, 'sendCommand 跳过: _writeCharacteristic=${_writeCharacteristic != null}');
+      logCallback?.call('OBD', LogType.warning,
+          'sendCommand 跳过: _writeCharacteristic=${_writeCharacteristic != null}');
       return;
     }
     try {
       final bytes = utf8.encode("$command\r");
-       _writeCharacteristic!.write(bytes, withoutResponse: false);
+      _writeCharacteristic!.write(bytes, withoutResponse: false);
     } catch (e) {
       final errorMsg = e.toString();
-      logCallback?.call('OBD', LogType.error, '发送命令失败: $command, 错误: $errorMsg');
+      logCallback?.call(
+          'OBD', LogType.error, '发送命令失败: $command, 错误: $errorMsg');
       if (errorMsg.contains('device is disconnected') ||
           errorMsg.contains('disconnected')) {
         stopPolling();
-      } else {
-      }
+      } else {}
     }
   }
 
@@ -236,6 +253,18 @@ class OBDService {
     int lowFreqIndex = 0;
     int tickCount = 0;
 
+    // codeflicker-fix: LOGIC-Issue-002/odko2evgylfq2rjqqr53
+    // 从 SettingsProvider 动态读取各频率间隔，计算 tickCount 倍率
+    // 倍率 = 目标间隔(ms) / 基础间隔(ms)，向最近整数取整，最小值为 1
+    final mediumRatio =
+        ((_settings?.mediumSpeedPidIntervalMs ?? 200) / pollingBaseInterval)
+            .round()
+            .clamp(1, 1000);
+    final lowRatio =
+        ((_settings?.lowSpeedPidIntervalMs ?? 500) / pollingBaseInterval)
+            .round()
+            .clamp(1, 1000);
+
     _pollingTimer = Timer.periodic(
       const Duration(milliseconds: pollingBaseInterval),
       (timer) {
@@ -244,16 +273,17 @@ class OBDService {
           return;
         }
         if (_writeCharacteristic == null || _isPollingActive == false) {
-          logCallback?.call('OBD', LogType.warning, '写入特征为空，isPollingActive=false');
+          logCallback?.call(
+              'OBD', LogType.warning, '写入特征为空，isPollingActive=false');
           timer.cancel();
           return;
         }
 
         String command;
-        if (tickCount % 10 == 0) {
+        if (tickCount % lowRatio == 0) {
           command = lowFreqPids[lowFreqIndex];
           lowFreqIndex = (lowFreqIndex + 1) % lowFreqPids.length;
-        } else if (tickCount % 4 == 0) {
+        } else if (tickCount % mediumRatio == 0) {
           command = mediumFreqPids[mediumFreqIndex];
           mediumFreqIndex = (mediumFreqIndex + 1) % mediumFreqPids.length;
         } else {
@@ -262,7 +292,10 @@ class OBDService {
         }
         sendCommand(command);
         tickCount++;
-        if (tickCount >= 1000) tickCount = 0;
+        // codeflicker-fix: OPT-Issue-7/omvh7ni7j93qpiynr7sw
+        // tickCount 需足够大，确保任意 lowRatio（最大 1000）下不会提前截断周期
+        // 10000 = 1000(最大lowRatio) × 10，保证至少完成 10 个完整的低频周期
+        if (tickCount >= 10000) tickCount = 0;
       },
     );
 

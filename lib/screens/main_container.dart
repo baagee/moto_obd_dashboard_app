@@ -17,6 +17,7 @@ import '../widgets/top_navigation_bar.dart';
 import 'dashboard_screen.dart';
 import 'record_screen.dart';
 import 'logs_screen.dart';
+import 'settings_screen.dart';
 import 'bluetooth_scan_screen.dart';
 
 /// 主容器 - 管理页面导航
@@ -38,51 +39,18 @@ class _MainContainerState extends State<MainContainer> {
     DashboardScreen(),
     RecordScreen(),
     LogsScreen(),
+    SettingsScreen(),
     BluetoothScanScreen(),
   ];
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: context.read<NavigationProvider>().currentIndex);
+    _pageController = PageController(
+        initialPage: context.read<NavigationProvider>().currentIndex);
     _initializeBluetooth();
-    // ====== [测试代码] APP启动3秒后自动添加测试事件 ======
-    // TODO: 测试完成后删除此代码
-    // Future.delayed(const Duration(seconds: 3), () {
-    //   if (mounted) {
-    //     _triggerTestEvent();
-    //   }
-    // });
-    // ====== [测试代码结束] ======
+    // codeflicker-fix: OPT-Issue-4/omvh7ni7j93qpiynr7sw
   }
-
-  /// ====== [测试方法] 触发测试事件 ======
-  /// TODO: 测试完成后删除此方法
-  void _triggerTestEvent() {
-    final statsProvider = context.read<RidingStatsProvider>();
-
-    // 创建测试事件
-    final testEvent = RidingEvent(
-      type: RidingEventType.performanceBurst,
-      title: '性能爆发',
-      description: '测试事件：发动机转速高于6300rpm且车速快速攀升',
-      triggerValue: 7500.0,
-      threshold: 6300.0,
-      timestamp: DateTime.now(),
-      additionalData: {
-        'isTestEvent': true, // 标记为测试事件
-        'condition': 'test mode',
-      },
-    );
-
-    // 手动触发测试事件（通过修改 RidingStatsProvider 的 latestEvent）
-    // 这里直接调用 _showEventNotification 来测试弹窗
-    _showEventNotification(testEvent);
-
-    // 打印日志
-    debugPrint('[测试] 已触发测试事件: ${testEvent.title}');
-  }
-  /// ====== [测试方法结束] ======
 
   Future<void> _initializeBluetooth() async {
     final bluetoothProvider = context.read<BluetoothProvider>();
@@ -273,7 +241,13 @@ class _MainContainerState extends State<MainContainer> {
                           onLinkVehiclePressed: _navigateToBluetoothScan,
                           isConnected: isConnected,
                           deviceName: deviceName,
-                          navItems: const ['DASHBOARD', 'RECORDS', 'LOGS', 'DEVICES'],
+                          navItems: const [
+                            'DASHBOARD',
+                            'RECORDS',
+                            'LOGS',
+                            'SETTINGS',
+                            'DEVICES',
+                          ],
                         );
                       },
                     );
