@@ -164,35 +164,15 @@ class RidingRecordProvider extends ChangeNotifier {
     double? endLatitude,
     double? endLongitude,
   }) async {
-    // 逆地理编码
-    String? startPlaceName;
-    if (startLatitude != null && startLongitude != null) {
-      startPlaceName = await GeocodingService.getPlaceName(
-        startLatitude,
-        startLongitude,
-        amapKey: _settingsProvider?.amapKey ?? '',
-        logCallback: _logCallback,
-      );
-    }
-    String? endPlaceName;
-    if (endLatitude != null && endLongitude != null) {
-      endPlaceName = await GeocodingService.getPlaceName(
-        endLatitude,
-        endLongitude,
-        amapKey: _settingsProvider?.amapKey ?? '',
-        logCallback: _logCallback,
-      );
-    }
-
-    // 用 updateRidingRecord 补全统计字段
+    // 第一步：立即写入核心字段（end_time、距离、时长等），让记录马上可见
+    // 起点地名已在 startRide() 时写入，无需再次编码
+    // 终点地名异步补充，不阻塞记录写入
     await DatabaseService.updateRidingRecord(recordId, {
       'end_time': endTime,
       'start_latitude': startLatitude,
       'start_longitude': startLongitude,
-      'start_place_name': startPlaceName,
       'end_latitude': endLatitude,
       'end_longitude': endLongitude,
-      'end_place_name': endPlaceName,
       'distance': distance,
       'avg_speed': avgSpeed,
       'duration': duration,
@@ -213,8 +193,25 @@ class RidingRecordProvider extends ChangeNotifier {
     await _updateDailyStats(endTime, distance, duration, avgSpeed, maxSpeed,
         maxLeftLean, maxRightLean);
 
-    // 重新加载
+    // 重新加载（记录已完整，UI 可以正常展示）
     await initialize(force: true);
+
+    // 第二步：异步补充终点地名（不阻塞 UI 刷新）
+    if (endLatitude != null && endLongitude != null) {
+      GeocodingService.getPlaceName(
+        endLatitude,
+        endLongitude,
+        logCallback: _logCallback,
+      ).then((endPlaceName) async {
+        if (endPlaceName != null) {
+          await DatabaseService.updateRidingRecord(recordId, {
+            'end_place_name': endPlaceName,
+          });
+          // 静默刷新，更新地名显示
+          await initialize(force: true);
+        }
+      }).catchError((_) {});
+    }
   }
 
   /// 保存骑行记录（骑行结束时调用）

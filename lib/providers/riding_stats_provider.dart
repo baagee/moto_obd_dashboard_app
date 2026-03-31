@@ -222,8 +222,8 @@ class RidingStatsProvider extends ChangeNotifier {
     // 将剩余未落库的轨迹点（尾巴批次）落库
     await _flushPendingWaypoints();
 
-    // 保存骑行记录
-    _saveRidingRecord(duration);
+    // 保存骑行记录（await 确保 end_time 写入完成后再返回，消除竞态）
+    await _saveRidingRecord(duration);
   }
 
   /// 启动轨迹点采集定时器
@@ -706,7 +706,7 @@ class RidingStatsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _saveRidingRecord(int duration) async {
+  Future<void> _saveRidingRecord(int duration) async {
     if (_ridingRecordProvider == null || _rideStartTime == null) return;
 
     // 无效骑行过滤：以下任一条件满足则丢弃
