@@ -122,15 +122,22 @@ class _CyberButtonState extends State<CyberButton> {
     }
   }
 
+  bool get _disabled => widget.onPressed == null && !_loading;
+
   Widget _buildPrimaryButton() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppTheme.primary,
+        color: _disabled
+            ? AppTheme.primary.withValues(alpha: 0.25)
+            : AppTheme.primary,
         borderRadius: BorderRadius.circular(AppTheme.radiusButton),
-        boxShadow: AppTheme.glowShadow(AppTheme.primary, blur: 10),
+        boxShadow: _disabled
+            ? null
+            : AppTheme.glowShadow(AppTheme.primary, blur: 10),
       ),
-      child: _buildContent(Colors.white),
+      child: _buildContent(
+          _disabled ? AppTheme.primary.withValues(alpha: 0.4) : Colors.white),
     );
   }
 
@@ -141,11 +148,12 @@ class _CyberButtonState extends State<CyberButton> {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(AppTheme.radiusButton),
         border: Border.all(
-          color: AppTheme.primary.withValues(alpha: 0.8),
+          color: AppTheme.primary.withValues(alpha: _disabled ? 0.2 : 0.8),
           width: 1,
         ),
       ),
-      child: _buildContent(AppTheme.primary),
+      child: _buildContent(
+          AppTheme.primary.withValues(alpha: _disabled ? 0.25 : 1.0)),
     );
   }
 

@@ -18,14 +18,18 @@ class ApiSettingsPanel extends StatefulWidget {
 
 class _ApiSettingsPanelState extends State<ApiSettingsPanel> {
   late String _amapKey;
+  late String _originalKey;
   bool _isTesting = false;
   String? _testResult;
   bool? _testSuccess;
+
+  bool get _isDirty => _amapKey != _originalKey;
 
   @override
   void initState() {
     super.initState();
     _amapKey = context.read<SettingsProvider>().amapKey;
+    _originalKey = _amapKey;
   }
 
   Future<void> _onSave() async {
@@ -152,7 +156,7 @@ class _ApiSettingsPanelState extends State<ApiSettingsPanel> {
             text: '重置本组',
             height: 30,
             fontSize: 11,
-            onPressed: _confirmReset,
+            onPressed: _isDirty ? _confirmReset : null,
           ),
           const SizedBox(width: 8),
           CyberButton.primary(
@@ -161,7 +165,7 @@ class _ApiSettingsPanelState extends State<ApiSettingsPanel> {
             height: 30,
             fontSize: 11,
             icon: Icons.save_outlined,
-            onPressed: _onSave,
+            onPressed: _isDirty ? _onSave : null,
           ),
         ],
       ),

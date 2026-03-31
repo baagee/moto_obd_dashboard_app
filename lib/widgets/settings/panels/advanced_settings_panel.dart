@@ -17,6 +17,14 @@ class AdvancedSettingsPanel extends StatefulWidget {
 
 class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
   late Map<String, dynamic> _draft;
+  late Map<String, dynamic> _original;
+
+  bool get _isDirty => !_mapsEqual(_draft, _original);
+  bool _mapsEqual(Map a, Map b) {
+    if (a.length != b.length) return false;
+    for (final k in a.keys) { if (a[k] != b[k]) return false; }
+    return true;
+  }
 
   @override
   void initState() {
@@ -26,7 +34,7 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
 
   void _loadDraft() {
     final s = context.read<SettingsProvider>();
-    _draft = {
+    _original = {
       'sensorAlpha': s.sensorAlpha,
       'movingAverageWindow': s.movingAverageWindow.toDouble(),
       'deadzoneThreshold': s.deadzoneThreshold,
@@ -35,6 +43,7 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
       'minRidingDistance': s.minRidingDistance.toDouble(),
       'maxEventHistory': s.maxEventHistory.toDouble(),
     };
+    _draft = Map.from(_original);
   }
 
   Future<void> _onSave() async {
@@ -111,7 +120,7 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
             text: '重置本组',
             height: 30,
             fontSize: 11,
-            onPressed: _confirmReset,
+            onPressed: _isDirty ? _confirmReset : null,
           ),
           const SizedBox(width: 8),
           CyberButton.primary(
@@ -120,7 +129,7 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
             height: 30,
             fontSize: 11,
             icon: Icons.save_outlined,
-            onPressed: _onSave,
+            onPressed: _isDirty ? _onSave : null,
           ),
         ],
       ),

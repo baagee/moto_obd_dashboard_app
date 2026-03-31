@@ -17,6 +17,14 @@ class EventsSettingsPanel extends StatefulWidget {
 
 class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
   late Map<String, dynamic> _draft;
+  late Map<String, dynamic> _original;
+
+  bool get _isDirty => !_mapsEqual(_draft, _original);
+  bool _mapsEqual(Map a, Map b) {
+    if (a.length != b.length) return false;
+    for (final k in a.keys) { if (a[k] != b[k]) return false; }
+    return true;
+  }
 
   @override
   void initState() {
@@ -26,46 +34,38 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
 
   void _loadDraft() {
     final s = context.read<SettingsProvider>();
-    _draft = {
+    _original = {
       'globalCooldown': s.globalCooldownSeconds.toDouble(),
-      // 性能爆发
       'performanceBurst_enabled': s.performanceBurstEnabled,
       'performanceBurst_rpm': s.performanceBurstRpm.toDouble(),
-      // 引擎过热
       'engineOverheat_enabled': s.engineOverheatEnabled,
       'engineOverheat_temp': s.engineOverheatTemp.toDouble(),
-      // 电压异常
       'voltageAnomaly_enabled': s.voltageAnomalyEnabled,
       'voltageAnomaly_low': s.voltageAnomalyLow,
       'voltageAnomaly_high': s.voltageAnomalyHigh,
-      // 高负荷
       'highLoad_enabled': s.highLoadEnabled,
       'highLoad_threshold': s.highLoadThreshold.toDouble(),
-      // 长途骑行
       'longRiding_enabled': s.longRidingEnabled,
       'longRiding_hours': s.longRidingDurationHours,
       'longRiding_cooldown': s.longRidingCooldownSeconds.toDouble(),
-      // 高效巡航
       'efficientCruising_enabled': s.efficientCruisingEnabled,
       'efficientCruising_speedMin': s.efficientCruisingSpeedMin.toDouble(),
       'efficientCruising_speedMax': s.efficientCruisingSpeedMax.toDouble(),
       'efficientCruising_loadMax': s.efficientCruisingLoadMax.toDouble(),
       'efficientCruising_cooldown': s.efficientCruisingCooldown.toDouble(),
-      // 引擎预热
       'engineWarmup_enabled': s.engineWarmupEnabled,
       'engineWarmup_temp': s.engineWarmupTemp.toDouble(),
       'engineWarmup_rpmMax': s.engineWarmupRpmMax.toDouble(),
-      // 低温风险
       'coldRisk_enabled': s.coldRiskEnabled,
       'coldRisk_temp': s.coldRiskTemp.toDouble(),
       'coldRisk_speedMin': s.coldRiskSpeedMin.toDouble(),
       'coldRisk_cooldown': s.coldRiskCooldown.toDouble(),
-      // 极限压弯
       'extremeLean_enabled': s.extremeLeanEnabled,
       'extremeLean_speedMin': s.extremeLeanSpeedMin.toDouble(),
       'extremeLean_angleMin': s.extremeLeanAngleMin.toDouble(),
       'extremeLean_cooldown': s.extremeLeanCooldown.toDouble(),
     };
+    _draft = Map.from(_original);
   }
 
   Future<void> _onSave() async {
@@ -187,7 +187,7 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
             text: '重置本组',
             height: 30,
             fontSize: 11,
-            onPressed: _confirmReset,
+            onPressed: _isDirty ? _confirmReset : null,
           ),
           const SizedBox(width: 8),
           CyberButton.primary(
@@ -196,7 +196,7 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
             height: 30,
             fontSize: 11,
             icon: Icons.save_outlined,
-            onPressed: _onSave,
+            onPressed: _isDirty ? _onSave : null,
           ),
         ],
       ),

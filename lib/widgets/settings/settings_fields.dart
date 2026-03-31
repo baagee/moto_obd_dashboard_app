@@ -90,12 +90,14 @@ class _SettingsNumberFieldState extends State<SettingsNumberField> {
   }
 
   void _increment() {
+    HapticFeedback.selectionClick();
     final next = _clamp(widget.currentValue + widget.step);
     _controller.text = _format(next);
     widget.onChanged(next);
   }
 
   void _decrement() {
+    HapticFeedback.selectionClick();
     final next = _clamp(widget.currentValue - widget.step);
     _controller.text = _format(next);
     widget.onChanged(next);
@@ -410,7 +412,9 @@ class _CyberSliderState extends State<_CyberSlider> {
       final step = (widget.max - widget.min) / widget.divisions!;
       v = (v / step).round() * step;
     }
-    widget.onChanged(v.clamp(widget.min, widget.max));
+    final newV = v.clamp(widget.min, widget.max);
+    if (newV != widget.value) HapticFeedback.selectionClick();
+    widget.onChanged(newV);
   }
 
   @override

@@ -4,11 +4,6 @@ import '../../../providers/settings_provider.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/cyber_button.dart';
 import '../../../widgets/cyber_dialog.dart';
-import '../../../widgets/cyber_dialog.dart';
-import '../../../widgets/cyber_dialog.dart';
-import '../../../widgets/cyber_dialog.dart';
-import '../../../widgets/cyber_dialog.dart';
-import '../../../widgets/cyber_dialog.dart';
 import '../../../widgets/cyber_toast.dart';
 import '../settings_fields.dart';
 
@@ -22,6 +17,14 @@ class DisplaySettingsPanel extends StatefulWidget {
 
 class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
   late Map<String, dynamic> _draft;
+  late Map<String, dynamic> _original;
+
+  bool get _isDirty => !_mapsEqual(_draft, _original);
+  bool _mapsEqual(Map a, Map b) {
+    if (a.length != b.length) return false;
+    for (final k in a.keys) { if (a[k] != b[k]) return false; }
+    return true;
+  }
 
   @override
   void initState() {
@@ -31,7 +34,7 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
 
   void _loadDraft() {
     final s = context.read<SettingsProvider>();
-    _draft = {
+    _original = {
       'maxRpm': s.maxRpm.toDouble(),
       'warnRpm': s.warnRpm.toDouble(),
       'dangerRpm': s.dangerRpm.toDouble(),
@@ -39,6 +42,7 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
       'warnSpeed': s.warnSpeed.toDouble(),
       'dangerSpeed': s.dangerSpeed.toDouble(),
     };
+    _draft = Map.from(_original);
   }
 
   Future<void> _onSave() async {
@@ -109,7 +113,7 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
             text: '重置本组',
             height: 30,
             fontSize: 11,
-            onPressed: _confirmReset,
+            onPressed: _isDirty ? _confirmReset : null,
           ),
           const SizedBox(width: 8),
           CyberButton.primary(
@@ -118,7 +122,7 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
             height: 30,
             fontSize: 11,
             icon: Icons.save_outlined,
-            onPressed: _onSave,
+            onPressed: _isDirty ? _onSave : null,
           ),
         ],
       ),

@@ -248,22 +248,21 @@ class OBDService {
     logCallback?.call('OBD', LogType.info, '启动 OBD 轮询（分级模式）...');
 
     _pollingTimer?.cancel();
+
+    // 队列驱动调度：每个 PID 独立记录下次允许发送的时间戳（毫秒）
+    // 初始化为 0，表示立即可发
+    final Map<String, int> nextSendAt = {
+      for (final p in [...highFreqPids, ...mediumFreqPids, ...lowFreqPids])
+        p: 0,
+    };
     int highFreqIndex = 0;
     int mediumFreqIndex = 0;
     int lowFreqIndex = 0;
-    int tickCount = 0;
 
-    // codeflicker-fix: LOGIC-Issue-002/odko2evgylfq2rjqqr53
-    // 从 SettingsProvider 动态读取各频率间隔，计算 tickCount 倍率
-    // 倍率 = 目标间隔(ms) / 基础间隔(ms)，向最近整数取整，最小值为 1
-    final mediumRatio =
-        ((_settings?.mediumSpeedPidIntervalMs ?? 200) / pollingBaseInterval)
-            .round()
-            .clamp(1, 1000);
-    final lowRatio =
-        ((_settings?.lowSpeedPidIntervalMs ?? 500) / pollingBaseInterval)
-            .round()
-            .clamp(1, 1000);
+    // 从 SettingsProvider 读取各级间隔（ms）
+    final highInterval = (_settings?.highSpeedPidIntervalMs ?? 50).clamp(50, 1000);
+    final mediumInterval = (_settings?.mediumSpeedPidIntervalMs ?? 250).clamp(250, 1500);
+    final lowInterval = (_settings?.lowSpeedPidIntervalMs ?? 500).clamp(500, 2000);
 
     _pollingTimer = Timer.periodic(
       const Duration(milliseconds: pollingBaseInterval),
@@ -279,23 +278,36 @@ class OBDService {
           return;
         }
 
-        String command;
-        if (tickCount % lowRatio == 0) {
-          command = lowFreqPids[lowFreqIndex];
+        final now = DateTime.now().millisecondsSinceEpoch;
+
+        // 优先级：低频 > 中频 > 高频，每次 tick 最多发一条
+        String? command;
+
+        // 低频 PID 到期检查
+        final lowPid = lowFreqPids[lowFreqIndex];
+        if (now >= (nextSendAt[lowPid] ?? 0)) {
+          command = lowPid;
+          nextSendAt[lowPid] = now + lowInterval;
           lowFreqIndex = (lowFreqIndex + 1) % lowFreqPids.length;
-        } else if (tickCount % mediumRatio == 0) {
-          command = mediumFreqPids[mediumFreqIndex];
-          mediumFreqIndex = (mediumFreqIndex + 1) % mediumFreqPids.length;
         } else {
-          command = highFreqPids[highFreqIndex];
-          highFreqIndex = (highFreqIndex + 1) % highFreqPids.length;
+          // 中频 PID 到期检查
+          final medPid = mediumFreqPids[mediumFreqIndex];
+          if (now >= (nextSendAt[medPid] ?? 0)) {
+            command = medPid;
+            nextSendAt[medPid] = now + mediumInterval;
+            mediumFreqIndex = (mediumFreqIndex + 1) % mediumFreqPids.length;
+          } else {
+            // 高频 PID 到期检查
+            final highPid = highFreqPids[highFreqIndex];
+            if (now >= (nextSendAt[highPid] ?? 0)) {
+              command = highPid;
+              nextSendAt[highPid] = now + highInterval;
+              highFreqIndex = (highFreqIndex + 1) % highFreqPids.length;
+            }
+          }
         }
-        sendCommand(command);
-        tickCount++;
-        // codeflicker-fix: OPT-Issue-7/omvh7ni7j93qpiynr7sw
-        // tickCount 需足够大，确保任意 lowRatio（最大 1000）下不会提前截断周期
-        // 10000 = 1000(最大lowRatio) × 10，保证至少完成 10 个完整的低频周期
-        if (tickCount >= 10000) tickCount = 0;
+
+        if (command != null) sendCommand(command);
       },
     );
 

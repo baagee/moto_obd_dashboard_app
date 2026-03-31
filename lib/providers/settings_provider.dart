@@ -110,11 +110,12 @@ class SettingsProvider extends ChangeNotifier {
   int get elm327InitWaitMs =>
       _getInt('settings_bluetooth_elm327InitWait', 1000);
   int get highSpeedPidIntervalMs =>
-      _getInt('settings_bluetooth_highSpeedPidInterval', 50);
+      _getInt('settings_bluetooth_highSpeedPidInterval', 50).clamp(50, 1000);
   int get mediumSpeedPidIntervalMs =>
-      _getInt('settings_bluetooth_mediumSpeedPidInterval', 200);
+      _getInt('settings_bluetooth_mediumSpeedPidInterval', 250)
+          .clamp(250, 1500);
   int get lowSpeedPidIntervalMs =>
-      _getInt('settings_bluetooth_lowSpeedPidInterval', 500);
+      _getInt('settings_bluetooth_lowSpeedPidInterval', 500).clamp(500, 2000);
 
   Future<void> setScanTimeoutSeconds(int v) =>
       _setInt('settings_bluetooth_scanTimeout', v);
@@ -263,7 +264,6 @@ class SettingsProvider extends ChangeNotifier {
   int get warnSpeed => _getInt('settings_display_warnSpeed', 120);
   int get dangerSpeed => _getInt('settings_display_dangerSpeed', 180);
 
-
   Future<void> setMaxRpm(int v) => _setInt('settings_display_maxRpm', v);
   Future<void> setWarnRpm(int v) => _setInt('settings_display_warnRpm', v);
   Future<void> setDangerRpm(int v) => _setInt('settings_display_dangerRpm', v);
@@ -271,7 +271,6 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setWarnSpeed(int v) => _setInt('settings_display_warnSpeed', v);
   Future<void> setDangerSpeed(int v) =>
       _setInt('settings_display_dangerSpeed', v);
-
 
   // ===== 第三方服务 =====
 
@@ -377,7 +376,6 @@ class SettingsProvider extends ChangeNotifier {
       'settings_display_maxSpeed',
       'settings_display_warnSpeed',
       'settings_display_dangerSpeed',
-
     ],
     'api': [
       'settings_api_amapKey',

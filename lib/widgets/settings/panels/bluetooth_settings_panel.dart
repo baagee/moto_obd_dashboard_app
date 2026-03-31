@@ -4,10 +4,6 @@ import '../../../providers/settings_provider.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/cyber_button.dart';
 import '../../../widgets/cyber_dialog.dart';
-import '../../../widgets/cyber_dialog.dart';
-import '../../../widgets/cyber_dialog.dart';
-import '../../../widgets/cyber_dialog.dart';
-import '../../../widgets/cyber_dialog.dart';
 import '../../../widgets/cyber_toast.dart';
 import '../settings_fields.dart';
 
@@ -21,6 +17,16 @@ class BluetoothSettingsPanel extends StatefulWidget {
 
 class _BluetoothSettingsPanelState extends State<BluetoothSettingsPanel> {
   late Map<String, dynamic> _draft;
+  late Map<String, dynamic> _original;
+
+  bool get _isDirty => !_mapsEqual(_draft, _original);
+  bool _mapsEqual(Map a, Map b) {
+    if (a.length != b.length) return false;
+    for (final k in a.keys) {
+      if (a[k] != b[k]) return false;
+    }
+    return true;
+  }
 
   @override
   void initState() {
@@ -30,15 +36,17 @@ class _BluetoothSettingsPanelState extends State<BluetoothSettingsPanel> {
 
   void _loadDraft() {
     final s = context.read<SettingsProvider>();
-    _draft = {
+    _original = {
       'scanTimeout': s.scanTimeoutSeconds.toDouble(),
       'minRssi': s.minRssi.toDouble(),
       'connectionTimeout': s.connectionTimeoutSeconds.toDouble(),
       'elm327InitWait': s.elm327InitWaitMs.toDouble(),
       'highSpeedInterval': s.highSpeedPidIntervalMs.toDouble(),
-      'mediumSpeedInterval': s.mediumSpeedPidIntervalMs.toDouble(),
+      'mediumSpeedInterval':
+          s.mediumSpeedPidIntervalMs.clamp(250, 1500).toDouble(),
       'lowSpeedInterval': s.lowSpeedPidIntervalMs.toDouble(),
     };
+    _draft = Map.from(_original);
   }
 
   Future<void> _onSave() async {
@@ -117,7 +125,7 @@ class _BluetoothSettingsPanelState extends State<BluetoothSettingsPanel> {
             text: '重置本组',
             height: 30,
             fontSize: 11,
-            onPressed: _confirmReset,
+            onPressed: _isDirty ? _confirmReset : null,
           ),
           const SizedBox(width: 8),
           CyberButton.primary(
@@ -126,7 +134,7 @@ class _BluetoothSettingsPanelState extends State<BluetoothSettingsPanel> {
             height: 30,
             fontSize: 11,
             icon: Icons.save_outlined,
-            onPressed: _onSave,
+            onPressed: _isDirty ? _onSave : null,
           ),
         ],
       ),
@@ -219,35 +227,35 @@ class _BluetoothSettingsPanelState extends State<BluetoothSettingsPanel> {
             ),
           ),
           SettingsSliderField(
-            label: '高速轮询间隔',
-            hint: '车速 ≥ 30km/h 时使用',
+            label: '高灵敏数据轮询间隔',
+            hint: '',
             value: _draft['highSpeedInterval'],
             defaultValue: 50,
-            min: 20,
-            max: 200,
-            divisions: 18,
+            min: 50,
+            max: 1000,
+            divisions: 19,
             valueFormatter: (v) => '${v.toInt()} ms',
             onChanged: (v) => setState(() => _draft['highSpeedInterval'] = v),
           ),
           SettingsSliderField(
-            label: '中速轮询间隔',
-            hint: '车速 5-30km/h 时使用',
+            label: '中灵敏数据轮询间隔',
+            hint: '',
             value: _draft['mediumSpeedInterval'],
-            defaultValue: 200,
-            min: 50,
-            max: 500,
-            divisions: 9,
+            defaultValue: 250,
+            min: 250,
+            max: 1500,
+            divisions: 25,
             valueFormatter: (v) => '${v.toInt()} ms',
             onChanged: (v) => setState(() => _draft['mediumSpeedInterval'] = v),
           ),
           SettingsSliderField(
-            label: '低速轮询间隔',
-            hint: '车速 < 5km/h 或怠速时使用',
+            label: '低灵敏数据轮询间隔',
+            hint: '',
             value: _draft['lowSpeedInterval'],
             defaultValue: 500,
-            min: 100,
+            min: 500,
             max: 2000,
-            divisions: 19,
+            divisions: 15,
             valueFormatter: (v) => '${v.toInt()} ms',
             onChanged: (v) => setState(() => _draft['lowSpeedInterval'] = v),
           ),
