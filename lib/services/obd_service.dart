@@ -248,21 +248,26 @@ class OBDService {
     logCallback?.call('OBD', LogType.info, '启动 OBD 轮询（分级模式）...');
 
     _pollingTimer?.cancel();
-
-    // 队列驱动调度：每个 PID 独立记录下次允许发送的时间戳（毫秒）
-    // 初始化为 0，表示立即可发
-    final Map<String, int> nextSendAt = {
-      for (final p in [...highFreqPids, ...mediumFreqPids, ...lowFreqPids])
-        p: 0,
-    };
+    int tickCount = 0;
     int highFreqIndex = 0;
     int mediumFreqIndex = 0;
     int lowFreqIndex = 0;
 
-    // 从 SettingsProvider 读取各级间隔（ms）
-    final highInterval = (_settings?.highSpeedPidIntervalMs ?? 50).clamp(50, 1000);
-    final mediumInterval = (_settings?.mediumSpeedPidIntervalMs ?? 250).clamp(250, 1500);
-    final lowInterval = (_settings?.lowSpeedPidIntervalMs ?? 500).clamp(500, 2000);
+    // 叠加调度：Timer 固定 50ms 节拍（设置里各档均为 50 的倍数，倍率必为整数）
+    // 每 tick 各频率独立判断，到期就发，互不排斥（每 tick 最多 3 条）
+    final highInterval =
+        (_settings?.highSpeedPidIntervalMs ?? 50).clamp(50, 1000);
+    final mediumInterval =
+        (_settings?.mediumSpeedPidIntervalMs ?? 250).clamp(250, 1500);
+    final lowInterval =
+        (_settings?.lowSpeedPidIntervalMs ?? 500).clamp(500, 2000);
+
+    // 倍率 = 目标间隔 / 50ms，设置保证整除，无精度误差
+    final highRatio = (highInterval / pollingBaseInterval).round().clamp(1, 20);
+    final mediumRatio =
+        (mediumInterval / pollingBaseInterval).round().clamp(1, 30);
+    final lowRatio =
+        (lowInterval / pollingBaseInterval).round().clamp(1, 40);
 
     _pollingTimer = Timer.periodic(
       const Duration(milliseconds: pollingBaseInterval),
@@ -278,36 +283,27 @@ class OBDService {
           return;
         }
 
-        final now = DateTime.now().millisecondsSinceEpoch;
-
-        // 优先级：低频 > 中频 > 高频，每次 tick 最多发一条
-        String? command;
-
-        // 低频 PID 到期检查
-        final lowPid = lowFreqPids[lowFreqIndex];
-        if (now >= (nextSendAt[lowPid] ?? 0)) {
-          command = lowPid;
-          nextSendAt[lowPid] = now + lowInterval;
-          lowFreqIndex = (lowFreqIndex + 1) % lowFreqPids.length;
-        } else {
-          // 中频 PID 到期检查
-          final medPid = mediumFreqPids[mediumFreqIndex];
-          if (now >= (nextSendAt[medPid] ?? 0)) {
-            command = medPid;
-            nextSendAt[medPid] = now + mediumInterval;
-            mediumFreqIndex = (mediumFreqIndex + 1) % mediumFreqPids.length;
-          } else {
-            // 高频 PID 到期检查
-            final highPid = highFreqPids[highFreqIndex];
-            if (now >= (nextSendAt[highPid] ?? 0)) {
-              command = highPid;
-              nextSendAt[highPid] = now + highInterval;
-              highFreqIndex = (highFreqIndex + 1) % highFreqPids.length;
-            }
-          }
+        // 高频：每 highRatio 个 tick 发一条
+        if (tickCount % highRatio == 0) {
+          sendCommand(highFreqPids[highFreqIndex]);
+          highFreqIndex = (highFreqIndex + 1) % highFreqPids.length;
         }
 
-        if (command != null) sendCommand(command);
+        // 中频：每 mediumRatio 个 tick 额外发一条
+        if (tickCount % mediumRatio == 0) {
+          sendCommand(mediumFreqPids[mediumFreqIndex]);
+          mediumFreqIndex = (mediumFreqIndex + 1) % mediumFreqPids.length;
+        }
+
+        // 低频：每 lowRatio 个 tick 额外发一条
+        if (tickCount % lowRatio == 0) {
+          sendCommand(lowFreqPids[lowFreqIndex]);
+          lowFreqIndex = (lowFreqIndex + 1) % lowFreqPids.length;
+        }
+
+        tickCount++;
+        // tickCount 重置：取三个倍率最小公倍数，防止溢出
+        if (tickCount >= highRatio * mediumRatio * lowRatio) tickCount = 0;
       },
     );
 

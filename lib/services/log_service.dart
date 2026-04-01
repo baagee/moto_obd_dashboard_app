@@ -10,25 +10,8 @@ class LogService {
   static const String _logFileName = 'obd_logs.txt';
   static String? _cachedFilePath;
 
-  /// 写入队列 - 用于异步顺序写入（StreamController 保证单线程顺序处理）
-  static final StreamController<String> _writeQueue =
-      StreamController<String>.broadcast();
-
-  /// 初始化后台写入监听
-  static void _initWriteListener() {
-    _writeQueue.stream.listen(_processWriteQueue);
-  }
-
-  /// 处理写入队列
-  static Future<void> _processWriteQueue(String logLine) async {
-    try {
-      final filePath = await getLogFilePath();
-      final file = File(filePath);
-      await file.writeAsString(logLine, encoding: utf8, mode: FileMode.append);
-    } catch (e) {
-      // 写入失败静默处理
-    }
-  }
+  /// 串行写入链：每次写入都链接在上一次完成之后，彻底杜绝并发竞争
+  static Future<void> _lastWrite = Future.value();
 
   /// 获取日志文件路径
   static Future<String> getLogFilePath() async {
@@ -38,11 +21,13 @@ class LogService {
     return _cachedFilePath!;
   }
 
+  /// 将任意写操作串行化：始终链接在上一次写入之后执行
+  static void _enqueue(Future<void> Function() task) {
+    _lastWrite = _lastWrite.then((_) => task()).catchError((_) {});
+  }
+
   /// 初始化日志文件（应用启动时调用）
   static Future<void> initLogFile() async {
-    // 启动后台写入监听
-    _initWriteListener();
-
     try {
       final filePath = await getLogFilePath();
       final file = File(filePath);
@@ -62,32 +47,36 @@ class LogService {
     }
   }
 
-  /// 实时追加写入单条日志到文件（通过队列异步顺序写入）
-  static Future<void> appendLog(DiagnosticLog log) async {
+  /// 实时追加写入单条日志到文件（串行队列，保证顺序、无覆盖）
+  static void appendLog(DiagnosticLog log) {
     final typeStr = log.type.name.toUpperCase();
-    final logLine = '[${log.formattedTime}] [$typeStr] [${log.source}] ${log.message}\n';
-
-    // 加入队列，由后台监听器顺序处理
-    _writeQueue.add(logLine);
+    final logLine =
+        '[${log.formattedTime}] [$typeStr] [${log.source}] ${log.message}\n';
+    _enqueue(() async {
+      final filePath = await getLogFilePath();
+      await File(filePath)
+          .writeAsString(logLine, encoding: utf8, mode: FileMode.append);
+    });
   }
 
-  /// 清空日志文件
+  /// 清空日志文件（同样走串行队列，避免与追加写入竞争）
   static Future<void> clearLogFile() async {
-    try {
-      final filePath = await getLogFilePath();
-      final file = File(filePath);
-
-      // 重新写入文件头
-      final buffer = StringBuffer();
-      buffer.writeln('OBD Dashboard Logs');
-      buffer.writeln('=' * 50);
-      buffer.writeln('File Cleared: ${DateTime.now().toIso8601String()}');
-      buffer.writeln('=' * 50);
-      buffer.writeln();
-      await file.writeAsString(buffer.toString(), encoding: utf8);
-    } catch (e) {
-      // 清空失败静默处理
-    }
+    final completer = Completer<void>();
+    _enqueue(() async {
+      try {
+        final filePath = await getLogFilePath();
+        final buffer = StringBuffer();
+        buffer.writeln('OBD Dashboard Logs');
+        buffer.writeln('=' * 50);
+        buffer.writeln('File Cleared: ${DateTime.now().toIso8601String()}');
+        buffer.writeln('=' * 50);
+        buffer.writeln();
+        await File(filePath).writeAsString(buffer.toString(), encoding: utf8);
+      } finally {
+        completer.complete();
+      }
+    });
+    return completer.future;
   }
 
   /// 分享日志文件

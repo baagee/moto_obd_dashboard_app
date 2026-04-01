@@ -185,6 +185,8 @@ class RidingStatsProvider extends ChangeNotifier {
       });
       _logCallback(
           'Stats', LogType.info, '骑行记录已插入，record_id=$_currentRecordId');
+      // 插入成功后刷新记录列表，让进行中的记录立即出现在记录页
+      _ridingRecordProvider?.refreshRecords();
     } catch (e) {
       _logCallback('Stats', LogType.warning, '骑行记录初始化插入失败: $e');
       // _currentRecordId 保持 null，_waypointTimer 启动但写库时跳过
@@ -339,8 +341,7 @@ class RidingStatsProvider extends ChangeNotifier {
     // 请求后台定位权限（确保 APP 切后台时 GPS 仍然工作）
     LocationService.requestBackgroundPermission().then((granted) {
       if (!granted) {
-        _logCallback(
-            'GPS', LogType.warning, '后台定位权限未授权，切换到后台时 GPS 追踪可能暂停');
+        _logCallback('GPS', LogType.warning, '后台定位权限未授权，切换到后台时 GPS 追踪可能暂停');
       } else {
         _logCallback('GPS', LogType.success, '后台定位权限已授权');
       }
@@ -552,7 +553,9 @@ class RidingStatsProvider extends ChangeNotifier {
     if (avgSpeed < minSpeed) return;
     if (avgLean < minAngle) return;
     if (!_canTriggerEvent(stats.RidingEventType.extremeLean,
-        customCooldown: Duration(seconds: cooldownSec))) { return; } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
+        customCooldown: Duration(seconds: cooldownSec))) {
+      return;
+    } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
 
     final direction = _obdDataProvider.data.leanDirection;
     final event = stats.RidingEvent.extremeLean(
@@ -615,7 +618,9 @@ class RidingStatsProvider extends ChangeNotifier {
     final duration = DateTime.now().difference(_rideStartTime!);
     if (duration.inMinutes < (durationHours * 60).toInt()) return;
     if (!_canTriggerEvent(stats.RidingEventType.longRiding,
-        customCooldown: Duration(seconds: cooldownSec))) { return; } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
+        customCooldown: Duration(seconds: cooldownSec))) {
+      return;
+    } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
 
     final event = stats.RidingEvent.longRiding(duration: duration);
     _addEvent(event);
@@ -636,7 +641,9 @@ class RidingStatsProvider extends ChangeNotifier {
     if (avgSpeed < speedMin || avgSpeed > speedMax) return;
     if (avgLoad >= loadMax) return;
     if (!_canTriggerEvent(stats.RidingEventType.efficientCruising,
-        customCooldown: Duration(seconds: cooldownSec))) { return; } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
+        customCooldown: Duration(seconds: cooldownSec))) {
+      return;
+    } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
 
     // 计算油门稳定性（标准差）
     final throttleStdDev = _sampler.getStdDev('throttle');
@@ -681,7 +688,9 @@ class RidingStatsProvider extends ChangeNotifier {
     if (avgIntakeTemp >= tempThreshold) return;
     if (avgSpeed <= speedThreshold) return;
     if (!_canTriggerEvent(stats.RidingEventType.coldEnvironmentRisk,
-        customCooldown: Duration(seconds: cooldownSec))) { return; } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
+        customCooldown: Duration(seconds: cooldownSec))) {
+      return;
+    } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
 
     final vehicleSpeed = _obdDataProvider.data.speed.toDouble();
     final event = stats.RidingEvent.coldEnvironmentRisk(
@@ -782,6 +791,8 @@ class RidingStatsProvider extends ChangeNotifier {
           endLatitude: endPoint?.latitude,
           endLongitude: endPoint?.longitude,
         );
+        // 骑行记录更新完成，刷新记录列表
+        _ridingRecordProvider!.refreshRecords();
       } catch (e) {
         _logCallback('Stats', LogType.error, '更新骑行记录失败: $e');
       }
@@ -802,6 +813,8 @@ class RidingStatsProvider extends ChangeNotifier {
         endLatitude: endPoint?.latitude,
         endLongitude: endPoint?.longitude,
       );
+      // 降级路径：骑行记录保存完成，刷新记录列表
+      unawaited(_ridingRecordProvider!.refreshRecords());
     }
   }
 

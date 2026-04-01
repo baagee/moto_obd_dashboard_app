@@ -92,6 +92,12 @@ class RidingRecordProvider extends ChangeNotifier {
     _records = maps.map((m) => RidingRecord.fromMap(m)).toList();
   }
 
+  /// 仅刷新记录列表，不触发清理操作（供骑行开始/结束时调用）
+  Future<void> refreshRecords() async {
+    await _loadRecords();
+    notifyListeners();
+  }
+
   /// 加载今日统计（从 daily_stats 读取，与周/月统计方式一致）
   Future<void> _loadTodayStats() async {
     final stats = await DatabaseService.calculateTodayStats();
