@@ -34,6 +34,7 @@ class _ApiSettingsPanelState extends State<ApiSettingsPanel> {
 
   Future<void> _onSave() async {
     await context.read<SettingsProvider>().setAmapKey(_amapKey);
+    if (mounted) setState(() => _originalKey = _amapKey);
     if (mounted) CyberToast.show(context, 'API Key 已保存');
   }
 
@@ -153,11 +154,7 @@ class _ApiSettingsPanelState extends State<ApiSettingsPanel> {
           const Text('第三方服务', style: AppTheme.titleMedium),
           const Spacer(),
           CyberButton.secondary(
-            text: '重置本组',
-            height: 30,
-            fontSize: 11,
-            onPressed: _isDirty ? _confirmReset : null,
-          ),
+              text: '重置本组', height: 30, fontSize: 11, onPressed: _confirmReset),
           const SizedBox(width: 8),
           CyberButton.primary(
             text: '保 存',

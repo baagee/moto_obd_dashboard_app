@@ -65,6 +65,7 @@ class _BluetoothSettingsPanelState extends State<BluetoothSettingsPanel> {
       'settings_bluetooth_lowSpeedPidInterval':
           (_draft['lowSpeedInterval'] as double).toInt(),
     });
+    if (mounted) setState(() => _original = Map.from(_draft));
     if (mounted) CyberToast.show(context, '蓝牙参数已保存（下次连接时生效）');
   }
 
@@ -122,11 +123,7 @@ class _BluetoothSettingsPanelState extends State<BluetoothSettingsPanel> {
           const Text('蓝牙连接', style: AppTheme.titleMedium),
           const Spacer(),
           CyberButton.secondary(
-            text: '重置本组',
-            height: 30,
-            fontSize: 11,
-            onPressed: _isDirty ? _confirmReset : null,
-          ),
+              text: '重置本组', height: 30, fontSize: 11, onPressed: _confirmReset),
           const SizedBox(width: 8),
           CyberButton.primary(
             text: '保 存',

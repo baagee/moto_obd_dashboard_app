@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vibration/vibration.dart';
 import '../../theme/app_theme.dart';
 
 // ═══════════════════════════════════════════════
@@ -8,6 +9,19 @@ import '../../theme/app_theme.dart';
 // 左侧：标签 + 默认值 + hint 描述
 // 右侧：控件（输入框 / 开关 / 当前值）
 // ═══════════════════════════════════════════════
+
+/// 触觉反馈（绕过 ColorOS 对 HapticFeedback 的屏蔽，直接调用原生 Vibrator）
+/// hasVibrator 结果缓存，避免每次异步查询导致单次点击振动丢失
+bool? _cachedHasVibrator;
+
+Future<void> _triggerHaptic() async {
+  _cachedHasVibrator ??= await Vibration.hasVibrator();
+  if (_cachedHasVibrator == true) {
+    Vibration.vibrate(duration: 30, amplitude: 80);
+  } else {
+    HapticFeedback.selectionClick();
+  }
+}
 
 /// 数字输入字段（带增减箭头）
 class SettingsNumberField extends StatefulWidget {
@@ -90,14 +104,14 @@ class _SettingsNumberFieldState extends State<SettingsNumberField> {
   }
 
   void _increment() {
-    HapticFeedback.selectionClick();
+    _triggerHaptic();
     final next = _clamp(widget.currentValue + widget.step);
     _controller.text = _format(next);
     widget.onChanged(next);
   }
 
   void _decrement() {
-    HapticFeedback.selectionClick();
+    _triggerHaptic();
     final next = _clamp(widget.currentValue - widget.step);
     _controller.text = _format(next);
     widget.onChanged(next);
@@ -413,7 +427,7 @@ class _CyberSliderState extends State<_CyberSlider> {
       v = (v / step).round() * step;
     }
     final newV = v.clamp(widget.min, widget.max);
-    if (newV != widget.value) HapticFeedback.selectionClick();
+    if (newV != widget.value) _triggerHaptic();
     widget.onChanged(newV);
   }
 
@@ -791,6 +805,15 @@ class SettingsStepperField extends StatefulWidget {
 class _SettingsStepperFieldState extends State<SettingsStepperField> {
   bool _pressing = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // 预热 hasVibrator 缓存，确保首次点击时同步可用
+    if (_cachedHasVibrator == null) {
+      Vibration.hasVibrator().then((v) => _cachedHasVibrator = v);
+    }
+  }
+
   String _fmt(double v) => v.toStringAsFixed(widget.decimalPlaces);
 
   double _clamp(double v) {
@@ -808,7 +831,10 @@ class _SettingsStepperFieldState extends State<SettingsStepperField> {
   }
 
   void _step(double delta) {
-    widget.onChanged(_clamp(_round(widget.value + delta)));
+    final before = widget.value;
+    final after = _clamp(_round(widget.value + delta));
+    if (after != before) _triggerHaptic();
+    widget.onChanged(after);
   }
 
   Future<void> _startLongPress(double delta) async {
@@ -966,6 +992,9 @@ class _StepButtonState extends State<_StepButton> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
       onLongPressStart: (_) {
         setState(() => _pressed = true);
         widget.onLongPressStart();
@@ -978,24 +1007,28 @@ class _StepButtonState extends State<_StepButton> {
         widget.onLongPressEnd();
         if (mounted) setState(() => _pressed = false);
       },
-      child: AnimatedContainer(
+      child: AnimatedScale(
+        scale: _pressed ? 0.82 : 1.0,
         duration: const Duration(milliseconds: 80),
-        width: 26,
-        height: 28,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: _pressed
-              ? AppTheme.primary.withValues(alpha: 0.2)
-              : Colors.transparent,
-          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.6)),
-          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-        ),
-        child: Text(
-          widget.label,
-          style: TextStyle(
-            color: AppTheme.primary,
-            fontSize: widget.label.length > 1 ? 10 : 14,
-            fontWeight: FontWeight.bold,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 80),
+          width: 26,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _pressed
+                ? AppTheme.primary.withValues(alpha: 0.35)
+                : Colors.transparent,
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.6)),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: AppTheme.primary,
+              fontSize: widget.label.length > 1 ? 10 : 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),

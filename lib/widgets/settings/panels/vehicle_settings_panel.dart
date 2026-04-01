@@ -22,7 +22,9 @@ class _VehicleSettingsPanelState extends State<VehicleSettingsPanel> {
   bool get _isDirty => !_mapsEqual(_draft, _original);
   bool _mapsEqual(Map a, Map b) {
     if (a.length != b.length) return false;
-    for (final k in a.keys) { if (a[k] != b[k]) return false; }
+    for (final k in a.keys) {
+      if (a[k] != b[k]) return false;
+    }
     return true;
   }
 
@@ -70,6 +72,7 @@ class _VehicleSettingsPanelState extends State<VehicleSettingsPanel> {
       'settings_vehicle_neutralRpmThreshold':
           (_draft['neutralRpmThreshold'] as double).toInt(),
     });
+    if (mounted) setState(() => _original = Map.from(_draft));
     if (mounted) CyberToast.show(context, '车辆参数已保存');
   }
 
@@ -126,11 +129,7 @@ class _VehicleSettingsPanelState extends State<VehicleSettingsPanel> {
           const Text('车辆参数', style: AppTheme.titleMedium),
           const Spacer(),
           CyberButton.secondary(
-            text: '重置本组',
-            height: 30,
-            fontSize: 11,
-            onPressed: _isDirty ? _confirmReset : null,
-          ),
+              text: '重置本组', height: 30, fontSize: 11, onPressed: _confirmReset),
           const SizedBox(width: 8),
           CyberButton.primary(
             text: '保 存',

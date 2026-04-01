@@ -28,6 +28,7 @@ dependencies:
   flutter_map: ^8.2.2
   latlong2: ^0.9.1
   shared_preferences: ^2.2.0
+  vibration: ^2.0.0
 
 dev_dependencies:
   flutter_test:

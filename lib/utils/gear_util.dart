@@ -54,7 +54,7 @@ class GSX8SCalculator {
   static const List<double> _gearThresholds = [
     0.18, // 1档: 传动比差异大，可严格
     0.15, // 2档
-    0.12, // 3档
+    0.10, // 3档 todo 测试下 原来0.12
     0.10, // 4档
     0.08, // 5档: 传动比接近6档，加严区分度
     0.12, // 6档: 放宽阈值减少误判

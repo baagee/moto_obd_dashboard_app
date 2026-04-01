@@ -22,7 +22,9 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
   bool get _isDirty => !_mapsEqual(_draft, _original);
   bool _mapsEqual(Map a, Map b) {
     if (a.length != b.length) return false;
-    for (final k in a.keys) { if (a[k] != b[k]) return false; }
+    for (final k in a.keys) {
+      if (a[k] != b[k]) return false;
+    }
     return true;
   }
 
@@ -127,6 +129,7 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
       'settings_events_extremeLean_cooldown':
           (_draft['extremeLean_cooldown'] as double).toInt(),
     });
+    if (mounted) setState(() => _original = Map.from(_draft));
     if (mounted) CyberToast.show(context, '骑行事件设置已保存');
   }
 
@@ -184,11 +187,7 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
           const Text('骑行事件', style: AppTheme.titleMedium),
           const Spacer(),
           CyberButton.secondary(
-            text: '重置本组',
-            height: 30,
-            fontSize: 11,
-            onPressed: _isDirty ? _confirmReset : null,
-          ),
+              text: '重置本组', height: 30, fontSize: 11, onPressed: _confirmReset),
           const SizedBox(width: 8),
           CyberButton.primary(
             text: '保 存',
@@ -547,14 +546,14 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
         Row(
           children: [
             Icon(icon,
-                size: 13,
+                size: 15,
                 color: enabled ? AppTheme.primary : AppTheme.textMuted),
             const SizedBox(width: 6),
             Text(
               title,
               style: TextStyle(
                 color: enabled ? AppTheme.primary : AppTheme.textMuted,
-                fontSize: 10,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
               ),

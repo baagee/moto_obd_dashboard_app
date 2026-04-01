@@ -22,7 +22,9 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
   bool get _isDirty => !_mapsEqual(_draft, _original);
   bool _mapsEqual(Map a, Map b) {
     if (a.length != b.length) return false;
-    for (final k in a.keys) { if (a[k] != b[k]) return false; }
+    for (final k in a.keys) {
+      if (a[k] != b[k]) return false;
+    }
     return true;
   }
 
@@ -54,6 +56,7 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
       'settings_display_warnSpeed': (_draft['warnSpeed'] as double).toInt(),
       'settings_display_dangerSpeed': (_draft['dangerSpeed'] as double).toInt(),
     });
+    if (mounted) setState(() => _original = Map.from(_draft));
     if (mounted) CyberToast.show(context, '仪表盘量程已保存，立即生效');
   }
 
@@ -110,11 +113,7 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
           const Text('仪表盘量程', style: AppTheme.titleMedium),
           const Spacer(),
           CyberButton.secondary(
-            text: '重置本组',
-            height: 30,
-            fontSize: 11,
-            onPressed: _isDirty ? _confirmReset : null,
-          ),
+              text: '重置本组', height: 30, fontSize: 11, onPressed: _confirmReset),
           const SizedBox(width: 8),
           CyberButton.primary(
             text: '保 存',
