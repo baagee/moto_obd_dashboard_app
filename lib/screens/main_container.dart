@@ -15,6 +15,7 @@ import '../services/location_service.dart';
 import '../widgets/event_notification_dialog.dart';
 import '../widgets/top_navigation_bar.dart';
 import '../widgets/cyber_toast.dart';
+import '../widgets/cyber_grid_background.dart';
 import 'dashboard_screen.dart';
 import 'record_screen.dart';
 import 'logs_screen.dart';
@@ -215,60 +216,63 @@ class _MainContainerState extends State<MainContainer> {
           await intent.launch();
         }
       },
-      child: Scaffold(
-        body: Column(
-          children: [
-            // 顶部导航栏 - 使用 Selector 精确监听
-            Selector<NavigationProvider, int>(
-              selector: (_, nav) => nav.currentIndex,
-              builder: (context, currentIndex, _) {
-                // 监听蓝牙连接状态
-                return Selector<BluetoothProvider, bool>(
-                  selector: (_, bt) => bt.isDeviceConnected,
-                  builder: (context, isConnected, _) {
-                    // 连接状态变化时管理骑行统计
-                    if (!isConnected && _hasStartedRide) {
-                      _hasStartedRide = false;
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        context.read<RidingStatsProvider>().endRide();
-                      });
-                    }
-                    if (isConnected && !_hasStartedRide) {
-                      _hasStartedRide = true;
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        context.read<RidingStatsProvider>().startRide();
-                      });
-                    }
+      child: CyberGridBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Column(
+            children: [
+              // 顶部导航栏 - 使用 Selector 精确监听
+              Selector<NavigationProvider, int>(
+                selector: (_, nav) => nav.currentIndex,
+                builder: (context, currentIndex, _) {
+                  // 监听蓝牙连接状态
+                  return Selector<BluetoothProvider, bool>(
+                    selector: (_, bt) => bt.isDeviceConnected,
+                    builder: (context, isConnected, _) {
+                      // 连接状态变化时管理骑行统计
+                      if (!isConnected && _hasStartedRide) {
+                        _hasStartedRide = false;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          context.read<RidingStatsProvider>().endRide();
+                        });
+                      }
+                      if (isConnected && !_hasStartedRide) {
+                        _hasStartedRide = true;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          context.read<RidingStatsProvider>().startRide();
+                        });
+                      }
 
-                    return Selector<BluetoothProvider, String?>(
-                      selector: (_, bt) => bt.connectedDevice?.name,
-                      builder: (context, deviceName, _) {
-                        return TopNavigationBar(
-                          currentIndex: currentIndex,
-                          onNavigate: _navigateTo,
-                          onLinkVehiclePressed: _navigateToBluetoothScan,
-                          isConnected: isConnected,
-                          deviceName: deviceName,
-                          navItems: const [
-                            'DASHBOARD',
-                            'RECORDS',
-                            'LOGS',
-                            'SETTINGS',
-                            'DEVICES',
-                          ],
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
+                      return Selector<BluetoothProvider, String?>(
+                        selector: (_, bt) => bt.connectedDevice?.name,
+                        builder: (context, deviceName, _) {
+                          return TopNavigationBar(
+                            currentIndex: currentIndex,
+                            onNavigate: _navigateTo,
+                            onLinkVehiclePressed: _navigateToBluetoothScan,
+                            isConnected: isConnected,
+                            deviceName: deviceName,
+                            navItems: const [
+                              'DASHBOARD',
+                              'RECORDS',
+                              'LOGS',
+                              'SETTINGS',
+                              'DEVICES',
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
 
-            // 页面内容 - 使用 PageView 实现滑动切换
-            Expanded(
-              child: _buildPageView(context),
-            ),
-          ],
+              // 页面内容 - 使用 PageView 实现滑动切换
+              Expanded(
+                child: _buildPageView(context),
+              ),
+            ],
+          ),
         ),
       ),
     );

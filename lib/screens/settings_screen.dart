@@ -36,7 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppTheme.backgroundDark,
+      color: Colors.transparent,
       child: Row(
         children: [
           // ===== 左侧导航列 =====
@@ -70,7 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildNavColumn() {
     return Container(
       width: 120,
-      color: AppTheme.backgroundDark,
+      color: Colors.transparent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -168,7 +168,7 @@ class OBDDashboardApp extends StatelessWidget {
           surface: Color(0xFF162229),
           error: Color(0xFFFF4D4D),
         ),
-        scaffoldBackgroundColor: const Color(0xFF0A1114),
+        scaffoldBackgroundColor: Colors.transparent,
       ),
       builder: (context, child) => GestureDetector(
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),

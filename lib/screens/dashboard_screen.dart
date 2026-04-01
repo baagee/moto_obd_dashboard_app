@@ -12,9 +12,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark,
-      ),
+      color: Colors.transparent,
       child: const Padding(
         padding: EdgeInsets.all(8),
         child: Row(

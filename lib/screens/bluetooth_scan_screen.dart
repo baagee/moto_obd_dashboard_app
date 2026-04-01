@@ -51,7 +51,7 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> with Automati
   Widget build(BuildContext context) {
     super.build(context);
     return Container(
-      color: AppTheme.backgroundDark,
+      color: Colors.transparent,
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Row(

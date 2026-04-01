@@ -55,7 +55,7 @@ class _RecordScreenState extends State<RecordScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppTheme.backgroundDark,
+      color: Colors.transparent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -380,7 +380,7 @@ class _EmptyState extends StatelessWidget {
             height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppTheme.surface,
+              color: AppTheme.surface.withValues(alpha: 0.5),
               border: Border.all(color: AppTheme.primary30, width: 1.5),
               boxShadow: [
                 BoxShadow(
@@ -639,7 +639,7 @@ class _StatsCard extends StatelessWidget {
             left: -4,
             top: 0,
             bottom: 0,
-            child: Icon(icon, size: 36, color: color.withOpacity(0.12)),
+            child: Icon(icon, size: 36, color: color.withOpacity(0.20)),
           ),
           // 前景文字：Positioned.fill 保证宽度有约束，不会溢出
           Positioned.fill(

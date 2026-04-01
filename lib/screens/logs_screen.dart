@@ -55,9 +55,7 @@ class _LogsScreenState extends State<LogsScreen>
   Widget build(BuildContext context) {
     super.build(context);
     return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark,
-      ),
+      color: Colors.transparent,
       child: Column(
         children: [
           // 合并后的顶部区域
