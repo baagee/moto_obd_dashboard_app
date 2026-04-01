@@ -130,23 +130,21 @@ class RidingStatsProvider extends ChangeNotifier {
     _totalSpeedSum = 0;
     _totalSampleCount = 0;
 
+    String? placeName;
+    double? startLat;
+    double? startLng;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
     // 并行获取起点位置 + 逆地理编码，完成后再插入带完整起点信息的记录
     try {
-      final now = DateTime.now().millisecondsSinceEpoch;
       _logCallback('Stats', LogType.info, '正在获取起点位置...');
-
       // 最多等 10s（LocationService 内部已有 timeLimit）
       final position = await LocationService.getCurrentPosition();
-
-      String? placeName;
-      double? startLat;
-      double? startLng;
 
       if (position != null) {
         startLat = position.latitude;
         startLng = position.longitude;
-        _logCallback(
-            'Stats', LogType.success, '起点位置已获取: $startLat, $startLng');
+        _logCallback('Stats', LogType.success, '起点位置已获取: $startLat, $startLng');
 
         // 将第一个位置作为 gpsTrack 的起点兜底
         if (_gpsTrack.isEmpty) {
@@ -165,7 +163,12 @@ class RidingStatsProvider extends ChangeNotifier {
       } else {
         _logCallback('Stats', LogType.warning, '起点位置获取失败，将以空坐标入库');
       }
+    } catch (e) {
+      _logCallback('Stats', LogType.warning, '起点位置获取失败: $e，开始点将无法落库');
+      // _currentRecordId 保持 null，_waypointTimer 启动但写库时跳过
+    }
 
+    try {
       _currentRecordId = await DatabaseService.insertRidingRecord({
         'start_time': now,
         'end_time': null,
@@ -183,7 +186,7 @@ class RidingStatsProvider extends ChangeNotifier {
       _logCallback(
           'Stats', LogType.info, '骑行记录已插入，record_id=$_currentRecordId');
     } catch (e) {
-      _logCallback('Stats', LogType.warning, '骑行记录插入失败: $e，轨迹点将无法落库');
+      _logCallback('Stats', LogType.warning, '骑行记录初始化插入失败: $e');
       // _currentRecordId 保持 null，_waypointTimer 启动但写库时跳过
     }
 
