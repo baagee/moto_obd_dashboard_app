@@ -19,14 +19,7 @@ class _BluetoothSettingsPanelState extends State<BluetoothSettingsPanel> {
   late Map<String, dynamic> _draft;
   late Map<String, dynamic> _original;
 
-  bool get _isDirty => !_mapsEqual(_draft, _original);
-  bool _mapsEqual(Map a, Map b) {
-    if (a.length != b.length) return false;
-    for (final k in a.keys) {
-      if (a[k] != b[k]) return false;
-    }
-    return true;
-  }
+  bool get _isDirty => !settingsMapsEqual(_draft, _original);
 
   @override
   void initState() {
@@ -42,8 +35,7 @@ class _BluetoothSettingsPanelState extends State<BluetoothSettingsPanel> {
       'connectionTimeout': s.connectionTimeoutSeconds.toDouble(),
       'elm327InitWait': s.elm327InitWaitMs.toDouble(),
       'highSpeedInterval': s.highSpeedPidIntervalMs.toDouble(),
-      'mediumSpeedInterval':
-          s.mediumSpeedPidIntervalMs.clamp(250, 1500).toDouble(),
+      'mediumSpeedInterval': s.mediumSpeedPidIntervalMs.toDouble(),
       'lowSpeedInterval': s.lowSpeedPidIntervalMs.toDouble(),
     };
     _draft = Map.from(_original);

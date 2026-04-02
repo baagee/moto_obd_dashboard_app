@@ -19,14 +19,7 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
   late Map<String, dynamic> _draft;
   late Map<String, dynamic> _original;
 
-  bool get _isDirty => !_mapsEqual(_draft, _original);
-  bool _mapsEqual(Map a, Map b) {
-    if (a.length != b.length) return false;
-    for (final k in a.keys) {
-      if (a[k] != b[k]) return false;
-    }
-    return true;
-  }
+  bool get _isDirty => !settingsMapsEqual(_draft, _original);
 
   @override
   void initState() {

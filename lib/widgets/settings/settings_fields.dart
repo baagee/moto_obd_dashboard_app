@@ -93,15 +93,8 @@ class _SettingsNumberFieldState extends State<SettingsNumberField> {
     if (clamped != widget.currentValue) widget.onChanged(clamped);
   }
 
-  double _clamp(double v) {
-    if (widget.minValue != null && v < widget.minValue!) {
-      return widget.minValue!;
-    }
-    if (widget.maxValue != null && v > widget.maxValue!) {
-      return widget.maxValue!;
-    }
-    return v;
-  }
+  double _clamp(double v) =>
+      settingsClampValue(v, widget.minValue, widget.maxValue);
 
   void _increment() {
     _triggerHaptic();
@@ -816,13 +809,8 @@ class _SettingsStepperFieldState extends State<SettingsStepperField> {
 
   String _fmt(double v) => v.toStringAsFixed(widget.decimalPlaces);
 
-  double _clamp(double v) {
-    if (widget.minValue != null && v < widget.minValue!)
-      return widget.minValue!;
-    if (widget.maxValue != null && v > widget.maxValue!)
-      return widget.maxValue!;
-    return v;
-  }
+  double _clamp(double v) =>
+      settingsClampValue(v, widget.minValue, widget.maxValue);
 
   double _round(double v) {
     // 避免浮点累积误差
@@ -1058,4 +1046,31 @@ class SettingsSectionTitle extends StatelessWidget {
       ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════
+// 设置面板共用工具函数
+// ═══════════════════════════════════════════════
+
+/// 比较两个设置草稿 Map 是否相等。
+/// double 值使用精度阈值（1e-9）比较，避免浮点累积误差导致误判。
+bool settingsMapsEqual(Map<String, dynamic> a, Map<String, dynamic> b) {
+  if (a.length != b.length) return false;
+  for (final k in a.keys) {
+    final av = a[k];
+    final bv = b[k];
+    if (av is double && bv is double) {
+      if ((av - bv).abs() >= 1e-9) return false;
+    } else {
+      if (av != bv) return false;
+    }
+  }
+  return true;
+}
+
+/// 将 [v] 限制在 [min]~[max] 范围内（任意一端为 null 时不限制该端）。
+double settingsClampValue(double v, double? min, double? max) {
+  if (min != null && v < min) return min;
+  if (max != null && v > max) return max;
+  return v;
 }

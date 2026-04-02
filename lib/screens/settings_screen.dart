@@ -88,7 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Text(
               'SETTINGS',
               style: TextStyle(
-                color: AppTheme.primary.withOpacity(0.6),
+                color: AppTheme.primary.withValues(alpha: 0.6),
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 2,

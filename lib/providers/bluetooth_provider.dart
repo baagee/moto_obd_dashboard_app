@@ -547,8 +547,8 @@ class BluetoothProvider extends ChangeNotifier {
     _logCallback('Bluetooth', LogType.success, '已连接到 ${device.name}');
     notifyListeners();
 
-    // 启动 RSSI 监测
-    _startRssiMonitoring();
+    // todo 启动 RSSI 监测
+    // _startRssiMonitoring();
   }
 
   /// 处理连接失败
