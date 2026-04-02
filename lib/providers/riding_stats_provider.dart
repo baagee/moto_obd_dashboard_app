@@ -65,7 +65,7 @@ class RidingStatsProvider extends ChangeNotifier {
 
   // GPS 轨迹追踪
   StreamSubscription<Position>? _positionSubscription;
-  final List<PositionData> _gpsTrack = [];
+  PositionData? _trackStartPoint; // 只保留起点坐标（终点用 _lastPosition）
   double _totalGpsDistance = 0; // 米
   PositionData? _lastPosition;
 
@@ -116,7 +116,7 @@ class RidingStatsProvider extends ChangeNotifier {
     _sampler.clear();
     _lastEventTime.clear();
     _eventHistory.clear();
-    _gpsTrack.clear();
+    _trackStartPoint = null;
     _totalGpsDistance = 0;
     _lastPosition = null;
     _pendingWaypoints.clear();
@@ -146,11 +146,9 @@ class RidingStatsProvider extends ChangeNotifier {
         startLng = position.longitude;
         _logCallback('Stats', LogType.success, '起点位置已获取: $startLat, $startLng');
 
-        // 将第一个位置作为 gpsTrack 的起点兜底
-        if (_gpsTrack.isEmpty) {
-          _gpsTrack.add(PositionData.fromGeolocator(position));
-          _lastPosition = _gpsTrack.first;
-        }
+        // 记录起点坐标（只保留第一次）
+        _trackStartPoint ??= PositionData.fromGeolocator(position);
+        _lastPosition = _trackStartPoint;
 
         // 逆地理编码获取地名
         placeName = await GeocodingService.getPlaceName(
@@ -383,7 +381,8 @@ class RidingStatsProvider extends ChangeNotifier {
       if (timeDiff.inMilliseconds < 500) return;
     }
 
-    _gpsTrack.add(position);
+    // 记录起点（只保留第一次）
+    _trackStartPoint ??= position;
 
     if (_lastPosition != null) {
       final distance = _calculateDistance(_lastPosition!, position);
@@ -769,9 +768,9 @@ class RidingStatsProvider extends ChangeNotifier {
     final maxLeftLean = _maxLeftLean;
     final maxRightLean = _maxRightLean;
 
-    // 从 GPS 轨迹中取起点（第一个点）和终点（最后一个点）
-    final startPoint = _gpsTrack.isNotEmpty ? _gpsTrack.first : null;
-    final endPoint = _gpsTrack.isNotEmpty ? _gpsTrack.last : null;
+    // 起点 = 骑行开始时第一个 GPS 点，终点 = 骑行结束时最后更新的位置
+    final startPoint = _trackStartPoint;
+    final endPoint = _lastPosition;
 
     // 转换事件
     final events = _eventHistory.map((e) => e.toRidingRecordEvent()).toList();

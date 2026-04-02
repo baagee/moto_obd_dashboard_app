@@ -10,6 +10,7 @@ import 'providers/riding_stats_provider.dart';
 import 'providers/riding_record_provider.dart';
 import 'providers/navigation_provider.dart';
 import 'providers/settings_provider.dart';
+import 'utils/gear_util.dart';
 import 'services/audio_service.dart';
 import 'screens/main_container.dart';
 
@@ -20,6 +21,9 @@ void main() async {
   // SharedPreferences.getInstance() 在真机上通常 < 20ms，不会造成可感知的启动延迟
   final settingsProvider = SettingsProvider();
   await settingsProvider.init();
+
+  // 加载档位自适应学习值（C1 优化）
+  await GSX8SCalculator.loadLearnedRatios();
 
   // 强制横屏
   SystemChrome.setPreferredOrientations([
