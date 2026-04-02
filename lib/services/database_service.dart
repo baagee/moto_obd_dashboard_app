@@ -178,13 +178,11 @@ class DatabaseService {
       where: 'start_time < ?',
       whereArgs: [cutoffMs],
     );
-    final expiredDates = expiredRows
-        .map((r) {
-          final ms = r['start_time'] as int;
-          final dt = DateTime.fromMillisecondsSinceEpoch(ms);
-          return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-        })
-        .toSet();
+    final expiredDates = expiredRows.map((r) {
+      final ms = r['start_time'] as int;
+      final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    }).toSet();
 
     // 2. 删除对应 daily_stats（不重算，直接清除）
     for (final date in expiredDates) {
@@ -518,15 +516,26 @@ class DatabaseService {
   }
 
   /// 清理空壳骑行记录（end_time 为 null 且 distance=0，非当次骑行残留）
+  /// 只删除 5 分钟前创建的孤儿记录，避免误删正在骑行中的占位记录
   static Future<int> deleteOrphanRecords({int? excludeId}) async {
     final db = await database;
-    return await db.delete(
-      'riding_records',
-      where: excludeId != null
-          ? 'end_time IS NULL AND distance = 0 AND id != ?'
-          : 'end_time IS NULL AND distance = 0',
-      whereArgs: excludeId != null ? [excludeId] : null,
-    );
+    final cutoff = DateTime.now()
+        .subtract(const Duration(minutes: 5))
+        .millisecondsSinceEpoch;
+    if (excludeId != null) {
+      return await db.delete(
+        'riding_records',
+        where:
+            'end_time IS NULL AND distance = 0 AND id != ? AND created_at < ?',
+        whereArgs: [excludeId, cutoff],
+      );
+    } else {
+      return await db.delete(
+        'riding_records',
+        where: 'end_time IS NULL AND distance = 0 AND created_at < ?',
+        whereArgs: [cutoff],
+      );
+    }
   }
 
   // ========== 开发调试工具 ==========

@@ -267,6 +267,8 @@ class RidingStatsProvider extends ChangeNotifier {
         ? DateTime.now().difference(_rideStartTime!).inSeconds
         : 0;
     try {
+      _logCallback('Stats', LogType.info,
+          '[DB] snapshot updateRidingRecord id=$_currentRecordId: distance=${distance.toStringAsFixed(3)}km duration=${duration}s avgSpeed=${avgSpeed.toStringAsFixed(1)} maxSpeed=${_maxSpeed.toStringAsFixed(1)}');
       await DatabaseService.updateRidingRecord(_currentRecordId!, {
         'avg_speed': avgSpeed,
         'max_speed': _maxSpeed,
@@ -731,8 +733,13 @@ class RidingStatsProvider extends ChangeNotifier {
       // 若有占位记录，删除之（避免留下空壳记录）
       if (_currentRecordId != null) {
         try {
+          _logCallback('Stats', LogType.warning,
+              '[DB] deleteRidingRecord id=$_currentRecordId 原因: maxSpeed=0，判定未实际行驶');
           await DatabaseService.deleteRidingRecord(_currentRecordId!);
-        } catch (_) {}
+        } catch (e) {
+          _logCallback('Stats', LogType.error,
+              '[DB] deleteRidingRecord id=$_currentRecordId 失败: $e');
+        }
       }
       return;
     }
@@ -744,8 +751,13 @@ class RidingStatsProvider extends ChangeNotifier {
           '骑行记录已丢弃（距离=${distanceMeters.toStringAsFixed(1)}m < ${minDistance}m，判定为未实际行驶）');
       if (_currentRecordId != null) {
         try {
+          _logCallback('Stats', LogType.warning,
+              '[DB] deleteRidingRecord id=$_currentRecordId 原因: 距离${distanceMeters.toStringAsFixed(1)}m < ${minDistance}m');
           await DatabaseService.deleteRidingRecord(_currentRecordId!);
-        } catch (_) {}
+        } catch (e) {
+          _logCallback('Stats', LogType.error,
+              '[DB] deleteRidingRecord id=$_currentRecordId 失败: $e');
+        }
       }
       return;
     }
@@ -798,7 +810,9 @@ class RidingStatsProvider extends ChangeNotifier {
       }
     } else {
       // 降级：占位记录插入失败时，走原来的 insertRidingRecord 路径
-      _ridingRecordProvider!.saveRidingRecord(
+      _logCallback('Stats', LogType.warning,
+          '[DB] _saveRidingRecord 降级路径: _currentRecordId=null，走 insertRidingRecord');
+      await _ridingRecordProvider!.saveRidingRecord(
         startTime: _rideStartTime!.millisecondsSinceEpoch,
         endTime: DateTime.now().millisecondsSinceEpoch,
         duration: duration,

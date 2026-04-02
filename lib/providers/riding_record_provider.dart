@@ -71,8 +71,16 @@ class RidingRecordProvider extends ChangeNotifier {
     notifyListeners();
 
     // 启动时清理 30 天前的过期记录 & 清理空壳残留记录
-    await DatabaseService.deleteExpiredRecords();
-    await DatabaseService.deleteOrphanRecords();
+    final expiredCount = await DatabaseService.deleteExpiredRecords();
+    if (expiredCount > 0) {
+      _logCallback('Record', LogType.warning,
+          '[DB] deleteExpiredRecords: 删除 $expiredCount 条 30天前过期记录');
+    }
+    final orphanCount = await DatabaseService.deleteOrphanRecords();
+    if (orphanCount > 0) {
+      _logCallback('Record', LogType.warning,
+          '[DB] deleteOrphanRecords: 删除 $orphanCount 条孤儿记录（end_time=NULL && distance=0）');
+    }
 
     await Future.wait([
       _loadRecords(),
@@ -173,6 +181,8 @@ class RidingRecordProvider extends ChangeNotifier {
     // 第一步：立即写入核心字段（end_time、距离、时长等），让记录马上可见
     // 起点地名已在 startRide() 时写入，无需再次编码
     // 终点地名异步补充，不阻塞记录写入
+    _logCallback('Record', LogType.info,
+        '[DB] updateRidingRecord id=$recordId: end_time=$endTime distance=${distance.toStringAsFixed(3)}km avgSpeed=${avgSpeed.toStringAsFixed(1)} maxSpeed=${maxSpeed.toStringAsFixed(1)} duration=${duration}s');
     await DatabaseService.updateRidingRecord(recordId, {
       'end_time': endTime,
       'start_latitude': startLatitude,
@@ -189,6 +199,8 @@ class RidingRecordProvider extends ChangeNotifier {
 
     // 保存事件
     if (events.isNotEmpty) {
+      _logCallback('Record', LogType.info,
+          '[DB] insertRidingEvents id=$recordId: ${events.length} 条事件');
       await DatabaseService.insertRidingEvents(
         recordId,
         events.map((e) => e.toMap()).toList(),
@@ -210,6 +222,8 @@ class RidingRecordProvider extends ChangeNotifier {
         logCallback: _logCallback,
       ).then((endPlaceName) async {
         if (endPlaceName != null) {
+          _logCallback('Record', LogType.info,
+              '[DB] updateRidingRecord id=$recordId: end_place_name=$endPlaceName');
           await DatabaseService.updateRidingRecord(recordId, {
             'end_place_name': endPlaceName,
           });
@@ -280,10 +294,16 @@ class RidingRecordProvider extends ChangeNotifier {
     );
 
     // 保存到数据库
+    _logCallback('Record', LogType.info,
+        '[DB] insertRidingRecord (降级路径): startTime=$startTime endTime=$endTime distance=${distance.toStringAsFixed(3)}km duration=${duration}s');
     final id = await DatabaseService.insertRidingRecord(record.toMap());
+    _logCallback(
+        'Record', LogType.info, '[DB] insertRidingRecord 成功，新 record_id=$id');
 
     // 保存事件
     if (events.isNotEmpty) {
+      _logCallback('Record', LogType.info,
+          '[DB] insertRidingEvents id=$id: ${events.length} 条事件');
       await DatabaseService.insertRidingEvents(
         id,
         events.map((e) => e.toMap()).toList(),
