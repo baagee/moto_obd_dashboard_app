@@ -52,6 +52,9 @@ class _CircuitTrace {
 // CustomPainter 实现
 // ─────────────────────────────────────────────
 class _CircuitPainter extends CustomPainter {
+  // App 启动时生成一次种子，保证同一次运行内图案稳定，但每次启动不同
+  static final int _seed = DateTime.now().millisecondsSinceEpoch;
+
   // 预生成走线数据（静态缓存，只算一次）
   static List<_CircuitTrace>? _cachedTraces;
   static List<Offset>? _cachedVias;
@@ -61,7 +64,7 @@ class _CircuitPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // 首次或尺寸变化时重新生成
     if (_cachedTraces == null || _cachedSize != size) {
-      final rng = math.Random(42);
+      final rng = math.Random(_seed);
       _cachedTraces = _generateTraces(size, rng);
       _cachedVias = _generateVias(size, rng);
       _cachedSize = size;
