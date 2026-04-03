@@ -26,7 +26,7 @@ class RidingStatsProvider extends ChangeNotifier {
 
   // 日志回调
   late final void Function(String source, LogType type, String message)
-      _logCallback;
+  _logCallback;
 
   // 最新添加的事件（用于外部监听）
   stats.RidingEvent? _latestEvent;
@@ -97,10 +97,10 @@ class RidingStatsProvider extends ChangeNotifier {
     AudioService? audioService,
     RidingRecordProvider? ridingRecordProvider,
     SettingsProvider? settingsProvider,
-  })  : _obdDataProvider = obdDataProvider,
-        _audioService = audioService,
-        _ridingRecordProvider = ridingRecordProvider,
-        _settingsProvider = settingsProvider {
+  }) : _obdDataProvider = obdDataProvider,
+       _audioService = audioService,
+       _ridingRecordProvider = ridingRecordProvider,
+       _settingsProvider = settingsProvider {
     _logCallback = createLogger(logProvider);
   }
 
@@ -139,8 +139,9 @@ class RidingStatsProvider extends ChangeNotifier {
     try {
       _logCallback('Stats', LogType.info, '正在获取起点位置...');
       // 最多等 10s（LocationService 内部已有 timeLimit）
-      final position =
-          await LocationService.getCurrentPosition(logCallback: _logCallback);
+      final position = await LocationService.getCurrentPosition(
+        logCallback: _logCallback,
+      );
 
       if (position != null) {
         startLat = position.latitude;
@@ -183,7 +184,10 @@ class RidingStatsProvider extends ChangeNotifier {
         'created_at': now,
       });
       _logCallback(
-          'Stats', LogType.info, '骑行记录已插入，record_id=$_currentRecordId');
+        'Stats',
+        LogType.info,
+        '骑行记录已插入，record_id=$_currentRecordId',
+      );
       // 插入成功后刷新记录列表，让进行中的记录立即出现在记录页
       _ridingRecordProvider?.refreshRecords();
     } catch (e) {
@@ -209,6 +213,12 @@ class RidingStatsProvider extends ChangeNotifier {
 
   /// 结束骑行
   void endRide() async {
+    final t0 = DateTime.now();
+    _logCallback(
+      'Stats',
+      LogType.info,
+      '[PERF] endRide 开始 ${t0.toIso8601String()}',
+    );
     _isRiding = false;
     _stopSampling();
     _stopGpsTracking();
@@ -216,25 +226,46 @@ class RidingStatsProvider extends ChangeNotifier {
     _stopSnapshotTimer();
     GSX8SCalculator.reset();
 
-    final duration = _rideStartTime != null
-        ? DateTime.now().difference(_rideStartTime!).inSeconds
-        : 0;
-    _logCallback('Stats', LogType.info,
-        '骑行结束，总时长: ${duration ~/ 60}分钟，总距离: ${(_totalGpsDistance / 1000).toStringAsFixed(2)} km');
+    final duration =
+        _rideStartTime != null
+            ? DateTime.now().difference(_rideStartTime!).inSeconds
+            : 0;
+    _logCallback(
+      'Stats',
+      LogType.info,
+      '骑行结束，总时长: ${duration ~/ 60}分钟，总距离: ${(_totalGpsDistance / 1000).toStringAsFixed(2)} km',
+    );
     notifyListeners();
+    _logCallback(
+      'Stats',
+      LogType.info,
+      '[PERF] endRide notifyListeners 完成 +${DateTime.now().difference(t0).inMilliseconds}ms',
+    );
 
     // 将剩余未落库的轨迹点（尾巴批次）落库
     await _flushPendingWaypoints();
+    _logCallback(
+      'Stats',
+      LogType.info,
+      '[PERF] endRide flushWaypoints 完成 +${DateTime.now().difference(t0).inMilliseconds}ms',
+    );
 
     // 保存骑行记录（await 确保 end_time 写入完成后再返回，消除竞态）
     await _saveRidingRecord(duration);
+    _logCallback(
+      'Stats',
+      LogType.info,
+      '[PERF] endRide 全部完成 +${DateTime.now().difference(t0).inMilliseconds}ms',
+    );
   }
 
   /// 启动轨迹点采集定时器
   void _startWaypointTimer() {
     _waypointTimer?.cancel();
-    _waypointTimer =
-        Timer.periodic(_waypointInterval, (_) => _collectWaypoint());
+    _waypointTimer = Timer.periodic(
+      _waypointInterval,
+      (_) => _collectWaypoint(),
+    );
   }
 
   /// 停止轨迹点采集定时器
@@ -246,8 +277,10 @@ class RidingStatsProvider extends ChangeNotifier {
   /// 启动统计快照定时器
   void _startSnapshotTimer() {
     _snapshotTimer?.cancel();
-    _snapshotTimer =
-        Timer.periodic(_snapshotInterval, (_) => _snapshotRidingStats());
+    _snapshotTimer = Timer.periodic(
+      _snapshotInterval,
+      (_) => _snapshotRidingStats(),
+    );
   }
 
   /// 停止统计快照定时器
@@ -262,12 +295,16 @@ class RidingStatsProvider extends ChangeNotifier {
     final avgSpeed =
         _totalSampleCount > 0 ? _totalSpeedSum / _totalSampleCount : 0.0;
     final distance = _totalGpsDistance > 0 ? _totalGpsDistance / 1000 : 0.0;
-    final duration = _rideStartTime != null
-        ? DateTime.now().difference(_rideStartTime!).inSeconds
-        : 0;
+    final duration =
+        _rideStartTime != null
+            ? DateTime.now().difference(_rideStartTime!).inSeconds
+            : 0;
     try {
-      _logCallback('Stats', LogType.info,
-          '[DB] snapshot updateRidingRecord id=$_currentRecordId: distance=${distance.toStringAsFixed(3)}km duration=${duration}s avgSpeed=${avgSpeed.toStringAsFixed(1)} maxSpeed=${_maxSpeed.toStringAsFixed(1)}');
+      _logCallback(
+        'Stats',
+        LogType.info,
+        '[DB] snapshot updateRidingRecord id=$_currentRecordId: distance=${distance.toStringAsFixed(3)}km duration=${duration}s avgSpeed=${avgSpeed.toStringAsFixed(1)} maxSpeed=${_maxSpeed.toStringAsFixed(1)}',
+      );
       await DatabaseService.updateRidingRecord(_currentRecordId!, {
         'avg_speed': avgSpeed,
         'max_speed': _maxSpeed,
@@ -325,8 +362,10 @@ class RidingStatsProvider extends ChangeNotifier {
   /// 启动降频采样
   void _startSampling() {
     _sampleTimer?.cancel();
-    _sampleTimer =
-        Timer.periodic(sampleInterval, (_) => _performSamplingAndDetection());
+    _sampleTimer = Timer.periodic(
+      sampleInterval,
+      (_) => _performSamplingAndDetection(),
+    );
   }
 
   /// 停止采样
@@ -340,14 +379,15 @@ class RidingStatsProvider extends ChangeNotifier {
     _stopGpsTracking();
 
     // 请求后台定位权限（确保 APP 切后台时 GPS 仍然工作）
-    LocationService.requestBackgroundPermission(logCallback: _logCallback)
-        .then((granted) {
-      if (!granted) {
-        _logCallback('GPS', LogType.warning, '后台定位权限未授权，切换到后台时 GPS 追踪可能暂停');
-      } else {
-        _logCallback('GPS', LogType.success, '后台定位权限已授权');
-      }
-    });
+    LocationService.requestBackgroundPermission(logCallback: _logCallback).then(
+      (granted) {
+        if (!granted) {
+          _logCallback('GPS', LogType.warning, '后台定位权限未授权，切换到后台时 GPS 追踪可能暂停');
+        } else {
+          _logCallback('GPS', LogType.success, '后台定位权限已授权');
+        }
+      },
+    );
 
     try {
       _positionSubscription = LocationService.getPositionStream(
@@ -388,9 +428,10 @@ class RidingStatsProvider extends ChangeNotifier {
 
     if (_lastPosition != null) {
       final distance = _calculateDistance(_lastPosition!, position);
-      final timeDiffMs = position.timestamp
-          .difference(_lastPosition!.timestamp)
-          .inMilliseconds;
+      final timeDiffMs =
+          position.timestamp
+              .difference(_lastPosition!.timestamp)
+              .inMilliseconds;
       final timeDiffSec = timeDiffMs / 1000.0;
 
       // 计算瞬时速度（m/s），使用毫秒精度避免 < 1s 时除零
@@ -400,12 +441,18 @@ class RidingStatsProvider extends ChangeNotifier {
         // 静止噪声：忽略，不计入里程
       } else if (timeDiffSec > _maxGpsGapSeconds) {
         // GPS 失联后大跳跃：跳过此段，避免里程虚增
-        _logCallback('GPS', LogType.warning,
-            'GPS 信号中断 ${timeDiffSec.toStringAsFixed(0)}s 后重连，跳过此段 ${distance.toStringAsFixed(0)}m');
+        _logCallback(
+          'GPS',
+          LogType.warning,
+          'GPS 信号中断 ${timeDiffSec.toStringAsFixed(0)}s 后重连，跳过此段 ${distance.toStringAsFixed(0)}m',
+        );
       } else if (speed > _maxReasonableSpeedMs) {
         // 速度超出摩托车极限：GPS 漂移，过滤
-        _logCallback('GPS', LogType.warning,
-            '过滤 GPS 漂移: ${distance.toStringAsFixed(1)}m, ${(speed * 3.6).toStringAsFixed(1)}km/h');
+        _logCallback(
+          'GPS',
+          LogType.warning,
+          '过滤 GPS 漂移: ${distance.toStringAsFixed(1)}m, ${(speed * 3.6).toStringAsFixed(1)}km/h',
+        );
       } else {
         // 正常采样：累加里程
         _totalGpsDistance += distance;
@@ -419,7 +466,8 @@ class RidingStatsProvider extends ChangeNotifier {
     const R = 6371000.0; // 地球半径（米）
     final dLat = _toRadians(p2.latitude - p1.latitude);
     final dLon = _toRadians(p2.longitude - p1.longitude);
-    final a = sin(dLat / 2) * sin(dLat / 2) +
+    final a =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(_toRadians(p1.latitude)) *
             cos(_toRadians(p2.latitude)) *
             sin(dLon / 2) *
@@ -511,11 +559,14 @@ class RidingStatsProvider extends ChangeNotifier {
   }
 
   /// 检查是否可以触发事件
-  bool _canTriggerEvent(stats.RidingEventType type,
-      {Duration? customCooldown}) {
+  bool _canTriggerEvent(
+    stats.RidingEventType type, {
+    Duration? customCooldown,
+  }) {
     final lastTime = _lastEventTime[type];
-    final globalCooldown =
-        Duration(seconds: _settingsProvider?.globalCooldownSeconds ?? 30);
+    final globalCooldown = Duration(
+      seconds: _settingsProvider?.globalCooldownSeconds ?? 30,
+    );
     final cooldown = customCooldown ?? globalCooldown;
     if (lastTime == null) return true;
     return DateTime.now().difference(lastTime) > cooldown;
@@ -555,8 +606,10 @@ class RidingStatsProvider extends ChangeNotifier {
     final cooldownSec = _settingsProvider?.extremeLeanCooldown ?? 60;
     if (avgSpeed < minSpeed) return;
     if (avgLean < minAngle) return;
-    if (!_canTriggerEvent(stats.RidingEventType.extremeLean,
-        customCooldown: Duration(seconds: cooldownSec))) {
+    if (!_canTriggerEvent(
+      stats.RidingEventType.extremeLean,
+      customCooldown: Duration(seconds: cooldownSec),
+    )) {
       return;
     } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
 
@@ -620,8 +673,10 @@ class RidingStatsProvider extends ChangeNotifier {
     final cooldownSec = _settingsProvider?.longRidingCooldownSeconds ?? 1200;
     final duration = DateTime.now().difference(_rideStartTime!);
     if (duration.inMinutes < (durationHours * 60).toInt()) return;
-    if (!_canTriggerEvent(stats.RidingEventType.longRiding,
-        customCooldown: Duration(seconds: cooldownSec))) {
+    if (!_canTriggerEvent(
+      stats.RidingEventType.longRiding,
+      customCooldown: Duration(seconds: cooldownSec),
+    )) {
       return;
     } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
 
@@ -631,7 +686,10 @@ class RidingStatsProvider extends ChangeNotifier {
 
   /// 高效巡航检测
   void _checkEfficientCruising(
-      double? avgSpeed, double? avgLoad, double? avgThrottle) {
+    double? avgSpeed,
+    double? avgLoad,
+    double? avgThrottle,
+  ) {
     if (avgSpeed == null || avgLoad == null || avgThrottle == null) return;
     if (_settingsProvider?.efficientCruisingEnabled == false) return;
     final speedMin =
@@ -643,8 +701,10 @@ class RidingStatsProvider extends ChangeNotifier {
     final cooldownSec = _settingsProvider?.efficientCruisingCooldown ?? 300;
     if (avgSpeed < speedMin || avgSpeed > speedMax) return;
     if (avgLoad >= loadMax) return;
-    if (!_canTriggerEvent(stats.RidingEventType.efficientCruising,
-        customCooldown: Duration(seconds: cooldownSec))) {
+    if (!_canTriggerEvent(
+      stats.RidingEventType.efficientCruising,
+      customCooldown: Duration(seconds: cooldownSec),
+    )) {
       return;
     } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
 
@@ -690,8 +750,10 @@ class RidingStatsProvider extends ChangeNotifier {
     final cooldownSec = _settingsProvider?.coldRiskCooldown ?? 120;
     if (avgIntakeTemp >= tempThreshold) return;
     if (avgSpeed <= speedThreshold) return;
-    if (!_canTriggerEvent(stats.RidingEventType.coldEnvironmentRisk,
-        customCooldown: Duration(seconds: cooldownSec))) {
+    if (!_canTriggerEvent(
+      stats.RidingEventType.coldEnvironmentRisk,
+      customCooldown: Duration(seconds: cooldownSec),
+    )) {
       return;
     } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
 
@@ -729,17 +791,26 @@ class RidingStatsProvider extends ChangeNotifier {
     //  2. 距离 < 20米 且 时长 < 30秒（短时误触/测试）
     final distanceMeters = _totalGpsDistance;
     if (_maxSpeed == 0) {
-      _logCallback('Stats', LogType.warning,
-          '骑行记录已丢弃（最大速度为 0，判定为未实际行驶，时长=${duration}s）');
+      _logCallback(
+        'Stats',
+        LogType.warning,
+        '骑行记录已丢弃（最大速度为 0，判定为未实际行驶，时长=${duration}s）',
+      );
       // 若有占位记录，删除之（避免留下空壳记录）
       if (_currentRecordId != null) {
         try {
-          _logCallback('Stats', LogType.warning,
-              '[DB] deleteRidingRecord id=$_currentRecordId 原因: maxSpeed=0，判定未实际行驶');
+          _logCallback(
+            'Stats',
+            LogType.warning,
+            '[DB] deleteRidingRecord id=$_currentRecordId 原因: maxSpeed=0，判定未实际行驶',
+          );
           await DatabaseService.deleteRidingRecord(_currentRecordId!);
         } catch (e) {
-          _logCallback('Stats', LogType.error,
-              '[DB] deleteRidingRecord id=$_currentRecordId 失败: $e');
+          _logCallback(
+            'Stats',
+            LogType.error,
+            '[DB] deleteRidingRecord id=$_currentRecordId 失败: $e',
+          );
         }
       }
       return;
@@ -748,16 +819,25 @@ class RidingStatsProvider extends ChangeNotifier {
     // codeflicker-fix: LOGIC-Issue-005/odko2evgylfq2rjqqr53
     final minDistance = _settingsProvider?.minRidingDistance ?? 20;
     if (distanceMeters < minDistance) {
-      _logCallback('Stats', LogType.warning,
-          '骑行记录已丢弃（距离=${distanceMeters.toStringAsFixed(1)}m < ${minDistance}m，判定为未实际行驶）');
+      _logCallback(
+        'Stats',
+        LogType.warning,
+        '骑行记录已丢弃（距离=${distanceMeters.toStringAsFixed(1)}m < ${minDistance}m，判定为未实际行驶）',
+      );
       if (_currentRecordId != null) {
         try {
-          _logCallback('Stats', LogType.warning,
-              '[DB] deleteRidingRecord id=$_currentRecordId 原因: 距离${distanceMeters.toStringAsFixed(1)}m < ${minDistance}m');
+          _logCallback(
+            'Stats',
+            LogType.warning,
+            '[DB] deleteRidingRecord id=$_currentRecordId 原因: 距离${distanceMeters.toStringAsFixed(1)}m < ${minDistance}m',
+          );
           await DatabaseService.deleteRidingRecord(_currentRecordId!);
         } catch (e) {
-          _logCallback('Stats', LogType.error,
-              '[DB] deleteRidingRecord id=$_currentRecordId 失败: $e');
+          _logCallback(
+            'Stats',
+            LogType.error,
+            '[DB] deleteRidingRecord id=$_currentRecordId 失败: $e',
+          );
         }
       }
       return;
@@ -811,8 +891,11 @@ class RidingStatsProvider extends ChangeNotifier {
       }
     } else {
       // 降级：占位记录插入失败时，走原来的 insertRidingRecord 路径
-      _logCallback('Stats', LogType.warning,
-          '[DB] _saveRidingRecord 降级路径: _currentRecordId=null，走 insertRidingRecord');
+      _logCallback(
+        'Stats',
+        LogType.warning,
+        '[DB] _saveRidingRecord 降级路径: _currentRecordId=null，走 insertRidingRecord',
+      );
       await _ridingRecordProvider!.saveRidingRecord(
         startTime: _rideStartTime!.millisecondsSinceEpoch,
         endTime: DateTime.now().millisecondsSinceEpoch,
@@ -910,7 +993,7 @@ class DataSampler {
     final avg = values.reduce((a, b) => a + b) / values.length;
     final variance =
         values.map((v) => pow(v - avg, 2)).reduce((a, b) => a + b) /
-            values.length;
+        values.length;
     return sqrt(variance);
   }
 

@@ -52,7 +52,7 @@ class BluetoothProvider extends ChangeNotifier {
 
   // 日志回调
   late final void Function(String source, LogType type, String message)
-      _logCallback;
+  _logCallback;
 
   // RSSI 过滤阈值（来自 SettingsProvider，回退到硬编码默认值）
   int get _minRssi => _settings?.minRssi ?? -90;
@@ -76,9 +76,9 @@ class BluetoothProvider extends ChangeNotifier {
     required LogProvider logProvider,
     AudioService? audioService,
     SettingsProvider? settings,
-  })  : _obdDataProvider = obdDataProvider,
-        _audioService = audioService,
-        _settings = settings {
+  }) : _obdDataProvider = obdDataProvider,
+       _audioService = audioService,
+       _settings = settings {
     // 初始化日志回调
     _logCallback = createLogger(logProvider);
 
@@ -147,8 +147,11 @@ class BluetoothProvider extends ChangeNotifier {
   /// 加载上次连接的设备
   Future<void> _loadLastDevice() async {
     final device = await DeviceStorageService.loadLastDevice();
-    _logCallback('Bluetooth', LogType.info,
-        '从文件加载上次连接的设备: ${device?.name} ${device?.id}');
+    _logCallback(
+      'Bluetooth',
+      LogType.info,
+      '从文件加载上次连接的设备: ${device?.name} ${device?.id}',
+    );
     if (device != null) {
       _lastConnectedDevice = device;
       notifyListeners();
@@ -170,25 +173,32 @@ class BluetoothProvider extends ChangeNotifier {
       await startScan();
       // 等待扫描结果（scanTimeout + 100ms 缓冲）
       final scanWait = Duration(
-          milliseconds: (_settings?.scanTimeoutSeconds ??
-                      BluetoothConstants.scanTimeout.inSeconds) *
-                  1000 +
-              100);
+        milliseconds:
+            (_settings?.scanTimeoutSeconds ??
+                    BluetoothConstants.scanTimeout.inSeconds) *
+                1000 +
+            100,
+      );
       await Future.delayed(scanWait);
 
       // 检查是否在扫描结果中找到设备（优先 ID 匹配）
-      var foundDevice = _scannedDevices
-          .where((d) => d.id == _lastConnectedDevice!.id)
-          .toList();
+      var foundDevice =
+          _scannedDevices
+              .where((d) => d.id == _lastConnectedDevice!.id)
+              .toList();
 
       // 如果 ID 匹配失败，尝试使用名称匹配（某些设备使用随机 MAC 地址）
       if (foundDevice.isEmpty && _lastConnectedDevice!.name.isNotEmpty) {
-        foundDevice = _scannedDevices
-            .where((d) => d.name == _lastConnectedDevice!.name)
-            .toList();
+        foundDevice =
+            _scannedDevices
+                .where((d) => d.name == _lastConnectedDevice!.name)
+                .toList();
         if (foundDevice.isNotEmpty) {
-          _logCallback('Bluetooth', LogType.info,
-              '通过名称匹配到设备: ${foundDevice.first.name}');
+          _logCallback(
+            'Bluetooth',
+            LogType.info,
+            '通过名称匹配到设备: ${foundDevice.first.name}',
+          );
         }
       }
 
@@ -198,8 +208,11 @@ class BluetoothProvider extends ChangeNotifier {
         _logCallback('Bluetooth', LogType.info, '尝试自动连接上次设备: ${device.name}');
         await _attemptReconnect(device);
       } else {
-        _logCallback('Bluetooth', LogType.warning,
-            '未找到上次设备: ${_lastConnectedDevice!.name}，请手动重试');
+        _logCallback(
+          'Bluetooth',
+          LogType.warning,
+          '未找到上次设备: ${_lastConnectedDevice!.name}，请手动重试',
+        );
       }
     } catch (e) {
       _logCallback('Bluetooth', LogType.error, '自动重连上次设备异常: ${e.toString()}');
@@ -216,17 +229,22 @@ class BluetoothProvider extends ChangeNotifier {
     while (reconnectAttempts < BluetoothConstants.maxReconnectAttempts &&
         _connectedDevice == null) {
       reconnectAttempts++;
-      _logCallback('Bluetooth', LogType.info,
-          '自动重连尝试 $reconnectAttempts/${BluetoothConstants.maxReconnectAttempts}');
+      _logCallback(
+        'Bluetooth',
+        LogType.info,
+        '自动重连尝试 $reconnectAttempts/${BluetoothConstants.maxReconnectAttempts}',
+      );
 
       try {
         await connectToDevice(device);
         // 等待结果回调（connectionTimeout + 100ms 缓冲）
         final connectWait = Duration(
-            milliseconds: (_settings?.connectionTimeoutSeconds ??
-                        BluetoothConstants.connectionTimeout.inSeconds) *
-                    1000 +
-                100);
+          milliseconds:
+              (_settings?.connectionTimeoutSeconds ??
+                      BluetoothConstants.connectionTimeout.inSeconds) *
+                  1000 +
+              100,
+        );
         await Future.delayed(connectWait);
         if (_connectedDevice != null) {
           _logCallback('Bluetooth', LogType.success, '自动重连成功');
@@ -328,21 +346,29 @@ class BluetoothProvider extends ChangeNotifier {
 
     _scanTimer?.cancel();
     _scanTimer = Timer(
-        Duration(
-            seconds: _settings?.scanTimeoutSeconds ??
-                BluetoothConstants.scanTimeout.inSeconds), () {
-      stopScan();
-    });
+      Duration(
+        seconds:
+            _settings?.scanTimeoutSeconds ??
+            BluetoothConstants.scanTimeout.inSeconds,
+      ),
+      () {
+        stopScan();
+      },
+    );
 
     // 监听扫描结果
     _scanSubscription = fb.FlutterBluePlus.scanResults.listen((results) {
       // 过滤弱信号设备和名称为空的设备，并按信号强度排序
       // 使用 advertisementData.advName 过滤，与模型创建时使用的字段一致
-      final filteredDevices = results
-          .where((r) =>
-              r.rssi >= _minRssi && r.advertisementData.advName.isNotEmpty)
-          .map((r) => BluetoothDeviceModel.fromScanResult(r))
-          .toList();
+      final filteredDevices =
+          results
+              .where(
+                (r) =>
+                    r.rssi >= _minRssi &&
+                    r.advertisementData.advName.isNotEmpty,
+              )
+              .map((r) => BluetoothDeviceModel.fromScanResult(r))
+              .toList();
 
       // 按设备优先级排序，再按信号强度，最后按名称
       filteredDevices.sort((a, b) {
@@ -362,10 +388,8 @@ class BluetoothProvider extends ChangeNotifier {
               d.id == _connectedDevice!.id || d.name == _connectedDevice!.name,
         );
         if (connectedIndex != -1) {
-          _scannedDevices[connectedIndex] =
-              _scannedDevices[connectedIndex].copyWith(
-            status: DeviceConnectionStatus.connected,
-          );
+          _scannedDevices[connectedIndex] = _scannedDevices[connectedIndex]
+              .copyWith(status: DeviceConnectionStatus.connected);
         }
       }
 
@@ -376,8 +400,10 @@ class BluetoothProvider extends ChangeNotifier {
     try {
       await fb.FlutterBluePlus.startScan(
         timeout: Duration(
-            seconds: _settings?.scanTimeoutSeconds ??
-                BluetoothConstants.scanTimeout.inSeconds),
+          seconds:
+              _settings?.scanTimeoutSeconds ??
+              BluetoothConstants.scanTimeout.inSeconds,
+        ),
       );
     } catch (e) {
       _logCallback('Bluetooth', LogType.error, '扫描失败: $e');
@@ -396,7 +422,10 @@ class BluetoothProvider extends ChangeNotifier {
 
     _isScanning = false;
     _logCallback(
-        'Bluetooth', LogType.info, '扫描完成，找到 ${_scannedDevices.length} 个设备');
+      'Bluetooth',
+      LogType.info,
+      '扫描完成，找到 ${_scannedDevices.length} 个设备',
+    );
     notifyListeners();
   }
 
@@ -457,7 +486,9 @@ class BluetoothProvider extends ChangeNotifier {
   /// 启动 OBD 会话（连接成功后的完整初始化流程）
   /// 由 _handleConnectionStateChanged 在连接成功时调用
   Future<void> _startObdSession(
-      BluetoothDeviceModel device, int deviceIndex) async {
+    BluetoothDeviceModel device,
+    int deviceIndex,
+  ) async {
     // 用局部变量缓存，消除 await 后字段被置 null 的竞态 NPE 风险
     final flutterDevice = device.flutterDevice;
     if (flutterDevice == null) {
@@ -506,15 +537,18 @@ class BluetoothProvider extends ChangeNotifier {
     _connectionSubscription = null;
 
     // 先注册连接状态监听，再发起连接，避免 connected 回调在 connect() 返回前触发而被错过
-    _connectionSubscription =
-        device.flutterDevice!.connectionState.listen((state) {
+    _connectionSubscription = device.flutterDevice!.connectionState.listen((
+      state,
+    ) {
       _handleConnectionStateChanged(state, device);
     });
 
     await device.flutterDevice!.connect(
       timeout: Duration(
-          seconds: _settings?.connectionTimeoutSeconds ??
-              BluetoothConstants.connectionTimeout.inSeconds),
+        seconds:
+            _settings?.connectionTimeoutSeconds ??
+            BluetoothConstants.connectionTimeout.inSeconds,
+      ),
       autoConnect: false,
     );
   }
@@ -531,7 +565,9 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 更新为已连接状态
   Future<void> _updateDeviceConnectedStatus(
-      BluetoothDeviceModel device, int index) async {
+    BluetoothDeviceModel device,
+    int index,
+  ) async {
     if (index != -1) {
       _scannedDevices[index] = _scannedDevices[index].copyWith(
         status: DeviceConnectionStatus.connected,
@@ -553,7 +589,10 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 处理连接失败
   void _handleConnectionError(
-      BluetoothDeviceModel device, int index, Object error) {
+    BluetoothDeviceModel device,
+    int index,
+    Object error,
+  ) {
     _logCallback('Bluetooth', LogType.error, '_handleConnectionError: $error');
 
     // 连接失败时，重置设备状态为 disconnected
@@ -569,7 +608,8 @@ class BluetoothProvider extends ChangeNotifier {
   }
 
   Future<bool> _trySmartMatching(
-      List<fb.BluetoothCharacteristic> characteristics) async {
+    List<fb.BluetoothCharacteristic> characteristics,
+  ) async {
     fb.BluetoothCharacteristic? notifyChar;
     fb.BluetoothCharacteristic? writeChar;
 
@@ -587,8 +627,11 @@ class BluetoothProvider extends ChangeNotifier {
       _notifyCharacteristic = notifyChar;
       // 设置 OBDService 的写入特征
       _obdService?.setWriteCharacteristic(writeChar);
-      _logCallback('Bluetooth', LogType.success,
-          '匹配写入特征: ${_writeCharacteristic?.uuid.str}');
+      _logCallback(
+        'Bluetooth',
+        LogType.success,
+        '匹配写入特征: ${_writeCharacteristic?.uuid.str}',
+      );
 
       // 订阅通知
       try {
@@ -597,8 +640,8 @@ class BluetoothProvider extends ChangeNotifier {
         _obdNotificationSubscription?.cancel();
         _obdNotificationSubscription = notifyChar.lastValueStream.listen(
           (value) => _obdService?.handleNotification(value),
-          onError: (e) =>
-              _logCallback('Bluetooth', LogType.error, '通知监听数据错误: $e'),
+          onError:
+              (e) => _logCallback('Bluetooth', LogType.error, '通知监听数据错误: $e'),
         );
         return true;
       } catch (e) {
@@ -612,15 +655,21 @@ class BluetoothProvider extends ChangeNotifier {
 
   /// 处理连接状态变化
   Future<void> _handleConnectionStateChanged(
-      fb.BluetoothConnectionState state, BluetoothDeviceModel device) async {
+    fb.BluetoothConnectionState state,
+    BluetoothDeviceModel device,
+  ) async {
     switch (state) {
       case fb.BluetoothConnectionState.connected:
-        _logCallback('Bluetooth', LogType.success,
-            '设备已连接: ${device.name}，正在启动 OBD 会话...');
+        _logCallback(
+          'Bluetooth',
+          LogType.success,
+          '设备已连接: ${device.name}，正在启动 OBD 会话...',
+        );
 
         // 查找设备在列表中的索引
-        final index = _scannedDevices
-            .indexWhere((d) => d.id == device.id || d.name == device.name);
+        final index = _scannedDevices.indexWhere(
+          (d) => d.id == device.id || d.name == device.name,
+        );
 
         // 启动完整的 OBD 会话初始化流程
         await _startObdSession(device, index);
@@ -628,7 +677,8 @@ class BluetoothProvider extends ChangeNotifier {
       case fb.BluetoothConnectionState.disconnected:
         if (isDeviceConnected) {
           _cleanupConnection(
-              caller: "_handleConnectionStateChanged.disconnected");
+            caller: "_handleConnectionStateChanged.disconnected",
+          );
         }
         break;
       default:
@@ -640,6 +690,7 @@ class BluetoothProvider extends ChangeNotifier {
   ///
   /// [shouldReconnect] - 清理后是否尝试自动重连
   void _cleanupConnection({required String caller}) {
+    final t0 = DateTime.now();
     // 停止 OBD 轮询
     _obdService?.stopPolling();
 
@@ -667,7 +718,10 @@ class BluetoothProvider extends ChangeNotifier {
       );
     }
     _logCallback(
-        'Bluetooth', LogType.warning, '_cleanupConnection caller:$caller');
+      'Bluetooth',
+      LogType.warning,
+      '_cleanupConnection caller:$caller',
+    );
 
     // 重置状态
     _connectedDevice = null;
@@ -677,6 +731,11 @@ class BluetoothProvider extends ChangeNotifier {
     _obdDataProvider.resetData();
 
     notifyListeners();
+    _logCallback(
+      'Bluetooth',
+      LogType.info,
+      '[PERF] _cleanupConnection 完成 +${DateTime.now().difference(t0).inMilliseconds}ms',
+    );
   }
 
   /// 内部断开连接（不设置用户主动断开标志）
@@ -751,7 +810,10 @@ class BluetoothProvider extends ChangeNotifier {
     _rssiMonitorTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (_rssiMonitorTimer == null) {
         _logCallback.call(
-            'Bluetooth', LogType.warning, '_rssiMonitorTimer is null');
+          'Bluetooth',
+          LogType.warning,
+          '_rssiMonitorTimer is null',
+        );
         return;
       }
       _updateRssiAndStability();
@@ -778,8 +840,9 @@ class BluetoothProvider extends ChangeNotifier {
       );
 
       // 同时更新扫描列表中的设备
-      final index =
-          _scannedDevices.indexWhere((d) => d.id == _connectedDevice!.id);
+      final index = _scannedDevices.indexWhere(
+        (d) => d.id == _connectedDevice!.id,
+      );
       if (index != -1) {
         _scannedDevices[index] = _connectedDevice!;
       }

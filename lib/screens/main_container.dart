@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:provider/provider.dart';
 import '../providers/bluetooth_provider.dart';
@@ -7,6 +8,7 @@ import '../providers/sensor_provider.dart';
 import '../providers/riding_stats_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../services/audio_service.dart';
+import '../services/log_service.dart';
 import '../models/riding_event.dart';
 import '../models/event_voice_config.dart';
 import '../widgets/bluetooth_alert_dialog.dart';
@@ -49,7 +51,8 @@ class _MainContainerState extends State<MainContainer> {
   void initState() {
     super.initState();
     _pageController = PageController(
-        initialPage: context.read<NavigationProvider>().currentIndex);
+      initialPage: context.read<NavigationProvider>().currentIndex,
+    );
     _initializeBluetooth();
     // codeflicker-fix: OPT-Issue-4/omvh7ni7j93qpiynr7sw
     // 注册 ELM327 初始化成功回调
@@ -58,6 +61,26 @@ class _MainContainerState extends State<MainContainer> {
       context.read<BluetoothProvider>().onDeviceConnected = (name) {
         if (mounted) CyberToast.show(context, '$name 已连接，OBD 初始化完成');
       };
+    });
+    _registerFrameMonitor();
+  }
+
+  /// 注册帧率监控：慢帧只写文件，不进内存列表，不触发 notifyListeners
+  void _registerFrameMonitor() {
+    SchedulerBinding.instance.addTimingsCallback((timings) {
+      for (final timing in timings) {
+        final totalMs = timing.totalSpan.inMilliseconds;
+        if (totalMs > 32) {
+          final buildMs = timing.buildDuration.inMilliseconds;
+          final rasterMs = timing.rasterDuration.inMilliseconds;
+          final now = DateTime.now();
+          final ts =
+              '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}.${now.millisecond.toString().padLeft(3, '0')}';
+          LogService.appendRawLine(
+            '[$ts] [WARNING] [PERF] 慢帧 ${totalMs}ms | build=${buildMs}ms raster=${rasterMs}ms',
+          );
+        }
+      }
     });
   }
 
@@ -189,10 +212,7 @@ class _MainContainerState extends State<MainContainer> {
     }
 
     // 显示弹窗
-    EventNotificationDialog.show(
-      context: context,
-      event: event,
-    );
+    EventNotificationDialog.show(context: context, event: event);
   }
 
   @override
@@ -268,9 +288,7 @@ class _MainContainerState extends State<MainContainer> {
               ),
 
               // 页面内容 - 使用 PageView 实现滑动切换
-              Expanded(
-                child: _buildPageView(context),
-              ),
+              Expanded(child: _buildPageView(context)),
             ],
           ),
         ),

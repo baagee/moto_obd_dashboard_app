@@ -79,6 +79,16 @@ class LogService {
     return completer.future;
   }
 
+  /// 直接追加原始文本到日志文件（不经过 LogProvider，不触发 notifyListeners）
+  /// 用于帧率监控等高频日志，避免 UI rebuild
+  static void appendRawLine(String line) {
+    _enqueue(() async {
+      final filePath = await getLogFilePath();
+      await File(filePath)
+          .writeAsString('$line\n', encoding: utf8, mode: FileMode.append);
+    });
+  }
+
   /// 分享日志文件
   static Future<void> shareLogFile() async {
     try {
