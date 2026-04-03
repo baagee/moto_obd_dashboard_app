@@ -139,7 +139,8 @@ class RidingStatsProvider extends ChangeNotifier {
     try {
       _logCallback('Stats', LogType.info, '正在获取起点位置...');
       // 最多等 10s（LocationService 内部已有 timeLimit）
-      final position = await LocationService.getCurrentPosition();
+      final position =
+          await LocationService.getCurrentPosition(logCallback: _logCallback);
 
       if (position != null) {
         startLat = position.latitude;
@@ -339,7 +340,8 @@ class RidingStatsProvider extends ChangeNotifier {
     _stopGpsTracking();
 
     // 请求后台定位权限（确保 APP 切后台时 GPS 仍然工作）
-    LocationService.requestBackgroundPermission().then((granted) {
+    LocationService.requestBackgroundPermission(logCallback: _logCallback)
+        .then((granted) {
       if (!granted) {
         _logCallback('GPS', LogType.warning, '后台定位权限未授权，切换到后台时 GPS 追踪可能暂停');
       } else {

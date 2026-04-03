@@ -20,7 +20,8 @@ class CyberGridBackground extends StatelessWidget {
                 colors: [
                   Color(0xFF060A14), // 深蓝黑（左上角）
                   Color(0xFF080E22), // 中心深蓝（稍暗）
-                  Color(0xFF160A28), // 深紫黑（右下角，稍亮）
+                  // Color(0xFF280D48), // 深紫黑（右下角，稍亮）
+                  Color(0xFF1E0F38), // 深紫色 略亮一点，整体仍很暗
                 ],
                 stops: [0.0, 0.5, 1.0],
               ),

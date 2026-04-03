@@ -491,6 +491,7 @@ class GSX8SCalculator {
     _isShifting = false;
     _lastShiftDirection = 0;
     _lastLearnGear = 0;
+    _lastRatio = 0;
     _rpmBuffer.clear();
     _speedBuffer.clear();
     _recentRatios.clear();

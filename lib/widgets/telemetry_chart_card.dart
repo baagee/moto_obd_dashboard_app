@@ -2,14 +2,35 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/obd_data_provider.dart';
+import '../providers/settings_provider.dart';
 import '../theme/app_theme.dart';
 
 /// 实时遥测图表卡片
 class TelemetryChartCard extends StatelessWidget {
   const TelemetryChartCard({super.key});
 
+  /// 将 maxRpm 均分为 4 段，从上到下生成 5 个刻度标签
+  static List<String> _buildRpmLabels(int maxRpm) {
+    return List.generate(5, (i) {
+      final value = maxRpm * (4 - i) ~/ 4;
+      return value == 0 ? '0' : '${(value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1)}k';
+    });
+  }
+
+  /// 将 maxSpeed 均分为 4 段，从上到下生成 5 个刻度标签
+  static List<String> _buildSpeedLabels(int maxSpeed) {
+    return List.generate(5, (i) {
+      final value = maxSpeed * (4 - i) ~/ 4;
+      return value.toString();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 精确订阅 SettingsProvider 中的量程字段，仅在量程变化时重建
+    final maxRpm = context.select<SettingsProvider, int>((s) => s.maxRpm);
+    final maxSpeed = context.select<SettingsProvider, int>((s) => s.maxSpeed);
+
     return Consumer<OBDDataProvider>(
       builder: (context, provider, child) {
 
@@ -44,9 +65,9 @@ class TelemetryChartCard extends StatelessWidget {
               Expanded(
                 child: Row(
                   children: [
-                    // 左侧Y轴（转速）
-                    const _YAxisLabels(
-                      labels: ['12k', '9k', '6k', '3k', '0'],
+                    // 左侧Y轴（转速）- 动态生成刻度
+                    _YAxisLabels(
+                      labels: _buildRpmLabels(maxRpm),
                       color: AppTheme.primary,
                       isLeft: true,
                     ),
@@ -59,12 +80,14 @@ class TelemetryChartCard extends StatelessWidget {
                             'chart_${provider.rpmHistory.length}_${provider.rpmHistory.last}_${provider.velocityHistory.length}_${provider.velocityHistory.last}'),
                         rpmHistory: provider.rpmHistory,
                         velocityHistory: provider.velocityHistory,
+                        maxRpm: maxRpm,
+                        maxSpeed: maxSpeed,
                       ),
                     ),
 
-                    // 右侧Y轴（时速）
-                    const _YAxisLabels(
-                      labels: ['230', '173', '115', '58', '0'],
+                    // 右侧Y轴（时速）- 动态生成刻度
+                    _YAxisLabels(
+                      labels: _buildSpeedLabels(maxSpeed),
                       color: AppTheme.accentCyan,
                       isLeft: false,
                     ),
@@ -137,11 +160,15 @@ class _YAxisLabels extends StatelessWidget {
 class _ChartArea extends StatelessWidget {
   final List<int> rpmHistory;
   final List<int> velocityHistory;
+  final int maxRpm;
+  final int maxSpeed;
 
   const _ChartArea({
     super.key,
     required this.rpmHistory,
     required this.velocityHistory,
+    required this.maxRpm,
+    required this.maxSpeed,
   });
 
   @override
@@ -152,6 +179,8 @@ class _ChartArea extends StatelessWidget {
         painter: TelemetryChartPainter(
           rpmHistory: rpmHistory,
           velocityHistory: velocityHistory,
+          maxRpm: maxRpm,
+          maxSpeed: maxSpeed,
         ),
       ),
     );
@@ -162,10 +191,14 @@ class _ChartArea extends StatelessWidget {
 class TelemetryChartPainter extends CustomPainter {
   final List<int> rpmHistory;
   final List<int> velocityHistory;
+  final int maxRpm;
+  final int maxSpeed;
 
   TelemetryChartPainter({
     required this.rpmHistory,
     required this.velocityHistory,
+    required this.maxRpm,
+    required this.maxSpeed,
   });
 
   @override
@@ -185,7 +218,7 @@ class TelemetryChartPainter extends CustomPainter {
         height,
         padding,
         rpmHistory,
-        12000,
+        maxRpm,
         AppTheme.primary,
       );
     }
@@ -198,7 +231,7 @@ class TelemetryChartPainter extends CustomPainter {
         height,
         padding,
         velocityHistory,
-        230,
+        maxSpeed,
         AppTheme.accentCyan,
       );
     }
@@ -340,10 +373,11 @@ class TelemetryChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant TelemetryChartPainter oldDelegate) {
+    // 量程变化时必须重绘（Y轴比例尺改变）
+    if (oldDelegate.maxRpm != maxRpm || oldDelegate.maxSpeed != maxSpeed) return true;
     // 优化：比较长度和最后一个元素，避免深度比较
     if (oldDelegate.rpmHistory.length != rpmHistory.length) return true;
     if (oldDelegate.velocityHistory.length != velocityHistory.length) return true;
-    // if (rpmHistory.isEmpty || velocityHistory.isEmpty) return false;
     return oldDelegate.rpmHistory.last != rpmHistory.last ||
         oldDelegate.velocityHistory.last != velocityHistory.last;
   }

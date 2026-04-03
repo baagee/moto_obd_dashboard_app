@@ -1,11 +1,12 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../models/obd_data.dart';
 
 /// 定位权限检查结果
 enum LocationPermissionStatus {
-  granted,         // 已授权（前台）
-  deniedForever,   // 永久拒绝，需引导去设置页
-  denied,          // 被拒绝（可再次请求）
+  granted, // 已授权（前台）
+  deniedForever, // 永久拒绝，需引导去设置页
+  denied, // 被拒绝（可再次请求）
   serviceDisabled, // 系统定位服务未开启
 }
 
@@ -15,7 +16,7 @@ class LocationService {
   static Future<bool> checkPermission() async {
     final permission = await Geolocator.checkPermission();
     return permission == LocationPermission.always ||
-           permission == LocationPermission.whileInUse;
+        permission == LocationPermission.whileInUse;
   }
 
   /// 请求定位权限
@@ -68,24 +69,35 @@ class LocationService {
 
   /// 请求后台定位权限（Android 10+ / iOS）
   /// 在骑行开始前调用，确保 APP 切后台时 GPS 仍然工作
-  static Future<bool> requestBackgroundPermission() async {
+  ///
+  /// [logCallback] 可选日志回调，传入后输出每个分支的权限状态
+  static Future<bool> requestBackgroundPermission({
+    void Function(String source, LogType type, String message)? logCallback,
+  }) async {
     try {
       // 先检查前台定位权限
       final foregroundStatus = await Permission.location.status;
       if (!foregroundStatus.isGranted) {
         final result = await Permission.location.request();
-        if (!result.isGranted) return false;
+        if (!result.isGranted) {
+          logCallback?.call('GPS', LogType.error, '前台定位权限被拒绝，后台权限无法申请');
+          return false;
+        }
       }
 
       // Android 10+ 需要单独申请后台定位权限
       final backgroundStatus = await Permission.locationAlways.status;
       if (!backgroundStatus.isGranted) {
         final result = await Permission.locationAlways.request();
+        if (!result.isGranted) {
+          logCallback?.call('GPS', LogType.warning, '后台定位权限被拒绝，切换到后台时 GPS 追踪可能暂停');
+        }
         return result.isGranted;
       }
 
       return true;
     } catch (e) {
+      logCallback?.call('GPS', LogType.error, '请求后台定位权限异常: $e');
       return false;
     }
   }
@@ -106,10 +118,16 @@ class LocationService {
   }
 
   /// 获取当前位置
-  static Future<Position?> getCurrentPosition() async {
+  ///
+  /// [logCallback] 可选日志回调，传入后输出定位各阶段状态和失败原因
+  static Future<Position?> getCurrentPosition({
+    void Function(String source, LogType type, String message)? logCallback,
+  }) async {
     try {
       // 检查服务
-      if (!await isLocationServiceEnabled()) {
+      final serviceEnabled = await isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        logCallback?.call('GPS', LogType.warning, '系统定位服务未开启，无法获取位置');
         return null;
       }
 
@@ -117,8 +135,12 @@ class LocationService {
       final hasPermission = await checkPermission();
       if (!hasPermission) {
         final permission = await requestPermission();
-        if (permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) {
+        if (permission == LocationPermission.denied) {
+          logCallback?.call('GPS', LogType.error, '定位权限被拒绝，无法获取位置');
+          return null;
+        }
+        if (permission == LocationPermission.deniedForever) {
+          logCallback?.call('GPS', LogType.error, '定位权限被永久拒绝，请前往系统设置授权');
           return null;
         }
       }
@@ -129,13 +151,14 @@ class LocationService {
         timeLimit: const Duration(seconds: 10),
       );
     } catch (e) {
+      logCallback?.call('GPS', LogType.error, '获取 GPS 位置异常: $e');
       return null;
     }
   }
 
   /// 获取位置更新流（用于持续追踪）
   static Stream<Position> getPositionStream({
-    int distanceFilter = 10,  // 米
+    int distanceFilter = 10, // 米
     Duration? timeLimit,
   }) {
     return Geolocator.getPositionStream(
