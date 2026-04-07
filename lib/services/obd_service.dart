@@ -189,6 +189,11 @@ class OBDService {
 
   /// 处理 OBD 通知
   void handleNotification(List<int> value) {
+    if (!_isPollingActive) {
+      // 如果这条日志在断开后大量出现，就证明了积压
+      logCallback?.call('OBD', LogType.info, 'handleNotification 跳过（已断开）');
+      return;
+    }
     if (value.isEmpty) return;
 
     // 记录数据采集时间戳
@@ -266,8 +271,7 @@ class OBDService {
     final highRatio = (highInterval / pollingBaseInterval).round().clamp(1, 20);
     final mediumRatio =
         (mediumInterval / pollingBaseInterval).round().clamp(1, 30);
-    final lowRatio =
-        (lowInterval / pollingBaseInterval).round().clamp(1, 40);
+    final lowRatio = (lowInterval / pollingBaseInterval).round().clamp(1, 40);
 
     _pollingTimer = Timer.periodic(
       const Duration(milliseconds: pollingBaseInterval),

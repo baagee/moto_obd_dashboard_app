@@ -5,7 +5,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:obd_dashboard/utils/gear_util.dart';
 import '../models/obd_data.dart';
 import '../models/riding_event.dart' as stats;
-import '../models/riding_record.dart';
 import '../services/audio_service.dart';
 import '../services/database_service.dart';
 import '../services/geocoding_service.dart';
@@ -26,7 +25,7 @@ class RidingStatsProvider extends ChangeNotifier {
 
   // 日志回调
   late final void Function(String source, LogType type, String message)
-  _logCallback;
+      _logCallback;
 
   // 最新添加的事件（用于外部监听）
   stats.RidingEvent? _latestEvent;
@@ -97,10 +96,10 @@ class RidingStatsProvider extends ChangeNotifier {
     AudioService? audioService,
     RidingRecordProvider? ridingRecordProvider,
     SettingsProvider? settingsProvider,
-  }) : _obdDataProvider = obdDataProvider,
-       _audioService = audioService,
-       _ridingRecordProvider = ridingRecordProvider,
-       _settingsProvider = settingsProvider {
+  })  : _obdDataProvider = obdDataProvider,
+        _audioService = audioService,
+        _ridingRecordProvider = ridingRecordProvider,
+        _settingsProvider = settingsProvider {
     _logCallback = createLogger(logProvider);
   }
 
@@ -226,10 +225,9 @@ class RidingStatsProvider extends ChangeNotifier {
     _stopSnapshotTimer();
     GSX8SCalculator.reset();
 
-    final duration =
-        _rideStartTime != null
-            ? DateTime.now().difference(_rideStartTime!).inSeconds
-            : 0;
+    final duration = _rideStartTime != null
+        ? DateTime.now().difference(_rideStartTime!).inSeconds
+        : 0;
     _logCallback(
       'Stats',
       LogType.info,
@@ -295,10 +293,9 @@ class RidingStatsProvider extends ChangeNotifier {
     final avgSpeed =
         _totalSampleCount > 0 ? _totalSpeedSum / _totalSampleCount : 0.0;
     final distance = _totalGpsDistance > 0 ? _totalGpsDistance / 1000 : 0.0;
-    final duration =
-        _rideStartTime != null
-            ? DateTime.now().difference(_rideStartTime!).inSeconds
-            : 0;
+    final duration = _rideStartTime != null
+        ? DateTime.now().difference(_rideStartTime!).inSeconds
+        : 0;
     try {
       _logCallback(
         'Stats',
@@ -393,6 +390,7 @@ class RidingStatsProvider extends ChangeNotifier {
       _positionSubscription = LocationService.getPositionStream(
         distanceFilter: 0, // 0米触发（每次位置变化都回调，最高精度）
       ).listen((position) {
+        if (!_isRiding) return; // 未骑行时积压的回调快速跳过，不分配对象
         _onPositionUpdate(PositionData.fromGeolocator(position));
       });
     } catch (e) {
@@ -428,10 +426,9 @@ class RidingStatsProvider extends ChangeNotifier {
 
     if (_lastPosition != null) {
       final distance = _calculateDistance(_lastPosition!, position);
-      final timeDiffMs =
-          position.timestamp
-              .difference(_lastPosition!.timestamp)
-              .inMilliseconds;
+      final timeDiffMs = position.timestamp
+          .difference(_lastPosition!.timestamp)
+          .inMilliseconds;
       final timeDiffSec = timeDiffMs / 1000.0;
 
       // 计算瞬时速度（m/s），使用毫秒精度避免 < 1s 时除零
@@ -466,8 +463,7 @@ class RidingStatsProvider extends ChangeNotifier {
     const R = 6371000.0; // 地球半径（米）
     final dLat = _toRadians(p2.latitude - p1.latitude);
     final dLon = _toRadians(p2.longitude - p1.longitude);
-    final a =
-        sin(dLat / 2) * sin(dLat / 2) +
+    final a = sin(dLat / 2) * sin(dLat / 2) +
         cos(_toRadians(p1.latitude)) *
             cos(_toRadians(p2.latitude)) *
             sin(dLon / 2) *
@@ -993,7 +989,7 @@ class DataSampler {
     final avg = values.reduce((a, b) => a + b) / values.length;
     final variance =
         values.map((v) => pow(v - avg, 2)).reduce((a, b) => a + b) /
-        values.length;
+            values.length;
     return sqrt(variance);
   }
 
