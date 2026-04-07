@@ -6,26 +6,6 @@ import '../utils/gear_util.dart';
 /// OBD数据提供者 - 管理真实 OBD 数据（无 Mock）
 /// 设备未连接时显示默认值（全为 0）
 class OBDDataProvider extends ChangeNotifier {
-  // 数据更新回调列表
-  final List<VoidCallback> _onDataUpdateCallbacks = [];
-
-  /// 注册数据更新回调
-  void addDataUpdateListener(VoidCallback callback) {
-    _onDataUpdateCallbacks.add(callback);
-  }
-
-  /// 移除数据更新回调
-  void removeDataUpdateListener(VoidCallback callback) {
-    _onDataUpdateCallbacks.remove(callback);
-  }
-
-  /// 通知数据更新
-  void _notifyDataUpdate() {
-    for (final callback in _onDataUpdateCallbacks) {
-      callback();
-    }
-  }
-
   // 默认值（设备未连接时显示）
   static const int defaultRpm = 0;
   static const int defaultSpeed = 0;
@@ -56,7 +36,6 @@ class OBDDataProvider extends ChangeNotifier {
     coolantTemp: defaultCoolantTemp,
     intakeTemp: defaultIntakeTemp,
   );
-
 
   // 历史数据
   List<int> _rpmHistory = List.generate(maxDataPoints, (_) => 0);
@@ -140,7 +119,6 @@ class OBDDataProvider extends ChangeNotifier {
     );
 
     notifyListeners();
-    _notifyDataUpdate();
   }
 
   /// 重置数据为默认值（设备断开时调用）
@@ -183,7 +161,6 @@ class OBDDataProvider extends ChangeNotifier {
       leanDirection: direction,
     );
     notifyListeners();
-    _notifyDataUpdate();
   }
 
   /// 零点校准（将当前角度设为零点）

@@ -9,34 +9,30 @@ class GearDisplayPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<OBDDataProvider>(
-      builder: (context, provider, child) {
-        final gear = provider.data.gear;
-
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // 顶部标签
-            const Text('档位', style: AppTheme.labelMediumPrimary12),
-            const SizedBox(height: 2),
-            // 档位块
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  GearBlock(gear: 6, currentGear: gear),
-                  GearBlock(gear: 5, currentGear: gear),
-                  GearBlock(gear: 4, currentGear: gear),
-                  GearBlock(gear: 3, currentGear: gear),
-                  GearBlock(gear: 2, currentGear: gear),
-                  GearBlock(gear: 0, currentGear: gear), // N
-                  GearBlock(gear: 1, currentGear: gear),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
+    // 精确订阅 gear 单字段，其他字段变化（倾角66Hz等）不触发重建
+    final gear = context.select<OBDDataProvider, int>((p) => p.data.gear);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        // 顶部标签
+        const Text('档位', style: AppTheme.labelMediumPrimary12),
+        const SizedBox(height: 2),
+        // 档位块
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              GearBlock(gear: 6, currentGear: gear),
+              GearBlock(gear: 5, currentGear: gear),
+              GearBlock(gear: 4, currentGear: gear),
+              GearBlock(gear: 3, currentGear: gear),
+              GearBlock(gear: 2, currentGear: gear),
+              GearBlock(gear: 0, currentGear: gear), // N
+              GearBlock(gear: 1, currentGear: gear),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -62,7 +58,8 @@ class GearBlock extends StatelessWidget {
       height: 23,
       margin: const EdgeInsets.symmetric(vertical: 1.5),
       decoration: BoxDecoration(
-        color: isActive ? activeColor.withValues(alpha: 0.2) : Colors.transparent,
+        color:
+            isActive ? activeColor.withValues(alpha: 0.2) : Colors.transparent,
         border: Border.all(
           color: isActive ? activeColor : inactiveColor,
           width: 1,

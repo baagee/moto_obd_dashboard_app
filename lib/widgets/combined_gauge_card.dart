@@ -12,10 +12,16 @@ class CombinedGaugeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = context.watch<OBDDataProvider>().data;
+    // 精确订阅 OBDDataProvider 中仪表盘实际用到的 5 个字段
+    // updateLeanAngle (66Hz) 不触发此 Widget 重建
+    final rpm = context.select<OBDDataProvider, int>((p) => p.data.rpm);
+    final speed = context.select<OBDDataProvider, int>((p) => p.data.speed);
+    final coolantTemp =
+        context.select<OBDDataProvider, int>((p) => p.data.coolantTemp);
+    final intakeTemp =
+        context.select<OBDDataProvider, int>((p) => p.data.intakeTemp);
+    // gear 字段由 GearDisplayPanel 单独订阅，此处传 0 保持画布不含档位
     // codeflicker-fix: OPT-Issue-6/omvh7ni7j93qpiynr7sw
-    // 用 context.select 精确订阅 SettingsProvider 中实际用到的 11 个字段，
-    // 避免 settings 任何字段变化都触发高频 OBDDataProvider 重建
     final maxRpm = context.select<SettingsProvider, int>((s) => s.maxRpm);
     final warnRpm = context.select<SettingsProvider, int>((s) => s.warnRpm);
     final dangerRpm = context.select<SettingsProvider, int>((s) => s.dangerRpm);
@@ -30,11 +36,11 @@ class CombinedGaugeCard extends StatelessWidget {
           return CustomPaint(
             size: Size(constraints.maxWidth, constraints.maxHeight),
             painter: CombinedGaugePainter(
-              rpm: data.rpm,
-              speed: data.speed,
+              rpm: rpm,
+              speed: speed,
               gear: 0,
-              coolantTemp: data.coolantTemp,
-              intakeTemp: data.intakeTemp,
+              coolantTemp: coolantTemp,
+              intakeTemp: intakeTemp,
               maxRpm: maxRpm,
               warnRpm: warnRpm,
               dangerRpm: dangerRpm,

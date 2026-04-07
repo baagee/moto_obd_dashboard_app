@@ -9,97 +9,86 @@ class SideStatsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<OBDDataProvider>(
-      builder: (context, provider, child) {
-        final data = provider.data;
+    // 各字段独立精确订阅：
+    // - throttle/load/voltage 来自 updateRealTimeData（OBD 轮询频率）
+    // - leanAngle/leanDirection 来自 updateLeanAngle（传感器 66Hz）
+    // - pressure/pressureHistory 来自 updateRealTimeData（OBD 低频）
+    // 拆分后 leanAngle 66Hz 更新不再触发 throttle/load/voltage/pressure 等的重建
+    final throttle =
+        context.select<OBDDataProvider, int>((p) => p.data.throttle);
+    final load = context.select<OBDDataProvider, int>((p) => p.data.load);
+    final leanAngle =
+        context.select<OBDDataProvider, int>((p) => p.data.leanAngle);
+    final leanDirection =
+        context.select<OBDDataProvider, String>((p) => p.data.leanDirection);
+    final pressure =
+        context.select<OBDDataProvider, int>((p) => p.data.pressure);
+    final voltage =
+        context.select<OBDDataProvider, double>((p) => p.data.voltage);
 
-        return Container(
-          padding: const EdgeInsets.all(6),
-          decoration: AppTheme.surfaceBorder(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 标题
-              const Text('车辆状态', style: AppTheme.labelMediumPrimary),
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: AppTheme.surfaceBorder(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标题（静态，不依赖数据）
+          const Text('车辆状态', style: AppTheme.labelMediumPrimary),
 
-              const SizedBox(height: 2),
+          const SizedBox(height: 2),
 
-              // 内容区域 - 不滚动
-              Expanded(
-                child: Column(
-                  children: [
-                    // 温度区域
-                    // Row(
-                    //   children: [
-                    //     Expanded(
-                    //       child: _TempCard(
-                    //         icon: Icons.device_thermostat,
-                    //         iconColor: AppTheme.accentOrange,
-                    //         label: '冷却水温',
-                    //         value: '${data.coolantTemp}°C',
-                    //       ),
-                    //     ),
-                    //     const SizedBox(width: 6),
-                    //     Expanded(
-                    //       child: _TempCard(
-                    //         icon: Icons.ac_unit,
-                    //         iconColor: AppTheme.accentCyan,
-                    //         label: '进气温度',
-                    //         value: '${data.intakeTemp}°C',
-                    //       ),
-                    //     ),
-                    //   ],
-                    // ),
-                    //
-                    // const SizedBox(height: 3),
-
-                    // 油门进度条
-                    _ProgressBar(
-                      icon: Icons.speed,
-                      iconColor: AppTheme.accentCyan,
-                      label: '油门开度',
-                      value: data.throttle,
-                      color: AppTheme.accentCyan,
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    // 负载进度条
-                    _ProgressBar(
-                      icon: Icons.settings,
-                      iconColor: AppTheme.accentOrange,
-                      label: '发动机负载',
-                      value: data.load,
-                      color: AppTheme.accentOrange,
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    // 倾斜角度指示器
-                    _LeanAngleIndicator(
-                      angle: data.leanAngle,
-                      direction: data.leanDirection,
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    // 气压趋势图
-                    _PressureChart(
-                      pressure: data.pressure,
-                      pressureHistory: provider.pressureHistory,
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    // 电压显示
-                    _VoltageDisplay(voltage: data.voltage),
-                  ],
+          // 内容区域
+          Expanded(
+            child: Column(
+              children: [
+                // 油门进度条
+                _ProgressBar(
+                  icon: Icons.speed,
+                  iconColor: AppTheme.accentCyan,
+                  label: '油门开度',
+                  value: throttle,
+                  color: AppTheme.accentCyan,
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 6),
+
+                // 负载进度条
+                _ProgressBar(
+                  icon: Icons.settings,
+                  iconColor: AppTheme.accentOrange,
+                  label: '发动机负载',
+                  value: load,
+                  color: AppTheme.accentOrange,
+                ),
+
+                const SizedBox(height: 6),
+
+                // 倾斜角度指示器
+                _LeanAngleIndicator(
+                  angle: leanAngle,
+                  direction: leanDirection,
+                ),
+
+                const SizedBox(height: 6),
+
+                // 气压趋势图：pressureHistory 是 List 引用，select 无法检测内容变化
+                // 单独用 Consumer 包裹，仅此处订阅完整 provider
+                Consumer<OBDDataProvider>(
+                  builder: (context, provider, _) => _PressureChart(
+                    pressure: pressure,
+                    pressureHistory: provider.pressureHistory,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                // 电压显示
+                _VoltageDisplay(voltage: voltage),
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -177,7 +166,8 @@ class _ProgressBar extends StatelessWidget {
               const SizedBox(width: 4),
               Text(label, style: AppTheme.labelMediumPrimary),
               const Spacer(),
-              Text('$value%', style: AppTheme.valueSmall.copyWith(color: color)),
+              Text('$value%',
+                  style: AppTheme.valueSmall.copyWith(color: color)),
             ],
           ),
           const SizedBox(height: 6),
@@ -244,7 +234,8 @@ class _LeanAngleIndicator extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     angle == 0 ? '无' : (direction == 'LEFT' ? '左' : '右'),
-                    style: AppTheme.valueSmall.copyWith(color: AppTheme.primary),
+                    style:
+                        AppTheme.valueSmall.copyWith(color: AppTheme.primary),
                   ),
                 ],
               ),
@@ -254,7 +245,9 @@ class _LeanAngleIndicator extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               // 计算指示器位置：50%为中间，最大60度，角度为0时居中
-              final leanPercent = angle == 0 ? 50 : 50 + (direction == 'LEFT' ? -angle : angle) * (50 / 60);
+              final leanPercent = angle == 0
+                  ? 50
+                  : 50 + (direction == 'LEFT' ? -angle : angle) * (50 / 60);
               return Stack(
                 children: [
                   // 背景条
@@ -262,7 +255,8 @@ class _LeanAngleIndicator extends StatelessWidget {
                     height: 12,
                     decoration: const BoxDecoration(
                       color: Color(0xFF1E293B),
-                      borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
+                      borderRadius: BorderRadius.all(
+                          Radius.circular(AppTheme.radiusSmall)),
                     ),
                   ),
                   // 中心线
@@ -299,9 +293,12 @@ class _LeanAngleIndicator extends StatelessWidget {
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('左60°', style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
-              Text('0°', style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
-              Text('右60°', style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
+              Text('左60°',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
+              Text('0°',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
+              Text('右60°',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
             ],
           ),
         ],
@@ -384,7 +381,10 @@ class PressureChartPainter extends CustomPainter {
 
     for (int i = 0; i < pressureHistory.length; i++) {
       final x = i * step;
-      final y = height - padding - ((pressureHistory[i] - minPressure) / (maxPressure - minPressure)) * (height - 2 * padding);
+      final y = height -
+          padding -
+          ((pressureHistory[i] - minPressure) / (maxPressure - minPressure)) *
+              (height - 2 * padding);
       points.add(Offset(x, y));
     }
 
@@ -428,9 +428,8 @@ class PressureChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant PressureChartPainter oldDelegate) {
-    if (oldDelegate.pressureHistory.length != pressureHistory.length) return true;
-    if (pressureHistory.isEmpty) return false;
-    return oldDelegate.pressureHistory.last != pressureHistory.last;
+    // pressureHistory 是原地修改的同一 List 实例，last 比较无效，直接返回 true
+    return true;
   }
 }
 
@@ -453,7 +452,8 @@ class _VoltageDisplay extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.battery_charging_full, color: AppTheme.accentGreen, size: 14),
+              Icon(Icons.battery_charging_full,
+                  color: AppTheme.accentGreen, size: 14),
               SizedBox(width: 4),
               Text('控制模块电压', style: AppTheme.labelMediumPrimary),
             ],

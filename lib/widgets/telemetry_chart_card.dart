@@ -13,7 +13,9 @@ class TelemetryChartCard extends StatelessWidget {
   static List<String> _buildRpmLabels(int maxRpm) {
     return List.generate(5, (i) {
       final value = maxRpm * (4 - i) ~/ 4;
-      return value == 0 ? '0' : '${(value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1)}k';
+      return value == 0
+          ? '0'
+          : '${(value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1)}k';
     });
   }
 
@@ -27,77 +29,69 @@ class TelemetryChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 精确订阅 SettingsProvider 中的量程字段，仅在量程变化时重建
+    // 精确订阅量程字段，仅在量程变化时重建
     final maxRpm = context.select<SettingsProvider, int>((s) => s.maxRpm);
     final maxSpeed = context.select<SettingsProvider, int>((s) => s.maxSpeed);
 
-    return Consumer<OBDDataProvider>(
-      builder: (context, provider, child) {
+    // 静态标题行和图例提到 Consumer 外，不随数据更新重建
+    final header = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: const [
+        Text('近期趋势', style: AppTheme.labelMediumPrimary),
+        Row(
+          children: [
+            _LegendDot(color: AppTheme.primary, label: '转速'),
+            SizedBox(width: 10),
+            _LegendDot(color: AppTheme.accentCyan, label: '速度 (km/h)'),
+          ],
+        ),
+      ],
+    );
 
-        return Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: AppTheme.surface40,
-            border: Border.all(color: AppTheme.primary10),
-            borderRadius: BorderRadius.circular(AppTheme.radiusCard),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 标题行
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('近期趋势', style: AppTheme.labelMediumPrimary),
-                  Row(
-                    children: [
-                      const _LegendDot(color: AppTheme.primary, label: '转速'),
-                      const SizedBox(width: 10),
-                      const _LegendDot(color: AppTheme.accentCyan, label: '速度 (km/h)'),
-                    ],
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 5),
-
-              // 图表区域（带左右Y轴）
-              Expanded(
-                child: Row(
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: AppTheme.surface40,
+        border: Border.all(color: AppTheme.primary10),
+        borderRadius: BorderRadius.circular(AppTheme.radiusCard),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          header,
+          const SizedBox(height: 5),
+          // 图表区域（带左右Y轴）
+          Expanded(
+            child: Consumer<OBDDataProvider>(
+              builder: (context, provider, _) {
+                return Row(
                   children: [
-                    // 左侧Y轴（转速）- 动态生成刻度
                     _YAxisLabels(
                       labels: _buildRpmLabels(maxRpm),
                       color: AppTheme.primary,
                       isLeft: true,
                     ),
-
-                    // 中间图表 - 使用 RepaintBoundary 隔离重绘
-                    // 使用 ValueKey 强制在数据变化时重建，确保 CustomPaint 刷新
+                    // ValueKey 已移除：shouldRepaint 负责控制重绘，ValueKey 会强制销毁重建整个 Widget
                     Expanded(
                       child: _ChartArea(
-                        key: ValueKey(
-                            'chart_${provider.rpmHistory.length}_${provider.rpmHistory.last}_${provider.velocityHistory.length}_${provider.velocityHistory.last}'),
                         rpmHistory: provider.rpmHistory,
                         velocityHistory: provider.velocityHistory,
                         maxRpm: maxRpm,
                         maxSpeed: maxSpeed,
                       ),
                     ),
-
-                    // 右侧Y轴（时速）- 动态生成刻度
                     _YAxisLabels(
                       labels: _buildSpeedLabels(maxSpeed),
                       color: AppTheme.accentCyan,
                       isLeft: false,
                     ),
                   ],
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -263,7 +257,8 @@ class TelemetryChartPainter extends CustomPainter {
 
     for (int i = 0; i < data.length; i++) {
       final x = i * step;
-      final y = height - padding - ((data[i] / maxValue) * (height - 2 * padding));
+      final y =
+          height - padding - ((data[i] / maxValue) * (height - 2 * padding));
       points.add(Offset(x, y));
     }
 
@@ -322,7 +317,8 @@ class TelemetryChartPainter extends CustomPainter {
 
     for (int i = 0; i < data.length; i++) {
       final x = i * step;
-      final y = height - padding - ((data[i] / maxValue) * (height - 2 * padding));
+      final y =
+          height - padding - ((data[i] / maxValue) * (height - 2 * padding));
       points.add(Offset(x, y));
     }
 
@@ -373,12 +369,9 @@ class TelemetryChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant TelemetryChartPainter oldDelegate) {
-    // 量程变化时必须重绘（Y轴比例尺改变）
-    if (oldDelegate.maxRpm != maxRpm || oldDelegate.maxSpeed != maxSpeed) return true;
-    // 优化：比较长度和最后一个元素，避免深度比较
-    if (oldDelegate.rpmHistory.length != rpmHistory.length) return true;
-    if (oldDelegate.velocityHistory.length != velocityHistory.length) return true;
-    return oldDelegate.rpmHistory.last != rpmHistory.last ||
-        oldDelegate.velocityHistory.last != velocityHistory.last;
+    // rpmHistory/velocityHistory 是原地修改的同一 List 实例，
+    // oldDelegate 和 this 持有相同引用，比较 last 永远相等，无法检测变化。
+    // Painter 只在 Consumer 触发时才重建（OBD 新数据到来），直接返回 true 即可。
+    return true;
   }
 }
