@@ -31,7 +31,8 @@ class EventNotificationDialog extends StatefulWidget {
   }
 
   @override
-  State<EventNotificationDialog> createState() => _EventNotificationDialogState();
+  State<EventNotificationDialog> createState() =>
+      _EventNotificationDialogState();
 }
 
 class _EventNotificationDialogState extends State<EventNotificationDialog>
@@ -180,10 +181,9 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
 
           return Container(
             width: 420,
-            padding: const EdgeInsets.all(24),
+            clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
               color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(AppTheme.radiusCard),
               border: Border.all(
                 color: neonColor,
                 width: 3,
@@ -197,17 +197,20 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
               ],
             ),
             child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 标题行
-                  Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── 顶部彩色高亮横条 ──
+                Container(height: 3, color: eventColor),
+                // ── 标题行 ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                  child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: eventColor.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(AppTheme.radiusButton),
                         ),
                         child: Icon(
                           _getEventIcon(),
@@ -228,9 +231,20 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  // 事件描述
-                  Text(
+                ),
+                // ── 分隔线 ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: eventColor.withOpacity(0.3),
+                  ),
+                ),
+                // ── 事件描述 ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                  child: Text(
                     widget.event.description,
                     style: const TextStyle(
                       color: AppTheme.textSecondary,
@@ -240,11 +254,14 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 16),
-                  // 扩展信息显示
-                  _buildAdditionalInfo(eventColor),
-                ],
-              ),
+                ),
+                // ── 扩展信息 ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+                  child: _buildAdditionalInfo(eventColor),
+                ),
+              ],
+            ),
           );
         },
       ),

@@ -41,24 +41,38 @@ class CyberToast {
           elevation: 4,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
             side: BorderSide(color: color.withValues(alpha: 0.4)),
           ),
-          content: Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+          content: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 左侧彩色竖条（撑满整行高度）
+                Container(width: 4, color: color),
+                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Icon(icon, size: 16, color: color),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      message,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+              ],
+            ),
           ),
         ),
       );

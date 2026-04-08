@@ -57,16 +57,16 @@ class BluetoothAlertDialog extends StatelessWidget {
       backgroundColor: Colors.transparent,
       child: Container(
         width: 280,
-        padding: const EdgeInsets.all(20),
+        clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
           color: AppTheme.surface,
           border: Border.all(
-            color: AppTheme.primary.withOpacity(0.5),
+            color: AppTheme.accentOrange.withOpacity(0.5),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primary.withOpacity(0.2),
+              color: AppTheme.accentOrange.withOpacity(0.2),
               blurRadius: 20,
               spreadRadius: 0,
             ),
@@ -74,54 +74,72 @@ class BluetoothAlertDialog extends StatelessWidget {
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 标题
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentOrange.withOpacity(0.2),
-                  ),
-                  child: const Icon(
-                    Icons.bluetooth_disabled,
-                    color: AppTheme.accentOrange,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+            // ── 顶部橙色高亮横条 ──
+            Container(height: 3, color: AppTheme.accentOrange),
+            // ── 标题行 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentOrange.withOpacity(0.2),
+                    ),
+                    child: const Icon(
+                      Icons.bluetooth_disabled,
+                      color: AppTheme.accentOrange,
+                      size: 24,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 消息
-            Text(
-              message,
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 13,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppTheme.accentOrange,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-
-            // 按钮
-            CyberButton.danger(
-              text: buttonText,
-              width: double.infinity,
-              onPressed: () {
-                Navigator.of(context).pop();
-                onButtonPressed?.call();
-              },
+            // ── 分隔线 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Divider(
+                height: 1,
+                thickness: 1,
+                color: AppTheme.accentOrange.withOpacity(0.3),
+              ),
+            ),
+            // ── 消息 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            // ── 按钮 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              child: CyberButton.danger(
+                text: buttonText,
+                width: double.infinity,
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  onButtonPressed?.call();
+                },
+              ),
             ),
           ],
         ),

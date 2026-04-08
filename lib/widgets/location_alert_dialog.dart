@@ -8,6 +8,7 @@ class LocationAlertDialog extends StatelessWidget {
   final String message;
   final String primaryButtonText;
   final VoidCallback? onPrimaryPressed;
+
   /// 可选的"忽略"按钮，不传则只显示主按钮
   final String? dismissButtonText;
 
@@ -75,16 +76,16 @@ class LocationAlertDialog extends StatelessWidget {
       backgroundColor: Colors.transparent,
       child: Container(
         width: 280,
-        padding: const EdgeInsets.all(20),
+        clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
           color: AppTheme.surface,
           border: Border.all(
-            color: AppTheme.primary.withValues(alpha: 0.5),
+            color: AppTheme.accentCyan.withValues(alpha: 0.5),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primary.withValues(alpha: 0.2),
+              color: AppTheme.accentCyan.withValues(alpha: 0.2),
               blurRadius: 20,
               spreadRadius: 0,
             ),
@@ -92,77 +93,94 @@ class LocationAlertDialog extends StatelessWidget {
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 标题行
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentCyan.withValues(alpha: 0.15),
-                  ),
-                  child: const Icon(
-                    Icons.location_on_outlined,
-                    color: AppTheme.accentCyan,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+            // ── 顶部青色高亮横条 ──
+            Container(height: 3, color: AppTheme.accentCyan),
+            // ── 标题行 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentCyan.withValues(alpha: 0.15),
+                    ),
+                    child: const Icon(
+                      Icons.location_on_outlined,
+                      color: AppTheme.accentCyan,
+                      size: 24,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 消息
-            Text(
-              message,
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 13,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppTheme.accentCyan,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-
-            // 按钮
-            if (dismissButtonText != null) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: CyberButton.secondary(
-                      text: dismissButtonText!,
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: CyberButton.primary(
+            // ── 分隔线 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Divider(
+                height: 1,
+                thickness: 1,
+                color: AppTheme.accentCyan.withValues(alpha: 0.3),
+              ),
+            ),
+            // ── 消息 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            // ── 按钮 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              child: dismissButtonText != null
+                  ? Row(
+                      children: [
+                        Expanded(
+                          child: CyberButton.secondary(
+                            text: dismissButtonText!,
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: CyberButton.primary(
+                            text: primaryButtonText,
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              onPrimaryPressed?.call();
+                            },
+                          ),
+                        ),
+                      ],
+                    )
+                  : CyberButton.primary(
                       text: primaryButtonText,
+                      width: double.infinity,
                       onPressed: () {
                         Navigator.of(context).pop();
                         onPrimaryPressed?.call();
                       },
                     ),
-                  ),
-                ],
-              ),
-            ] else
-              CyberButton.primary(
-                text: primaryButtonText,
-                width: double.infinity,
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  onPrimaryPressed?.call();
-                },
-              ),
+            ),
           ],
         ),
       ),

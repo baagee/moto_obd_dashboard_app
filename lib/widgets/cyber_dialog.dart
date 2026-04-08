@@ -63,7 +63,7 @@ class CyberDialog extends StatelessWidget {
       backgroundColor: Colors.transparent,
       child: Container(
         width: width,
-        padding: const EdgeInsets.all(20),
+        clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
           color: AppTheme.surface,
           border: Border.all(
@@ -82,51 +82,64 @@ class CyberDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 标题行
-            Row(
-              children: [
-                if (icon != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusButton),
+            // ── 顶部彩色高亮横条 ──
+            Container(height: 3, color: accentColor),
+            // ── 标题行 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                children: [
+                  if (icon != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: accentColor.withOpacity(0.2),
+                      ),
+                      child: Icon(icon, color: accentColor, size: 24),
                     ),
-                    child: Icon(
-                      icon,
-                      color: accentColor,
-                      size: 24,
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        color: accentColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
                 ],
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: accentColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 内容区域（添加最大高度约束，确保可滚动）
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.5,
               ),
-              child: content,
             ),
-
-            // 按钮区域
-            if (actions != null && actions!.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              _buildActions(context),
-            ],
+            // ── 分隔线 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Divider(
+                height: 1,
+                thickness: 1,
+                color: accentColor.withOpacity(0.3),
+              ),
+            ),
+            // ── 内容区域 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: content,
+              ),
+            ),
+            // ── 按钮区域（actions==null 时显示默认关闭按钮；[] 时隐藏）──
+            if (actions == null || actions!.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                child: _buildActions(context),
+              ),
+            ] else
+              const SizedBox(height: 16),
           ],
         ),
       ),
@@ -141,7 +154,11 @@ class CyberDialog extends StatelessWidget {
       );
     }
 
-    // 默认关闭按钮
+    if (actions != null && actions!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // 默认关闭按钮（actions == null 时）
     return Align(
       alignment: Alignment.centerRight,
       child: CyberButton.secondary(

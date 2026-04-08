@@ -14,6 +14,7 @@ class RideEventListModal {
       icon: Icons.flag_outlined,
       accentColor: AppTheme.primary,
       barrierDismissible: true,
+      actions: [],
       content: ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.6,
