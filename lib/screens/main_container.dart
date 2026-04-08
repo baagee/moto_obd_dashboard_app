@@ -62,7 +62,7 @@ class _MainContainerState extends State<MainContainer> {
         if (mounted) CyberToast.show(context, '$name 已连接，OBD 初始化完成');
       };
     });
-    _registerFrameMonitor();
+    // _registerFrameMonitor();
   }
 
   /// 注册帧率监控：慢帧只写文件，不进内存列表，不触发 notifyListeners
