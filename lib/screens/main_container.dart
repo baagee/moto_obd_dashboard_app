@@ -273,11 +273,11 @@ class _MainContainerState extends State<MainContainer> {
                             isConnected: isConnected,
                             deviceName: deviceName,
                             navItems: const [
-                              'DASHBOARD',
-                              'RECORDS',
-                              'LOGS',
-                              'SETTINGS',
-                              'DEVICES',
+                              '仪表盘',
+                              '骑行记录',
+                              '日志',
+                              '设置',
+                              '设备',
                             ],
                           );
                         },

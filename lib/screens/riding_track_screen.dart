@@ -560,7 +560,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'TRACK REPLAY',
+                  '轨迹回放',
                   style: TextStyle(
                     color: AppTheme.primary70,
                     fontSize: 10,

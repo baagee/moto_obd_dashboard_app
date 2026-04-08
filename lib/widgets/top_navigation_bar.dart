@@ -18,7 +18,7 @@ class TopNavigationBar extends StatelessWidget {
     this.onLinkVehiclePressed,
     required this.isConnected,
     this.deviceName,
-    this.navItems = const ['DASHBOARD', 'LOGS', 'DEVICES'],
+    this.navItems = const ['仪表盘', '日志', '设备'],
   });
 
   @override
@@ -119,10 +119,12 @@ class TopNavigationBar extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  isConnected && deviceName != null ? deviceName! : (isConnected ? 'LINKED' : 'LINK VEHICLE'),
+                  isConnected && deviceName != null
+                      ? deviceName!
+                      : (isConnected ? '已连接' : '连接车辆'),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 7,
+                    fontSize: 9,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1,
                   ),
@@ -145,7 +147,7 @@ class TopNavigationBar extends StatelessWidget {
     final items = <Widget>[];
     for (int i = 0; i < navItems.length; i++) {
       if (i > 0) {
-        items.add(const SizedBox(width: 12));
+        items.add(const SizedBox(width: 6));
       }
       items.add(
         _NavItem(
@@ -183,7 +185,7 @@ class _NavItem extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: isActive ? AppTheme.primary : AppTheme.textSecondary,
-                  fontSize: 8,
+                  fontSize: 11,
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                 ),
               ),

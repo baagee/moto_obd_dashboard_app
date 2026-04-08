@@ -23,11 +23,11 @@ class _LogsScreenState extends State<LogsScreen>
   void _showClearConfirmDialog(BuildContext context, LogProvider provider) {
     CyberDialog.show(
       context: context,
-      title: 'Clear Logs',
+      title: '清空日志',
       icon: Icons.warning_amber_rounded,
       accentColor: AppTheme.accentOrange,
       content: const Text(
-        'Are you sure you want to clear all logs? This action cannot be undone.',
+        '确认清空所有日志？此操作无法撤销。',
         style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
       ),
       actions: [
@@ -89,7 +89,7 @@ class _LogsScreenState extends State<LogsScreen>
                         ),
                         SizedBox(height: 12),
                         Text(
-                          'No logs match the current filter',
+                          '当前筛选无匹配日志',
                           style: TextStyle(
                             color: AppTheme.textMuted,
                             fontSize: 12,

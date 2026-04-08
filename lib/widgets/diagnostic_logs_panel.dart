@@ -37,7 +37,7 @@ class DiagnosticLogsPanel extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'DIAGNOSTIC LOGS',
+                      '诊断日志',
                       style: TextStyle(
                         color: AppTheme.primary.withOpacity(0.6),
                         fontSize: 9,
@@ -52,7 +52,7 @@ class DiagnosticLogsPanel extends StatelessWidget {
                         minimumSize: Size.zero,
                       ),
                       child: const Text(
-                        'EXPORT',
+                        '导出',
                         style: TextStyle(
                           color: AppTheme.primary,
                           fontSize: 10,

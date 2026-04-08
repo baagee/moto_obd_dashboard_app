@@ -14,7 +14,8 @@ class BluetoothScanScreen extends StatefulWidget {
   State<BluetoothScanScreen> createState() => _BluetoothScanScreenState();
 }
 
-class _BluetoothScanScreenState extends State<BluetoothScanScreen> with AutomaticKeepAliveClientMixin {
+class _BluetoothScanScreenState extends State<BluetoothScanScreen>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -87,7 +88,7 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> with Automati
             Row(
               children: [
                 const Text(
-                  'Device Scanner',
+                  '设备扫描',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -98,7 +99,8 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> with Automati
                 const SizedBox(width: 8),
                 if (provider.isScanning)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppTheme.primary20,
                       borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
@@ -116,7 +118,7 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> with Automati
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'SCANNING',
+                          '扫描中',
                           style: AppTheme.labelTiny.copyWith(
                             color: AppTheme.primary,
                             letterSpacing: 1,
@@ -144,7 +146,7 @@ class _BluetoothScanScreenState extends State<BluetoothScanScreen> with Automati
             ),
             const SizedBox(height: 4),
             const Text(
-              'Detecting nearby Bluetooth OBD-II adapters',
+              '正在搜索附近的蓝牙 OBD-II 适配器',
               style: TextStyle(
                 fontSize: 10,
                 color: AppTheme.textSecondary,

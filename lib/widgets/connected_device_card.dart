@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/bluetooth_device.dart';
 import '../theme/app_theme.dart';
-import 'cyber_button.dart';
 
 /// 已连接设备详情卡片
 class ConnectedDeviceCard extends StatelessWidget {
@@ -76,7 +75,7 @@ class _ConnectedState extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Connected Device',
+                    '已连接设备',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -93,12 +92,13 @@ class _ConnectedState extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: AppTheme.accentGreen,
                           shape: BoxShape.circle,
-                          boxShadow: AppTheme.glowShadow(AppTheme.accentGreen, blur: 8),
+                          boxShadow: AppTheme.glowShadow(AppTheme.accentGreen,
+                              blur: 8),
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'SYNC ESTABLISHED',
+                        '已建立同步',
                         style: AppTheme.labelTinyPrimary.copyWith(
                           color: AppTheme.accentGreen,
                         ),
@@ -138,7 +138,8 @@ class _ConnectedState extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppTheme.primary20,
                     borderRadius: BorderRadius.circular(AppTheme.radiusButton),
-                    boxShadow: AppTheme.glowShadow(AppTheme.primary, blur: 15, opacity: 0.3),
+                    boxShadow: AppTheme.glowShadow(AppTheme.primary,
+                        blur: 15, opacity: 0.3),
                   ),
                   child: const Icon(
                     Icons.memory,
@@ -152,7 +153,7 @@ class _ConnectedState extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Model',
+                        '型号',
                         style: AppTheme.labelSmall.copyWith(
                           color: AppTheme.textMuted,
                         ),
@@ -179,7 +180,7 @@ class _ConnectedState extends StatelessWidget {
             children: [
               Expanded(
                 child: _InfoBox(
-                  label: 'MAC Address',
+                  label: 'MAC 地址',
                   value: device.macAddress,
                   isPrimary: true,
                 ),
@@ -187,7 +188,7 @@ class _ConnectedState extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _InfoBox(
-                  label: 'Protocol',
+                  label: '协议',
                   value: 'ISO 15765-4 CAN',
                   isPrimary: true,
                 ),
@@ -237,7 +238,7 @@ class _LastConnectedState extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Last Connected',
+                    '上次连接',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -247,7 +248,7 @@ class _LastConnectedState extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Tap to reconnect',
+                    '点击重新连接',
                     style: AppTheme.labelSmall.copyWith(
                       color: AppTheme.textMuted,
                     ),
@@ -310,7 +311,7 @@ class _LastConnectedState extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Model',
+                        '型号',
                         style: AppTheme.labelSmall.copyWith(
                           color: AppTheme.textMuted,
                         ),
@@ -334,7 +335,7 @@ class _LastConnectedState extends StatelessWidget {
 
           // MAC 地址
           _InfoBox(
-            label: 'MAC Address',
+            label: 'MAC 地址',
             value: device.macAddress,
             isPrimary: false,
           ),
@@ -369,14 +370,14 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'No Device Connected',
+            '未连接设备',
             style: AppTheme.titleMedium.copyWith(
               color: AppTheme.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Scan and connect to an OBD device',
+            '扫描并连接 OBD 设备',
             style: AppTheme.labelSmall.copyWith(
               color: AppTheme.textMuted,
             ),
@@ -415,7 +416,7 @@ class _InfoBox extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label.toUpperCase(),
+            label,
             style: AppTheme.labelSmall.copyWith(
               color: AppTheme.textMuted,
               letterSpacing: 1,
@@ -457,14 +458,14 @@ class _StabilityIndicator extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'CONNECTION STABILITY',
+                '连接稳定性',
                 style: AppTheme.labelSmall.copyWith(
                   color: AppTheme.textMuted,
                   letterSpacing: 1,
                 ),
               ),
               Text(
-                '${stability.toStringAsFixed(1)}% Reliable',
+                '稳定性 ${stability.toStringAsFixed(1)}%',
                 style: AppTheme.labelSmall.copyWith(
                   color: AppTheme.primary,
                   fontFamily: 'monospace',

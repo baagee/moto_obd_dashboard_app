@@ -42,11 +42,11 @@ class SwipeableRecordCard extends StatelessWidget {
   String get _intensityLabel {
     switch (_intensity) {
       case _RideIntensity.intense:
-        return 'INTENSE';
+        return '激烈';
       case _RideIntensity.moderate:
-        return 'ACTIVE';
+        return '活跃';
       case _RideIntensity.normal:
-        return 'CASUAL';
+        return '休闲';
     }
   }
 

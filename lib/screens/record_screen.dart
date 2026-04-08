@@ -234,7 +234,7 @@ class _RecordCompactHeader extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'RIDING RECORDS',
+                '骑行记录',
                 style: TextStyle(
                   color: AppTheme.primary60,
                   fontSize: 10,
@@ -244,7 +244,7 @@ class _RecordCompactHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Total: $totalCount records',
+                '共 $totalCount 条记录',
                 style: const TextStyle(color: AppTheme.textMuted, fontSize: 9),
               ),
             ],
@@ -413,7 +413,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           // 主标题
           Text(
-            'NO RIDING RECORDS',
+            '暂无骑行记录',
             style: TextStyle(
               color: AppTheme.primary70,
               fontSize: 12,
@@ -448,7 +448,7 @@ class _EmptyState extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                 ),
                 child: Text(
-                  'SIGNAL AWAITING',
+                  '等待信号',
                   style: TextStyle(
                     color: AppTheme.primary.withOpacity(0.35),
                     fontSize: 8,
