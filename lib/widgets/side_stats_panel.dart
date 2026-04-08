@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/obd_data_provider.dart';
@@ -355,11 +356,14 @@ class _PressureChart extends StatelessWidget {
   }
 }
 
-/// 气压图表绘制器
+/// 气压图表绘制器（柱状图，最近30个点，全直角矩形柱）
 class PressureChartPainter extends CustomPainter {
   final List<int> pressureHistory;
   final int minPressure;
   final int maxPressure;
+
+  static const int _maxBars = 30;
+  static const double _gap = 1.5;
 
   PressureChartPainter({
     required this.pressureHistory,
@@ -369,61 +373,57 @@ class PressureChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (pressureHistory.length < 2) return;
+    if (pressureHistory.isEmpty) return;
 
     final width = size.width;
     final height = size.height;
-    const padding = 2.0;
 
-    // 计算点位置
-    final points = <Offset>[];
-    final step = width / (pressureHistory.length - 1);
+    // 取最后 30 个点
+    final start = math.max(0, pressureHistory.length - _maxBars);
+    final data = pressureHistory.sublist(start);
+    final count = data.length;
 
-    for (int i = 0; i < pressureHistory.length; i++) {
-      final x = i * step;
-      final y = height -
-          padding -
-          ((pressureHistory[i] - minPressure) / (maxPressure - minPressure)) *
-              (height - 2 * padding);
-      points.add(Offset(x, y));
+    // 计算柱宽
+    final totalGap = _gap * (count - 1);
+    final barW = (width - totalGap) / count;
+    final range = (maxPressure - minPressure).toDouble();
+
+    // 底部基线
+    final baselinePaint = Paint()
+      ..color = AppTheme.primary30
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset(0, height), Offset(width, height), baselinePaint);
+
+    // 柱子渐变画笔（从顶部 primary 到底部 primary30）
+    final barPaint = Paint();
+
+    for (int i = 0; i < count; i++) {
+      final left = i * (barW + _gap);
+      final normalized = (data[i] - minPressure) / range;
+      final barH = normalized * height;
+      final top = height - barH;
+
+      final rect = Rect.fromLTWH(left, top, barW, barH);
+
+      // 最新一根柱子（最右侧）高亮发光
+      if (i == count - 1) {
+        final glowPaint = Paint()
+          ..color = AppTheme.primary.withOpacity(0.45)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+        canvas.drawRect(rect, glowPaint);
+        barPaint.color = AppTheme.primary;
+      } else {
+        barPaint.shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppTheme.primary, AppTheme.primary30],
+        ).createShader(rect);
+      }
+
+      canvas.drawRect(rect, barPaint);
+      barPaint.shader = null;
     }
-
-    // 绘制面积
-    final areaPath = Path();
-    areaPath.moveTo(points.first.dx, height);
-    areaPath.lineTo(points.first.dx, points.first.dy);
-
-    for (int i = 1; i < points.length; i++) {
-      areaPath.lineTo(points[i].dx, points[i].dy);
-    }
-
-    areaPath.lineTo(points.last.dx, height);
-    areaPath.close();
-
-    final areaPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [AppTheme.primary30, Colors.transparent],
-      ).createShader(Rect.fromLTWH(0, 0, width, height));
-
-    canvas.drawPath(areaPath, areaPaint);
-
-    // 绘制线条
-    final linePath = Path();
-    linePath.moveTo(points.first.dx, points.first.dy);
-
-    for (int i = 1; i < points.length; i++) {
-      linePath.lineTo(points[i].dx, points[i].dy);
-    }
-
-    final linePaint = Paint()
-      ..color = AppTheme.primary
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawPath(linePath, linePaint);
   }
 
   @override
