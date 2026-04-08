@@ -53,14 +53,14 @@ class AppTheme {
   static const double spacing24 = 24;
 
   // ========== 圆角常量 ==========
-  /// 卡片/面板圆角
-  static const double radiusCard = 12;
+  /// 卡片/面板圆角（硬核工业派：直角）
+  static const double radiusCard = 2;
 
   /// 按钮/内层容器圆角
-  static const double radiusButton = 8;
+  static const double radiusButton = 2;
 
   /// 小型元素圆角
-  static const double radiusSmall = 4;
+  static const double radiusSmall = 0;
 
   // ========== 预定义 TextStyle (const 优化) ==========
   /// 标签样式 - 小号 (fontSize: 9)
@@ -149,7 +149,6 @@ class AppTheme {
         color: borderColor.withValues(alpha: opacity),
         width: 1,
       ),
-      borderRadius: BorderRadius.circular(radiusCard),
     );
   }
 
@@ -162,7 +161,6 @@ class AppTheme {
       right: BorderSide(color: primary20, width: 1),
       bottom: BorderSide(color: primary20, width: 1),
     ),
-    borderRadius: BorderRadius.all(Radius.circular(radiusCard)),
   );
 
   // ========== 发光效果 ==========

@@ -78,7 +78,6 @@ class LocationAlertDialog extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(AppTheme.radiusCard),
           border: Border.all(
             color: AppTheme.primary.withValues(alpha: 0.5),
             width: 1,
@@ -101,7 +100,6 @@ class LocationAlertDialog extends StatelessWidget {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: AppTheme.accentCyan.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusButton),
                   ),
                   child: const Icon(
                     Icons.location_on_outlined,

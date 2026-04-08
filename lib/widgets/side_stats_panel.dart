@@ -115,7 +115,6 @@ class _TempCard extends StatelessWidget {
       padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,7 +156,6 @@ class _ProgressBar extends StatelessWidget {
       padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,7 +177,6 @@ class _ProgressBar extends StatelessWidget {
                 height: 10,
                 decoration: const BoxDecoration(
                   color: AppTheme.slateGray,
-                  borderRadius: BorderRadius.all(Radius.circular(3)),
                 ),
               ),
               FractionallySizedBox(
@@ -188,7 +185,6 @@ class _ProgressBar extends StatelessWidget {
                   height: 10,
                   decoration: BoxDecoration(
                     color: color,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                     boxShadow: [
                       BoxShadow(color: color, blurRadius: 8, spreadRadius: -2),
                     ],
@@ -222,7 +218,6 @@ class _LeanAngleIndicator extends StatelessWidget {
       padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -416,7 +411,6 @@ class _PressureChart extends StatelessWidget {
       padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,7 +531,6 @@ class _VoltageDisplay extends StatelessWidget {
       padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
         color: AppTheme.backgroundDark30,
-        borderRadius: BorderRadius.all(Radius.circular(AppTheme.radiusSmall)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

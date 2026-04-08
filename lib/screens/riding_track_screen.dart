@@ -693,10 +693,10 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
       decoration: BoxDecoration(
         color: AppTheme.backgroundDark.withOpacity(0.88),
-        // 只有左侧两个圆角，右侧贴边
+        // 只有左侧有边框，右侧贴边
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(AppTheme.radiusCard),
-          bottomLeft: Radius.circular(AppTheme.radiusCard),
+          topLeft: Radius.circular(2),
+          bottomLeft: Radius.circular(2),
         ),
         border: Border(
           top: BorderSide(color: AppTheme.primary20),

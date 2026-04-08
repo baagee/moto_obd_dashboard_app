@@ -131,10 +131,8 @@ class _CyberButtonState extends State<CyberButton> {
         color: _disabled
             ? AppTheme.primary.withValues(alpha: 0.25)
             : AppTheme.primary,
-        borderRadius: BorderRadius.circular(AppTheme.radiusButton),
-        boxShadow: _disabled
-            ? null
-            : AppTheme.glowShadow(AppTheme.primary, blur: 10),
+        boxShadow:
+            _disabled ? null : AppTheme.glowShadow(AppTheme.primary, blur: 10),
       ),
       child: _buildContent(
           _disabled ? AppTheme.primary.withValues(alpha: 0.4) : Colors.white),
@@ -146,7 +144,6 @@ class _CyberButtonState extends State<CyberButton> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(AppTheme.radiusButton),
         border: Border.all(
           color: AppTheme.primary.withValues(alpha: _disabled ? 0.2 : 0.8),
           width: 1,
@@ -162,7 +159,6 @@ class _CyberButtonState extends State<CyberButton> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: AppTheme.accentRed,
-        borderRadius: BorderRadius.circular(AppTheme.radiusButton),
         boxShadow: AppTheme.glowShadow(AppTheme.accentRed, blur: 10),
       ),
       child: _buildContent(Colors.white),
@@ -174,7 +170,6 @@ class _CyberButtonState extends State<CyberButton> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: AppTheme.accentGreen,
-        borderRadius: BorderRadius.circular(AppTheme.radiusButton),
         boxShadow: AppTheme.glowShadow(AppTheme.accentGreen, blur: 10),
       ),
       child: _buildContent(Colors.white),

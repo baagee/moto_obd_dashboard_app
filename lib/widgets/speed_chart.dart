@@ -398,7 +398,7 @@ class _SpeedChartState extends State<SpeedChart> {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: AppTheme.backgroundDark.withOpacity(0.88),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(0),
           border: Border.all(color: AppTheme.primary20.withOpacity(0.5)),
         ),
         child: Row(

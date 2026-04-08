@@ -42,7 +42,6 @@ class CyberToast {
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
             side: BorderSide(color: color.withValues(alpha: 0.4)),
           ),
           content: Row(
