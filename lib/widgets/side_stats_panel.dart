@@ -270,7 +270,12 @@ class _LeanAngleRulerPainter extends CustomPainter {
   static const double _maxAngle = 60.0;
   static const double _fadeWidth = 18.0; // 边缘渐隐宽度
 
-  const _LeanAngleRulerPainter({required this.signedAngle});
+  // 渐隐遮罩 Paint 缓存（shader 依赖 size，首次或 size 变化时重建）
+  Size? _cachedSize;
+  Paint? _fadeLeftPaint;
+  Paint? _fadeRightPaint;
+
+  _LeanAngleRulerPainter({required this.signedAngle});
 
   Color get _activeColor {
     final abs = signedAngle.abs();
@@ -354,18 +359,22 @@ class _LeanAngleRulerPainter extends CustomPainter {
       );
     }
 
-    // 左右边缘渐隐遮罩
-    final bgColor = AppTheme.backgroundDark30;
-    final fadeLeft = Paint()
-      ..shader = LinearGradient(
-        colors: [bgColor, bgColor.withOpacity(0)],
-      ).createShader(Rect.fromLTWH(0, 0, _fadeWidth, h));
-    final fadeRight = Paint()
-      ..shader = LinearGradient(
-        colors: [bgColor.withOpacity(0), bgColor],
-      ).createShader(Rect.fromLTWH(w - _fadeWidth, 0, _fadeWidth, h));
-    canvas.drawRect(Rect.fromLTWH(0, 0, _fadeWidth, h), fadeLeft);
-    canvas.drawRect(Rect.fromLTWH(w - _fadeWidth, 0, _fadeWidth, h), fadeRight);
+    // 左右边缘渐隐遮罩（缓存 shader，size 不变时直接复用）
+    if (size != _cachedSize) {
+      _cachedSize = size;
+      const bgColor = AppTheme.backgroundDark30;
+      _fadeLeftPaint = Paint()
+        ..shader = const LinearGradient(
+          colors: [bgColor, Color(0x00000000)],
+        ).createShader(Rect.fromLTWH(0, 0, _fadeWidth, h));
+      _fadeRightPaint = Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0x00000000), bgColor],
+        ).createShader(Rect.fromLTWH(w - _fadeWidth, 0, _fadeWidth, h));
+    }
+    canvas.drawRect(Rect.fromLTWH(0, 0, _fadeWidth, h), _fadeLeftPaint!);
+    canvas.drawRect(
+        Rect.fromLTWH(w - _fadeWidth, 0, _fadeWidth, h), _fadeRightPaint!);
 
     // 中央固定指针（倒三角 ▼）
     const pointerW = 8.0;
@@ -478,34 +487,34 @@ class PressureChartPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
     canvas.drawLine(Offset(0, height), Offset(width, height), baselinePaint);
 
-    // 柱子渐变画笔（从顶部 primary 到底部 primary30）
-    final barPaint = Paint();
+    // 柱子渐变画笔：共享一个覆盖整个画布高度的 shader，避免逐柱重建
+    // 竖向渐变从 Y=0（primary）到 Y=height（primary30），所有普通柱子共用
+    final sharedShader = const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [AppTheme.primary, AppTheme.primary30],
+    ).createShader(Rect.fromLTWH(0, 0, 1, height));
+
+    final barPaint = Paint()..shader = sharedShader;
+    final lastBarPaint = Paint()..color = AppTheme.primary;
+    final glowPaint = Paint()
+      ..color = const Color(0x72006EAF) // AppTheme.primary.withOpacity(0.45) 预算
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
 
     for (int i = 0; i < count; i++) {
       final left = i * (barW + _gap);
       final normalized = (data[i] - minPressure) / range;
       final barH = normalized * height;
       final top = height - barH;
-
       final rect = Rect.fromLTWH(left, top, barW, barH);
 
       // 最新一根柱子（最右侧）高亮发光
       if (i == count - 1) {
-        final glowPaint = Paint()
-          ..color = AppTheme.primary.withOpacity(0.45)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
         canvas.drawRect(rect, glowPaint);
-        barPaint.color = AppTheme.primary;
+        canvas.drawRect(rect, lastBarPaint);
       } else {
-        barPaint.shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppTheme.primary, AppTheme.primary30],
-        ).createShader(rect);
+        canvas.drawRect(rect, barPaint);
       }
-
-      canvas.drawRect(rect, barPaint);
-      barPaint.shader = null;
     }
   }
 
