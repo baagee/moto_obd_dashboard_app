@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/obd_data_provider.dart';
@@ -214,6 +215,9 @@ class _LeanAngleIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 将倾角转为带符号的度数：左倾为负，右倾为正
+    final signedAngle = angle == 0 ? 0 : (direction == 'LEFT' ? -angle : angle);
+
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: const BoxDecoration(
@@ -243,69 +247,148 @@ class _LeanAngleIndicator extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              // 计算指示器位置：50%为中间，最大60度，角度为0时居中
-              final leanPercent = angle == 0
-                  ? 50
-                  : 50 + (direction == 'LEFT' ? -angle : angle) * (50 / 60);
-              return Stack(
-                children: [
-                  // 背景条
-                  Container(
-                    height: 12,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF1E293B),
-                      borderRadius: BorderRadius.all(
-                          Radius.circular(AppTheme.radiusSmall)),
-                    ),
-                  ),
-                  // 中心线
-                  Positioned(
-                    left: constraints.maxWidth / 2 - 0.5,
-                    top: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 1,
-                      color: AppTheme.primary30,
-                    ),
-                  ),
-                  // 指示器
-                  Positioned(
-                    left: (leanPercent / 100) * constraints.maxWidth - 2,
-                    top: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 4,
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentCyan,
-                        borderRadius: BorderRadius.circular(2),
-                        boxShadow: [
-                          BoxShadow(color: AppTheme.accentCyan, blurRadius: 6),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 6),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('左60°',
-                  style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
-              Text('0°',
-                  style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
-              Text('右60°',
-                  style: TextStyle(color: AppTheme.textMuted, fontSize: 8)),
-            ],
+          // 滚动刻度尺
+          RepaintBoundary(
+            child: SizedBox(
+              height: 30,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _LeanAngleRulerPainter(signedAngle: signedAngle),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+/// 滚动刻度尺 Painter
+class _LeanAngleRulerPainter extends CustomPainter {
+  final int signedAngle; // 负=左倾，正=右倾，范围 -60~+60
+
+  static const double _maxAngle = 60.0;
+  static const double _fadeWidth = 18.0; // 边缘渐隐宽度
+
+  const _LeanAngleRulerPainter({required this.signedAngle});
+
+  Color get _activeColor {
+    final abs = signedAngle.abs();
+    if (abs >= 45) return Colors.red;
+    if (abs >= 30) return AppTheme.accentOrange;
+    return AppTheme.primary;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    // 每1度对应的像素
+    final pixPerDeg = (w / 2) / _maxAngle;
+    // 刻度尺整体向左偏移量（右倾时刻度左移，左倾时右移）
+    final offset = -signedAngle * pixPerDeg;
+    final center = w / 2;
+
+    final mutedPaint = Paint()
+      ..color = AppTheme.textMuted
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    final activePaint = Paint()
+      ..color = _activeColor
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    // 背景底线
+    canvas.drawLine(
+      Offset(0, h - 1),
+      Offset(w, h - 1),
+      Paint()
+        ..color = AppTheme.primary30
+        ..strokeWidth = 1.0,
+    );
+
+    // 绘制刻度线和标签（-70 到 +70 范围，超出画布的自动跳过）
+    final textStyle = ui.TextStyle(
+      color: AppTheme.textMuted,
+      fontSize: 9,
+    );
+
+    for (int deg = -70; deg <= 70; deg += 10) {
+      final x = center + offset + deg * pixPerDeg;
+      if (x < -10 || x > w + 10) continue;
+
+      final isMajor = deg % 30 == 0;
+      final isZero = deg == 0;
+      final lineH = isZero ? 18.0 : (isMajor ? 14.0 : 9.0);
+      final paint = (isZero || isMajor) ? activePaint : mutedPaint;
+
+      canvas.drawLine(Offset(x, 0), Offset(x, lineH), paint);
+
+      // 主刻度标签
+      if (isMajor) {
+        final label = deg == 0 ? '0°' : '${deg.abs()}°';
+        final pb = ui.ParagraphBuilder(ui.ParagraphStyle(
+          textAlign: TextAlign.center,
+          fontSize: 9,
+        ))
+          ..pushStyle(textStyle)
+          ..addText(label);
+        final paragraph = pb.build()
+          ..layout(const ui.ParagraphConstraints(width: 28));
+        canvas.drawParagraph(paragraph, Offset(x - 14, lineH + 1));
+      }
+    }
+
+    // 激活区域高亮底线（从0到当前角度）
+    if (signedAngle != 0) {
+      final zeroX = center + offset;
+      final currentX = center + offset + signedAngle * pixPerDeg;
+      final highlightPaint = Paint()
+        ..color = _activeColor.withOpacity(0.5)
+        ..strokeWidth = 2.0;
+      canvas.drawLine(
+        Offset(zeroX.clamp(0.0, w), h - 1),
+        Offset(currentX.clamp(0.0, w), h - 1),
+        highlightPaint,
+      );
+    }
+
+    // 左右边缘渐隐遮罩
+    final bgColor = AppTheme.backgroundDark30;
+    final fadeLeft = Paint()
+      ..shader = LinearGradient(
+        colors: [bgColor, bgColor.withOpacity(0)],
+      ).createShader(Rect.fromLTWH(0, 0, _fadeWidth, h));
+    final fadeRight = Paint()
+      ..shader = LinearGradient(
+        colors: [bgColor.withOpacity(0), bgColor],
+      ).createShader(Rect.fromLTWH(w - _fadeWidth, 0, _fadeWidth, h));
+    canvas.drawRect(Rect.fromLTWH(0, 0, _fadeWidth, h), fadeLeft);
+    canvas.drawRect(Rect.fromLTWH(w - _fadeWidth, 0, _fadeWidth, h), fadeRight);
+
+    // 中央固定指针（倒三角 ▼）
+    const pointerW = 8.0;
+    const pointerH = 6.0;
+    final pointerColor = _activeColor;
+    final pointerPaint = Paint()
+      ..color = pointerColor
+      ..style = PaintingStyle.fill;
+    final glowPaint = Paint()
+      ..color = pointerColor.withOpacity(0.5)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+    final path = Path()
+      ..moveTo(center - pointerW / 2, 0)
+      ..lineTo(center + pointerW / 2, 0)
+      ..lineTo(center, pointerH)
+      ..close();
+    canvas.drawPath(path, glowPaint);
+    canvas.drawPath(path, pointerPaint);
+  }
+
+  @override
+  bool shouldRepaint(_LeanAngleRulerPainter old) =>
+      old.signedAngle != signedAngle;
 }
 
 /// 气压趋势图
