@@ -163,17 +163,17 @@ class _CompactHeader extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'DIAGNOSTIC LOGS',
+                '运行日志',
                 style: TextStyle(
-                  color: AppTheme.primary.withOpacity(0.6),
-                  fontSize: 10,
+                  color: AppTheme.primary60,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                'Total: ${counts[LogFilterType.all]} entries',
+                '共: ${counts[LogFilterType.all]} 条日志',
                 style: const TextStyle(
                   color: AppTheme.textMuted,
                   fontSize: 9,

@@ -237,7 +237,7 @@ class _RecordCompactHeader extends StatelessWidget {
                 '骑行记录',
                 style: TextStyle(
                   color: AppTheme.primary60,
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
                 ),

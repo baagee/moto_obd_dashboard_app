@@ -124,7 +124,7 @@ class TopNavigationBar extends StatelessWidget {
                       : (isConnected ? '已连接' : '连接车辆'),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 9,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1,
                   ),

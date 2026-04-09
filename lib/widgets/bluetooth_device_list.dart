@@ -297,13 +297,13 @@ class _DeviceListItem extends StatelessWidget {
                       text: '已连接',
                       onPressed: null,
                       height: 32,
-                      fontSize: 10,
+                      fontSize: 12,
                     )
                   : CyberButton.primary(
                       text: '连接',
                       onPressed: onConnect,
                       height: 32,
-                      fontSize: 10,
+                      fontSize: 11,
                     ),
             ),
         ],
