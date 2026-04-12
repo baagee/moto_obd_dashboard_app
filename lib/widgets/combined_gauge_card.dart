@@ -164,116 +164,174 @@ class CombinedGaugePainter extends CustomPainter {
   }
 
   void _drawTickBackground(Canvas canvas, Offset center, double radius) {
-    final paint = Paint()
+    // 上半圆：60 个暗格背景（与分节刻度条对齐）
+    const totalSegments = 60;
+    const totalAngle = pi;
+    const fillRatio = 0.65;
+    final segAngle = totalAngle / totalSegments;
+    final segFill = segAngle * fillRatio;
+    final segGap = segAngle * (1 - fillRatio);
+
+    final bgPaint = Paint()
+      ..color = AppTheme.slateGray.withValues(alpha: 0.35)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 27
+      ..strokeCap = StrokeCap.butt;
+
+    for (int i = 0; i < totalSegments; i++) {
+      final startAngle = pi + i * segAngle + segGap / 2;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        segFill,
+        false,
+        bgPaint,
+      );
+    }
+
+    // 下半圆：保持连续背景弧
+    final speedBgPaint = Paint()
       ..color = AppTheme.slateGray
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 27 // 加粗0.5倍 (18 * 1.5)
-      ..strokeCap = StrokeCap.round;
+      ..strokeWidth = 27
+      ..strokeCap = StrokeCap.butt;
 
-    // 上半圆背景
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      pi,
-      pi,
-      false,
-      paint,
-    );
-
-    // 下半圆背景
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       0,
       pi,
       false,
-      paint,
+      speedBgPaint,
     );
   }
 
   void _drawRPMProgress(Canvas canvas, Offset center, double radius) {
-    final sweepAngle = _rpmToAngle(rpm.toDouble());
+    // 分节刻度条：60 格，覆盖上半圆 180°
+    const totalSegments = 60;
+    const totalAngle = pi;
+    const fillRatio = 0.65;
+    final segAngle = totalAngle / totalSegments;
+    final segFill = segAngle * fillRatio;
+    final segGap = segAngle * (1 - fillRatio);
 
-    // 阶段颜色 - 青色(正常) → 橙色(警告) → 红色(危险)
-    Color color;
-    if (rpm <= warnRpm) {
-      color = AppTheme.primary; // 蓝色 - 正常
-    } else if (rpm <= dangerRpm) {
-      color = AppTheme.accentOrange; // 橙色 - 警告
-    } else {
-      color = AppTheme.accentRed; // 红色 - 危险
+    final currentSweep = _rpmToAngle(rpm.toDouble());
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    for (int i = 0; i < totalSegments; i++) {
+      final segMidSweep = (i + 0.5) * segAngle; // 该格中点对应的角度
+      final isActive = segMidSweep <= currentSweep;
+
+      if (!isActive) continue; // 暗格已在 _drawTickBackground 中绘制
+
+      // 根据该格对应的 RPM 值确定颜色
+      // 使用逆映射：由角度比例还原近似 RPM
+      final segMidRpm = _angleToApproxRpm(segMidSweep);
+      final Color segColor;
+      if (segMidRpm <= warnRpm) {
+        segColor = AppTheme.primary;
+      } else if (segMidRpm <= dangerRpm) {
+        segColor = AppTheme.accentOrange;
+      } else {
+        segColor = AppTheme.accentRed;
+      }
+
+      final startAngle = pi + i * segAngle + segGap / 2;
+
+      // 发光层（先画，在底部）
+      canvas.drawArc(
+        rect,
+        startAngle,
+        segFill,
+        false,
+        Paint()
+          ..color = segColor.withValues(alpha: 0.35)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 40
+          ..strokeCap = StrokeCap.butt
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+      );
+
+      // 实体格
+      canvas.drawArc(
+        rect,
+        startAngle,
+        segFill,
+        false,
+        Paint()
+          ..color = segColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 27
+          ..strokeCap = StrokeCap.butt,
+      );
     }
+  }
 
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 27 // 加粗0.5倍 (18 * 1.5)
-      ..strokeCap = StrokeCap.butt; // 平头样式，避免与对向弧冲突
+  /// 将角度（从 _rpmToAngle 映射空间）近似还原为 RPM 值，用于刻度格着色
+  double _angleToApproxRpm(double angle) {
+    const double normalMax = 4000;
+    const double normalRatio = 0.20;
+    final double normalEndAngle = normalRatio * pi;
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      pi,
-      sweepAngle, // 顺时针，经过上方
-      false,
-      paint,
-    );
-
-    // 发光效果
-    final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 36 // 加粗0.5倍 (24 * 1.5)
-      ..strokeCap = StrokeCap.butt // 平头样式
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      pi,
-      sweepAngle, // 顺时针，经过上方
-      false,
-      glowPaint,
-    );
+    if (angle <= normalEndAngle) {
+      return (angle / normalEndAngle) * normalMax;
+    } else {
+      return normalMax +
+          ((angle - normalEndAngle) / ((1 - normalRatio) * pi)) *
+              (maxRpm - normalMax);
+    }
   }
 
   void _drawSpeedProgress(Canvas canvas, Offset center, double radius) {
     final sweepAngle = _speedToAngle(speed.toDouble());
+    if (sweepAngle <= 0) return;
 
-    // 阶段颜色 - 青色(正常) → 紫色(警告) → 红色(危险)
-    Color color;
+    // 末端颜色（当前速度阶段）
+    Color endColor;
     if (speed <= warnSpeed) {
-      color = AppTheme.accentCyan; // 青色 - 正常
+      endColor = AppTheme.accentCyan;
     } else if (speed <= dangerSpeed) {
-      color = AppTheme.accentPurple; // 紫色 - 警告
+      endColor = AppTheme.accentPurple;
     } else {
-      color = AppTheme.accentRed; // 红色 - 危险
+      endColor = AppTheme.accentRed;
     }
 
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 27 // 加粗0.5倍 (18 * 1.5)
-      ..strokeCap = StrokeCap.butt; // 平头样式，避免与对向弧冲突
+    // 将弧分成若干小段，每段插值透明度，实现低速区浅、高速区亮的渐变
+    const segments = 60;
+    final segSweep = sweepAngle / segments;
+    final rect = Rect.fromCircle(center: center, radius: radius);
 
+    for (int i = 0; i < segments; i++) {
+      // t: 0.0 = 起点（低速/浅），1.0 = 末端（高速/亮）
+      final t = i / (segments - 1);
+      final alpha = 0.15 + 0.85 * t;
+      // 速度弧逆时针：第 0 段在 π 附近（低速起点），最后一段在 π-sweepAngle 附近（当前速度末端）
+      final segStart = pi - (i + 1) * segSweep;
+      canvas.drawArc(
+        rect,
+        segStart,
+        segSweep,
+        false,
+        Paint()
+          ..color = endColor.withValues(alpha: alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 27
+          ..strokeCap = StrokeCap.butt,
+      );
+    }
+
+    // 发光层：仅末端 1/4 弧
+    final glowSweep = sweepAngle * 0.25;
     canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      pi,
-      -sweepAngle, // 逆时针
+      rect,
+      pi - sweepAngle,
+      glowSweep,
       false,
-      paint,
-    );
-
-    // 发光效果
-    final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 36 // 加粗0.5倍 (24 * 1.5)
-      ..strokeCap = StrokeCap.butt // 平头样式
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      pi,
-      -sweepAngle, // 逆时针
-      false,
-      glowPaint,
+      Paint()
+        ..color = endColor.withValues(alpha: 0.38)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 40
+        ..strokeCap = StrokeCap.butt
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
     );
   }
 
@@ -341,8 +399,7 @@ class CombinedGaugePainter extends CustomPainter {
     );
 
     // 实体刀片（渐变：根部→尖端高亮）
-    final bladeRect =
-        Rect.fromPoints(Offset(rootX, rootY), Offset(tipX, tipY));
+    final bladeRect = Rect.fromPoints(Offset(rootX, rootY), Offset(tipX, tipY));
     canvas.drawPath(
       bladePath,
       Paint()
@@ -435,8 +492,7 @@ class CombinedGaugePainter extends CustomPainter {
     );
 
     // 实体刀片（渐变）
-    final bladeRect =
-        Rect.fromPoints(Offset(rootX, rootY), Offset(tipX, tipY));
+    final bladeRect = Rect.fromPoints(Offset(rootX, rootY), Offset(tipX, tipY));
     canvas.drawPath(
       bladePath,
       Paint()
