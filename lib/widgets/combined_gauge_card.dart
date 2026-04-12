@@ -135,6 +135,7 @@ class CombinedGaugePainter extends CustomPainter {
     // 绘制指针
     _drawRPMPointer(canvas, center, radius);
     _drawSpeedPointer(canvas, center, radius);
+    _drawCenterHub(canvas, center, radius);
 
     // 绘制刻度线
     _drawTicks(canvas, center, radius);
@@ -279,127 +280,226 @@ class CombinedGaugePainter extends CustomPainter {
   void _drawRPMPointer(Canvas canvas, Offset center, double radius) {
     if (rpm <= 0) return;
 
-    // 固定颜色 - 橙色，与数字蓝色区分
-    const color = AppTheme.accentOrange;
+    // 动态颜色：跟随 RPM 区间变化
+    Color color;
+    if (rpm <= warnRpm) {
+      color = AppTheme.primary;
+    } else if (rpm <= dangerRpm) {
+      color = AppTheme.accentOrange;
+    } else {
+      color = AppTheme.accentRed;
+    }
 
-    // 使用非线性映射计算角度
     final sweepAngle = _rpmToAngle(rpm.toDouble());
     final angle = pi + sweepAngle;
-    final pointerLength = radius - 35;
-    final headRadius = radius * 0.06; // 水滴头部半径
+    final pointerLength = radius - 30;
+    const halfWidth = 3.5;
 
-    // 指针尖端坐标
+    // 指针尖端（贴近弧面）
     final tipX = center.dx + pointerLength * cos(angle);
     final tipY = center.dy + pointerLength * sin(angle);
 
-    // 绘制指针发光效果
-    final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.5)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    // 指针根部（从圆心略微后退）
+    final rootDist = radius * 0.10;
+    final rootX = center.dx - rootDist * cos(angle);
+    final rootY = center.dy - rootDist * sin(angle);
 
-    // 绘制水滴形状指针
-    final pointerPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
+    // 刀片最宽处（距圆心约 30%）
+    final perpAngle = angle + pi / 2;
+    final midDist = radius * 0.30;
+    final midX = center.dx + midDist * cos(angle);
+    final midY = center.dy + midDist * sin(angle);
+    final leftX = midX + halfWidth * cos(perpAngle);
+    final leftY = midY + halfWidth * sin(perpAngle);
+    final rightX = midX - halfWidth * cos(perpAngle);
+    final rightY = midY - halfWidth * sin(perpAngle);
 
-    // 水滴形状：从尖端到圆心处的圆润头部
-    final pointerPath = Path()
-      // 从尖端开始
+    // 刀片路径：菱形（尖端→左宽→根部→右宽）
+    final bladePath = Path()
       ..moveTo(tipX, tipY)
-      // 左侧曲线延伸到头部
-      ..quadraticBezierTo(
-        center.dx + headRadius * cos(angle - pi / 2) * 0.5,
-        center.dy + headRadius * sin(angle - pi / 2) * 0.5,
-        center.dx + headRadius * cos(angle - pi / 2),
-        center.dy + headRadius * sin(angle - pi / 2),
-      )
-      // 头部半圆
-      ..arcToPoint(
-        Offset(
-          center.dx + headRadius * cos(angle + pi / 2),
-          center.dy + headRadius * sin(angle + pi / 2),
-        ),
-        radius: Radius.circular(headRadius),
-        clockwise: true,
-      )
-      // 右侧曲线延伸到尖端
-      ..quadraticBezierTo(
-        center.dx + headRadius * cos(angle + pi / 2) * 0.5,
-        center.dy + headRadius * sin(angle + pi / 2) * 0.5,
-        tipX,
-        tipY,
-      )
+      ..lineTo(leftX, leftY)
+      ..lineTo(rootX, rootY)
+      ..lineTo(rightX, rightY)
       ..close();
 
-    canvas.drawPath(pointerPath, glowPaint);
-    canvas.drawPath(pointerPath, pointerPaint);
+    // 外层大光晕
+    canvas.drawPath(
+      bladePath,
+      Paint()
+        ..color = color.withValues(alpha: 0.20)
+        ..style = PaintingStyle.fill
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
+    );
 
-    // 绘制指针中心亮点
-    final dotPaint = Paint()..color = Colors.white.withValues(alpha: 0.8);
-    canvas.drawCircle(center, headRadius * 0.5, dotPaint);
+    // 中层光晕
+    canvas.drawPath(
+      bladePath,
+      Paint()
+        ..color = color.withValues(alpha: 0.45)
+        ..style = PaintingStyle.fill
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
+
+    // 实体刀片（渐变：根部→尖端高亮）
+    final bladeRect =
+        Rect.fromPoints(Offset(rootX, rootY), Offset(tipX, tipY));
+    canvas.drawPath(
+      bladePath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            color.withValues(alpha: 0.55),
+            Colors.white.withValues(alpha: 0.92),
+          ],
+        ).createShader(bladeRect)
+        ..style = PaintingStyle.fill,
+    );
+
+    // 尖端高亮发光点
+    canvas.drawCircle(
+      Offset(tipX, tipY),
+      2.8,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.85)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+    canvas.drawCircle(
+      Offset(tipX, tipY),
+      1.4,
+      Paint()..color = Colors.white,
+    );
   }
 
   void _drawSpeedPointer(Canvas canvas, Offset center, double radius) {
     if (speed <= 0) return;
 
-    // 固定颜色 - 品红色，与数字青色区分
-    const color = AppTheme.accentPink;
+    // 动态颜色：跟随速度区间变化
+    Color color;
+    if (speed <= warnSpeed) {
+      color = AppTheme.accentCyan;
+    } else if (speed <= dangerSpeed) {
+      color = AppTheme.accentPurple;
+    } else {
+      color = AppTheme.accentRed;
+    }
 
-    // 使用非线性映射计算角度（逆时针）
     final sweepAngle = _speedToAngle(speed.toDouble());
     final angle = pi - sweepAngle;
-    final pointerLength = radius - 35;
-    final headRadius = radius * 0.06; // 水滴头部半径
+    final pointerLength = radius - 30;
+    const halfWidth = 3.5;
 
-    // 指针尖端坐标
+    // 指针尖端
     final tipX = center.dx + pointerLength * cos(angle);
     final tipY = center.dy + pointerLength * sin(angle);
 
-    // 绘制指针发光效果
-    final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.5)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    // 指针根部
+    final rootDist = radius * 0.10;
+    final rootX = center.dx - rootDist * cos(angle);
+    final rootY = center.dy - rootDist * sin(angle);
 
-    // 绘制水滴形状指针
-    final pointerPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
+    // 刀片最宽处
+    final perpAngle = angle + pi / 2;
+    final midDist = radius * 0.30;
+    final midX = center.dx + midDist * cos(angle);
+    final midY = center.dy + midDist * sin(angle);
+    final leftX = midX + halfWidth * cos(perpAngle);
+    final leftY = midY + halfWidth * sin(perpAngle);
+    final rightX = midX - halfWidth * cos(perpAngle);
+    final rightY = midY - halfWidth * sin(perpAngle);
 
-    // 水滴形状：从尖端到圆心处的圆润头部
-    final pointerPath = Path()
-      // 从尖端开始
+    final bladePath = Path()
       ..moveTo(tipX, tipY)
-      // 左侧曲线延伸到头部
-      ..quadraticBezierTo(
-        center.dx + headRadius * cos(angle - pi / 2) * 0.5,
-        center.dy + headRadius * sin(angle - pi / 2) * 0.5,
-        center.dx + headRadius * cos(angle - pi / 2),
-        center.dy + headRadius * sin(angle - pi / 2),
-      )
-      // 头部半圆
-      ..arcToPoint(
-        Offset(
-          center.dx + headRadius * cos(angle + pi / 2),
-          center.dy + headRadius * sin(angle + pi / 2),
-        ),
-        radius: Radius.circular(headRadius),
-        clockwise: true,
-      )
-      // 右侧曲线延伸到尖端
-      ..quadraticBezierTo(
-        center.dx + headRadius * cos(angle + pi / 2) * 0.5,
-        center.dy + headRadius * sin(angle + pi / 2) * 0.5,
-        tipX,
-        tipY,
-      )
+      ..lineTo(leftX, leftY)
+      ..lineTo(rootX, rootY)
+      ..lineTo(rightX, rightY)
       ..close();
 
-    canvas.drawPath(pointerPath, glowPaint);
-    canvas.drawPath(pointerPath, pointerPaint);
+    // 外层大光晕
+    canvas.drawPath(
+      bladePath,
+      Paint()
+        ..color = color.withValues(alpha: 0.20)
+        ..style = PaintingStyle.fill
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
+    );
 
-    // 绘制指针中心亮点
-    final dotPaint = Paint()..color = Colors.white.withValues(alpha: 0.8);
-    canvas.drawCircle(center, headRadius * 0.5, dotPaint);
+    // 中层光晕
+    canvas.drawPath(
+      bladePath,
+      Paint()
+        ..color = color.withValues(alpha: 0.45)
+        ..style = PaintingStyle.fill
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
+
+    // 实体刀片（渐变）
+    final bladeRect =
+        Rect.fromPoints(Offset(rootX, rootY), Offset(tipX, tipY));
+    canvas.drawPath(
+      bladePath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            color.withValues(alpha: 0.55),
+            Colors.white.withValues(alpha: 0.92),
+          ],
+        ).createShader(bladeRect)
+        ..style = PaintingStyle.fill,
+    );
+
+    // 尖端高亮发光点
+    canvas.drawCircle(
+      Offset(tipX, tipY),
+      2.8,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.85)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+    canvas.drawCircle(
+      Offset(tipX, tipY),
+      1.4,
+      Paint()..color = Colors.white,
+    );
+  }
+
+  /// 分层发光金属轮毂（统一替代两个指针末尾的中心白点）
+  void _drawCenterHub(Canvas canvas, Offset center, double radius) {
+    final hubR = radius * 0.065;
+
+    // 最外层散射光晕
+    canvas.drawCircle(
+      center,
+      hubR * 2.8,
+      Paint()
+        ..color = AppTheme.primary.withValues(alpha: 0.12)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+    );
+
+    // 金属质感径向渐变圆盘
+    canvas.drawCircle(
+      center,
+      hubR,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.95),
+            AppTheme.primary.withValues(alpha: 0.7),
+            AppTheme.backgroundDark,
+          ],
+          stops: const [0.0, 0.45, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: hubR)),
+    );
+
+    // 顶层高光小点（偏左上，营造金属反光感）
+    canvas.drawCircle(
+      center.translate(-hubR * 0.22, -hubR * 0.22),
+      hubR * 0.22,
+      Paint()..color = Colors.white.withValues(alpha: 0.75),
+    );
   }
 
   void _drawTicks(Canvas canvas, Offset center, double radius) {

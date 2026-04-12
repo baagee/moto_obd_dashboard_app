@@ -2,37 +2,35 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/obd_data_provider.dart';
-import '../providers/settings_provider.dart';
 import '../theme/app_theme.dart';
 
 /// 实时遥测图表卡片
 class TelemetryChartCard extends StatelessWidget {
   const TelemetryChartCard({super.key});
 
-  /// 将 maxRpm 均分为 4 段，从上到下生成 5 个刻度标签
-  static List<String> _buildRpmLabels(int maxRpm) {
+  /// 根据动态范围生成 5 个刻度标签（从上到下）
+  static List<String> _buildDynamicRpmLabels(double displayMin, double displayMax) {
     return List.generate(5, (i) {
-      final value = maxRpm * (4 - i) ~/ 4;
-      return value == 0
-          ? '0'
-          : '${(value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1)}k';
+      final value = displayMax - (displayMax - displayMin) * i / 4;
+      if (value >= 1000) {
+        final k = value / 1000;
+        return k == k.truncateToDouble()
+            ? '${k.toInt()}k'
+            : '${k.toStringAsFixed(1)}k';
+      }
+      return value.toInt().toString();
     });
   }
 
-  /// 将 maxSpeed 均分为 4 段，从上到下生成 5 个刻度标签
-  static List<String> _buildSpeedLabels(int maxSpeed) {
+  static List<String> _buildDynamicSpeedLabels(double displayMin, double displayMax) {
     return List.generate(5, (i) {
-      final value = maxSpeed * (4 - i) ~/ 4;
-      return value.toString();
+      final value = displayMax - (displayMax - displayMin) * i / 4;
+      return value.toInt().toString();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // 精确订阅量程字段，仅在量程变化时重建
-    final maxRpm = context.select<SettingsProvider, int>((s) => s.maxRpm);
-    final maxSpeed = context.select<SettingsProvider, int>((s) => s.maxSpeed);
-
     // 静态标题行和图例提到 Consumer 外，不随数据更新重建
     final header = Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -64,10 +62,20 @@ class TelemetryChartCard extends StatelessWidget {
           Expanded(
             child: Consumer<OBDDataProvider>(
               builder: (context, provider, _) {
+                // 动态计算显示范围
+                final rpmRange = TelemetryChartPainter.calcDisplayRange(
+                  provider.rpmHistory,
+                  minGap: 500,
+                );
+                final speedRange = TelemetryChartPainter.calcDisplayRange(
+                  provider.velocityHistory,
+                  minGap: 15,
+                );
+
                 return Row(
                   children: [
                     _YAxisLabels(
-                      labels: _buildRpmLabels(maxRpm),
+                      labels: _buildDynamicRpmLabels(rpmRange.min, rpmRange.max),
                       color: AppTheme.primary,
                       isLeft: true,
                     ),
@@ -76,12 +84,14 @@ class TelemetryChartCard extends StatelessWidget {
                       child: _ChartArea(
                         rpmHistory: provider.rpmHistory,
                         velocityHistory: provider.velocityHistory,
-                        maxRpm: maxRpm,
-                        maxSpeed: maxSpeed,
+                        rpmDisplayMin: rpmRange.min,
+                        rpmDisplayMax: rpmRange.max,
+                        speedDisplayMin: speedRange.min,
+                        speedDisplayMax: speedRange.max,
                       ),
                     ),
                     _YAxisLabels(
-                      labels: _buildSpeedLabels(maxSpeed),
+                      labels: _buildDynamicSpeedLabels(speedRange.min, speedRange.max),
                       color: AppTheme.accentCyan,
                       isLeft: false,
                     ),
@@ -154,15 +164,18 @@ class _YAxisLabels extends StatelessWidget {
 class _ChartArea extends StatelessWidget {
   final List<int> rpmHistory;
   final List<int> velocityHistory;
-  final int maxRpm;
-  final int maxSpeed;
+  final double rpmDisplayMin;
+  final double rpmDisplayMax;
+  final double speedDisplayMin;
+  final double speedDisplayMax;
 
   const _ChartArea({
-    super.key,
     required this.rpmHistory,
     required this.velocityHistory,
-    required this.maxRpm,
-    required this.maxSpeed,
+    required this.rpmDisplayMin,
+    required this.rpmDisplayMax,
+    required this.speedDisplayMin,
+    required this.speedDisplayMax,
   });
 
   @override
@@ -173,8 +186,10 @@ class _ChartArea extends StatelessWidget {
         painter: TelemetryChartPainter(
           rpmHistory: rpmHistory,
           velocityHistory: velocityHistory,
-          maxRpm: maxRpm,
-          maxSpeed: maxSpeed,
+          rpmDisplayMin: rpmDisplayMin,
+          rpmDisplayMax: rpmDisplayMax,
+          speedDisplayMin: speedDisplayMin,
+          speedDisplayMax: speedDisplayMax,
         ),
       ),
     );
@@ -185,15 +200,54 @@ class _ChartArea extends StatelessWidget {
 class TelemetryChartPainter extends CustomPainter {
   final List<int> rpmHistory;
   final List<int> velocityHistory;
-  final int maxRpm;
-  final int maxSpeed;
+  final double rpmDisplayMin;
+  final double rpmDisplayMax;
+  final double speedDisplayMin;
+  final double speedDisplayMax;
 
   TelemetryChartPainter({
     required this.rpmHistory,
     required this.velocityHistory,
-    required this.maxRpm,
-    required this.maxSpeed,
+    required this.rpmDisplayMin,
+    required this.rpmDisplayMax,
+    required this.speedDisplayMin,
+    required this.speedDisplayMax,
   });
+
+  /// 根据历史数据动态计算显示区间。
+  /// - [minGap]：最小显示跨度（防止数据完全相同时 range = 0）
+  /// - [margin]：上下各留的余量比例（默认 15%）
+  static ({double min, double max}) calcDisplayRange(
+    List<int> data, {
+    required double minGap,
+    double margin = 0.15,
+  }) {
+    if (data.isEmpty) return (min: 0, max: minGap);
+
+    // 过滤全0数据（断开连接时的默认填充）
+    final nonZero = data.where((v) => v > 0).toList();
+    if (nonZero.isEmpty) return (min: 0, max: minGap);
+
+    double lo = nonZero.reduce(min).toDouble();
+    double hi = nonZero.reduce(max).toDouble();
+
+    // 1. 保证最小跨度
+    if (hi - lo < minGap) {
+      final mid = (hi + lo) / 2;
+      lo = mid - minGap / 2;
+      hi = mid + minGap / 2;
+    }
+
+    // 2. 加上下余量
+    final gap = hi - lo;
+    lo -= gap * margin;
+    hi += gap * margin;
+
+    // 3. 下限不为负
+    if (lo < 0) lo = 0;
+
+    return (min: lo, max: hi);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -212,7 +266,8 @@ class TelemetryChartPainter extends CustomPainter {
         height,
         padding,
         rpmHistory,
-        maxRpm,
+        rpmDisplayMin,
+        rpmDisplayMax,
         AppTheme.primary,
       );
     }
@@ -225,7 +280,8 @@ class TelemetryChartPainter extends CustomPainter {
         height,
         padding,
         velocityHistory,
-        maxSpeed,
+        speedDisplayMin,
+        speedDisplayMax,
         AppTheme.accentCyan,
       );
     }
@@ -249,16 +305,19 @@ class TelemetryChartPainter extends CustomPainter {
     double height,
     double padding,
     List<int> data,
-    int maxValue,
+    double displayMin,
+    double displayMax,
     Color color,
   ) {
+    if (data.length < 2) return;
+    final range = displayMax - displayMin;
     final points = <Offset>[];
     final step = width / (data.length - 1);
 
     for (int i = 0; i < data.length; i++) {
       final x = i * step;
-      final y =
-          height - padding - ((data[i] / maxValue) * (height - 2 * padding));
+      final normalized = ((data[i] - displayMin) / range).clamp(0.0, 1.0);
+      final y = height - padding - (normalized * (height - 2 * padding));
       points.add(Offset(x, y));
     }
 
@@ -309,16 +368,19 @@ class TelemetryChartPainter extends CustomPainter {
     double height,
     double padding,
     List<int> data,
-    int maxValue,
+    double displayMin,
+    double displayMax,
     Color color,
   ) {
+    if (data.length < 2) return;
+    final range = displayMax - displayMin;
     final points = <Offset>[];
     final step = width / (data.length - 1);
 
     for (int i = 0; i < data.length; i++) {
       final x = i * step;
-      final y =
-          height - padding - ((data[i] / maxValue) * (height - 2 * padding));
+      final normalized = ((data[i] - displayMin) / range).clamp(0.0, 1.0);
+      final y = height - padding - (normalized * (height - 2 * padding));
       points.add(Offset(x, y));
     }
 
@@ -352,6 +414,7 @@ class TelemetryChartPainter extends CustomPainter {
     final dx = end.dx - start.dx;
     final dy = end.dy - start.dy;
     final distance = sqrt(dx * dx + dy * dy);
+    if (distance == 0) return;
     final unitX = dx / distance;
     final unitY = dy / distance;
 

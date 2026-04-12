@@ -545,7 +545,7 @@ class _VoltageDisplay extends StatelessWidget {
           ),
           Text(
             '${voltage.toStringAsFixed(1)}V',
-            style: AppTheme.valueMedium.copyWith(color: AppTheme.accentGreen),
+            style: AppTheme.valueSmall.copyWith(color: AppTheme.accentGreen),
           ),
         ],
       ),
