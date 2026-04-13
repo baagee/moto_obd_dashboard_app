@@ -255,6 +255,25 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setExtremeLeanCooldown(int v) =>
       _setInt('settings_events_extremeLean_cooldown', v);
 
+  // ===== 换挡提醒 =====
+
+  bool get gearShiftUpEnabled =>
+      _getBool('settings_events_gearShiftUp_enabled', true);
+  int get gearShiftUpRpm => _getInt('settings_events_gearShiftUp_rpm', 8000);
+  bool get gearShiftDownEnabled =>
+      _getBool('settings_events_gearShiftDown_enabled', true);
+  int get gearShiftDownRpm =>
+      _getInt('settings_events_gearShiftDown_rpm', 2500);
+
+  Future<void> setGearShiftUpEnabled(bool v) =>
+      _setBool('settings_events_gearShiftUp_enabled', v);
+  Future<void> setGearShiftUpRpm(int v) =>
+      _setInt('settings_events_gearShiftUp_rpm', v);
+  Future<void> setGearShiftDownEnabled(bool v) =>
+      _setBool('settings_events_gearShiftDown_enabled', v);
+  Future<void> setGearShiftDownRpm(int v) =>
+      _setInt('settings_events_gearShiftDown_rpm', v);
+
   // ===== 仪表盘显示 =====
 
   int get maxRpm => _getInt('settings_display_maxRpm', 12000);
@@ -368,6 +387,10 @@ class SettingsProvider extends ChangeNotifier {
       'settings_events_extremeLean_speedMin',
       'settings_events_extremeLean_angleMin',
       'settings_events_extremeLean_cooldown',
+      'settings_events_gearShiftUp_enabled',
+      'settings_events_gearShiftUp_rpm',
+      'settings_events_gearShiftDown_enabled',
+      'settings_events_gearShiftDown_rpm',
     ],
     'display': [
       'settings_display_maxRpm',

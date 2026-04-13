@@ -110,6 +110,10 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
         return AppTheme.accentCyan;
       case RidingEventType.extremeLean:
         return AppTheme.accentRed;
+      case RidingEventType.gearShiftUp:
+        return AppTheme.accentGreen;
+      case RidingEventType.gearShiftDown:
+        return AppTheme.accentOrange;
     }
   }
 
@@ -134,6 +138,10 @@ class _EventNotificationDialogState extends State<EventNotificationDialog>
         return Icons.ac_unit;
       case RidingEventType.extremeLean:
         return Icons.sports_motorsports;
+      case RidingEventType.gearShiftUp:
+        return Icons.arrow_circle_up;
+      case RidingEventType.gearShiftDown:
+        return Icons.arrow_circle_down;
     }
   }
 

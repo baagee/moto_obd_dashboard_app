@@ -11,6 +11,8 @@ enum RidingEventType {
   engineWarmup, // 引擎预热
   coldEnvironmentRisk, // 低温环境风险
   extremeLean, // 高速大倾角压弯
+  gearShiftUp, // 建议升档
+  gearShiftDown, // 建议降档
 }
 
 String getEventTypeDisplayName(RidingEventType type) {
@@ -33,6 +35,10 @@ String getEventTypeDisplayName(RidingEventType type) {
       return '低温风险';
     case RidingEventType.extremeLean:
       return '极限压弯';
+    case RidingEventType.gearShiftUp:
+      return '建议升档';
+    case RidingEventType.gearShiftDown:
+      return '建议降档';
   }
 }
 
@@ -237,6 +243,50 @@ class RidingEvent {
         'speedThreshold': speedThreshold,
         'angleThreshold': angleThreshold,
         'condition': 'speed >= 60 km/h && |leanAngle| >= 20°',
+      },
+    );
+  }
+
+  factory RidingEvent.gearShiftUp({
+    required int rpm,
+    required int gear,
+    required int upshiftRpm,
+    DateTime? timestamp,
+  }) {
+    return RidingEvent(
+      type: RidingEventType.gearShiftUp,
+      title: getEventTypeDisplayName(RidingEventType.gearShiftUp),
+      description: '${gear}档均值转速 $rpm rpm 持续高于升档阈值，建议升至${gear + 1}档',
+      triggerValue: rpm.toDouble(),
+      threshold: upshiftRpm.toDouble(),
+      timestamp: timestamp ?? DateTime.now(),
+      additionalData: {
+        'currentGear': gear,
+        'suggestedGear': gear + 1,
+        'avgRpm': rpm,
+        'upshiftRpm': upshiftRpm,
+      },
+    );
+  }
+
+  factory RidingEvent.gearShiftDown({
+    required int rpm,
+    required int gear,
+    required int downshiftRpm,
+    DateTime? timestamp,
+  }) {
+    return RidingEvent(
+      type: RidingEventType.gearShiftDown,
+      title: getEventTypeDisplayName(RidingEventType.gearShiftDown),
+      description: '${gear}档均值转速 $rpm rpm 持续低于降档阈值，建议降至${gear - 1}档',
+      triggerValue: rpm.toDouble(),
+      threshold: downshiftRpm.toDouble(),
+      timestamp: timestamp ?? DateTime.now(),
+      additionalData: {
+        'currentGear': gear,
+        'suggestedGear': gear - 1,
+        'avgRpm': rpm,
+        'downshiftRpm': downshiftRpm,
       },
     );
   }

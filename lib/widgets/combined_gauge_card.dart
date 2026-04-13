@@ -173,7 +173,7 @@ class CombinedGaugePainter extends CustomPainter {
     final segGap = segAngle * (1 - fillRatio);
 
     final bgPaint = Paint()
-      ..color = AppTheme.slateGray.withValues(alpha: 0.35)
+      ..color = AppTheme.slateGray
       ..style = PaintingStyle.stroke
       ..strokeWidth = 27
       ..strokeCap = StrokeCap.butt;

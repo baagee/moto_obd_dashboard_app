@@ -47,6 +47,10 @@ class RidingEventItem extends StatelessWidget {
         return AppTheme.accentCyan;
       case 'RidingEventType.extremeLean':
         return Colors.purple;
+      case 'RidingEventType.gearShiftUp':
+        return AppTheme.accentGreen;
+      case 'RidingEventType.gearShiftDown':
+        return AppTheme.accentOrange;
       default:
         return AppTheme.textSecondary;
     }
@@ -72,6 +76,10 @@ class RidingEventItem extends StatelessWidget {
         return Icons.severe_cold;
       case 'RidingEventType.extremeLean':
         return Icons.rotate_right;
+      case 'RidingEventType.gearShiftUp':
+        return Icons.arrow_circle_up;
+      case 'RidingEventType.gearShiftDown':
+        return Icons.arrow_circle_down;
       default:
         return Icons.info_outline;
     }

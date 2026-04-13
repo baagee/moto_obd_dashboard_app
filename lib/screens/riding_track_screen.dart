@@ -49,6 +49,9 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
   List<Polyline> _cachedPolylines = [];
   double _cachedPolylineZoom = -1;
 
+  // 事件 Marker 缓存（数据加载后一次性构建，地图交互时直接复用）
+  List<Marker> _cachedEventMarkers = [];
+
   // 加载状态
   bool _isLoading = true;
   String? _errorMessage;
@@ -91,10 +94,14 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         return LatLng(coords[0], coords[1]);
       }).toList();
 
+      // 数据加载完成后一次性构建事件 Marker 缓存（避免每次 build 重建）
+      final eventMarkers = _buildEventMarkersFromData(events, gcjPoints, waypoints);
+
       setState(() {
         _allWaypoints = waypoints;
         _cachedGcjPoints = gcjPoints;
         _events = events;
+        _cachedEventMarkers = eventMarkers;
         _isLoading = false;
         // 数据更新后清空 polyline 缓存
         _cachedPolylines = [];
@@ -268,24 +275,55 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     return polylines;
   }
 
-  /// 找到与事件时间戳最近的轨迹点坐标（找不到或偏差 >30s 返回 null）
-  LatLng? _findNearestWaypointPosition(int eventTs) {
-    if (_allWaypoints.isEmpty) return null;
-
-    int minDiff = (_allWaypoints.first.timestamp - eventTs).abs();
-    int minIdx = 0;
-
-    for (int i = 1; i < _allWaypoints.length; i++) {
-      final diff = (_allWaypoints[i].timestamp - eventTs).abs();
-      if (diff < minDiff) {
-        minDiff = diff;
-        minIdx = i;
+  /// 一次性构建事件 Marker 列表（在数据加载完成后调用一次，结果缓存到 _cachedEventMarkers）
+  List<Marker> _buildEventMarkersFromData(
+    List<RidingRecordEvent> events,
+    List<LatLng> gcjPoints,
+    List<RidingWaypoint> waypoints,
+  ) {
+    if (gcjPoints.isEmpty || waypoints.isEmpty) return [];
+    final markers = <Marker>[];
+    for (final event in events) {
+      // 找最近轨迹点（使用传入的数据，不依赖成员变量）
+      int minDiff = (waypoints.first.timestamp - event.timestamp).abs();
+      int minIdx = 0;
+      for (int i = 1; i < waypoints.length; i++) {
+        final diff = (waypoints[i].timestamp - event.timestamp).abs();
+        if (diff < minDiff) {
+          minDiff = diff;
+          minIdx = i;
+        }
       }
+      if (minDiff > 30000) continue;
+      if (minIdx >= gcjPoints.length) continue;
+      final pos = gcjPoints[minIdx];
+      final color = RidingEventItem.colorFromType(event.type);
+      final icon = RidingEventItem.iconFromType(event.type);
+      markers.add(Marker(
+        point: pos,
+        width: 32,
+        height: 32,
+        child: GestureDetector(
+          onTap: () => _showEventDetail(context, event),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.9),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.5),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 15),
+          ),
+        ),
+      ));
     }
-
-    if (minDiff > 30000) return null;
-    if (minIdx >= _cachedGcjPoints.length) return null;
-    return _cachedGcjPoints[minIdx];
+    return markers;
   }
 
   @override
@@ -411,38 +449,6 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
       );
     }
 
-    // 构建事件 Marker 列表（无法定位时静默忽略）
-    final eventMarkers = <Marker>[];
-    for (final event in _events) {
-      final pos = _findNearestWaypointPosition(event.timestamp);
-      if (pos == null) continue;
-      final color = RidingEventItem.colorFromType(event.type);
-      final icon = RidingEventItem.iconFromType(event.type);
-      eventMarkers.add(Marker(
-        point: pos,
-        width: 32,
-        height: 32,
-        child: GestureDetector(
-          onTap: () => _showEventDetail(context, event),
-          child: Container(
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.9),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.5),
-                  blurRadius: 6,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: Icon(icon, color: Colors.white, size: 15),
-          ),
-        ),
-      ));
-    }
-
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
@@ -464,8 +470,8 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         PolylineLayer(
           polylines: _buildGradientPolylines(_currentZoom),
         ),
-        // 骑行事件 Marker
-        MarkerLayer(markers: eventMarkers),
+        // 骑行事件 Marker（数据加载时一次性构建，地图交互时直接复用）
+        MarkerLayer(markers: _cachedEventMarkers),
         // 起点 Marker
         MarkerLayer(
           markers: [

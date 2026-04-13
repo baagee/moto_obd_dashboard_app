@@ -58,6 +58,10 @@ class RidingStatsProvider extends ChangeNotifier {
   // 事件历史列表
   final List<stats.RidingEvent> _eventHistory = [];
 
+  // 换挡提醒防重复状态（记录已触发时的档位，0 = 未触发）
+  int _lastGearShiftUpTriggeredGear = 0;
+  int _lastGearShiftDownTriggeredGear = 0;
+
   // 骑行状态
   bool _isRiding = false;
   DateTime? _rideStartTime;
@@ -128,6 +132,10 @@ class RidingStatsProvider extends ChangeNotifier {
     _maxRightLean = 0;
     _totalSpeedSum = 0;
     _totalSampleCount = 0;
+
+    // 重置换挡提醒状态
+    _lastGearShiftUpTriggeredGear = 0;
+    _lastGearShiftDownTriggeredGear = 0;
 
     String? placeName;
     double? startLat;
@@ -297,11 +305,11 @@ class RidingStatsProvider extends ChangeNotifier {
         ? DateTime.now().difference(_rideStartTime!).inSeconds
         : 0;
     try {
-      _logCallback(
-        'Stats',
-        LogType.info,
-        '[DB] snapshot updateRidingRecord id=$_currentRecordId: distance=${distance.toStringAsFixed(3)}km duration=${duration}s avgSpeed=${avgSpeed.toStringAsFixed(1)} maxSpeed=${_maxSpeed.toStringAsFixed(1)}',
-      );
+      // _logCallback(
+      //   'Stats',
+      //   LogType.info,
+      //   '[DB] snapshot updateRidingRecord id=$_currentRecordId: distance=${distance.toStringAsFixed(3)}km duration=${duration}s avgSpeed=${avgSpeed.toStringAsFixed(1)} maxSpeed=${_maxSpeed.toStringAsFixed(1)}',
+      // );
       await DatabaseService.updateRidingRecord(_currentRecordId!, {
         'avg_speed': avgSpeed,
         'max_speed': _maxSpeed,
@@ -538,6 +546,8 @@ class RidingStatsProvider extends ChangeNotifier {
     _checkEfficientCruising(avgSpeed, avgLoad, avgThrottle);
     _checkEngineWarmup(avgTemp, avgRpm);
     _checkColdEnvironmentRisk(avgIntakeTemp, avgSpeed);
+    _checkGearShiftUp(avgRpm, avgSpeed, data.gear);
+    _checkGearShiftDown(avgRpm, avgSpeed, data.gear);
   }
 
   /// 数据有效性检查
@@ -757,6 +767,68 @@ class RidingStatsProvider extends ChangeNotifier {
     final event = stats.RidingEvent.coldEnvironmentRisk(
       intakeAirTemp: avgIntakeTemp,
       vehicleSpeed: vehicleSpeed,
+    );
+    _addEvent(event);
+  }
+
+  /// 升档提醒检测
+  /// 使用 5 秒均值 avgRpm，过滤换挡瞬间 RPM 刺穿和路面颠簸噪声
+  /// 不调用 _canTriggerEvent()，无时间冷却；用档位状态防止同档重复触发
+  void _checkGearShiftUp(double? avgRpm, double? avgSpeed, int gear) {
+    if (avgRpm == null || avgSpeed == null) return;
+    if (_settingsProvider?.gearShiftUpEnabled == false) return;
+    if (gear <= 0 || gear >= 6) return; // 空档或6档无需升档
+    if (avgSpeed < 20) return; // 低速起步阶段不触发（< 20 km/h）
+
+    final threshold = (_settingsProvider?.gearShiftUpRpm ?? 8000).toDouble();
+
+    if (avgRpm <= threshold) {
+      // 均值回落到阈值以下：解锁本档触发状态
+      if (_lastGearShiftUpTriggeredGear == gear) {
+        _lastGearShiftUpTriggeredGear = 0;
+      }
+      return;
+    }
+
+    // avgRpm 超过阈值，但本档已触发过 → 不重复
+    if (_lastGearShiftUpTriggeredGear == gear) return;
+
+    _lastGearShiftUpTriggeredGear = gear;
+    final event = stats.RidingEvent.gearShiftUp(
+      rpm: avgRpm.toInt(),
+      gear: gear,
+      upshiftRpm: threshold.toInt(),
+    );
+    _addEvent(event);
+  }
+
+  /// 降档提醒检测
+  /// 使用 5 秒均值 avgRpm，过滤发动机制动瞬间低转误报
+  /// 不调用 _canTriggerEvent()，无时间冷却；用档位状态防止同档重复触发
+  void _checkGearShiftDown(double? avgRpm, double? avgSpeed, int gear) {
+    if (avgRpm == null || avgSpeed == null) return;
+    if (_settingsProvider?.gearShiftDownEnabled == false) return;
+    if (gear <= 1) return; // 空档或1档无需降档
+    if (avgSpeed < 15) return; // 减速停车过程不触发（< 15 km/h）
+
+    final threshold = (_settingsProvider?.gearShiftDownRpm ?? 2500).toDouble();
+
+    if (avgRpm >= threshold) {
+      // 均值回升到阈值以上：解锁本档触发状态
+      if (_lastGearShiftDownTriggeredGear == gear) {
+        _lastGearShiftDownTriggeredGear = 0;
+      }
+      return;
+    }
+
+    // avgRpm 低于阈值，但本档已触发过 → 不重复
+    if (_lastGearShiftDownTriggeredGear == gear) return;
+
+    _lastGearShiftDownTriggeredGear = gear;
+    final event = stats.RidingEvent.gearShiftDown(
+      rpm: avgRpm.toInt(),
+      gear: gear,
+      downshiftRpm: threshold.toInt(),
     );
     _addEvent(event);
   }

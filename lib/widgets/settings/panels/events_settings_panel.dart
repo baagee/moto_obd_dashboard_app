@@ -59,6 +59,10 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
       'extremeLean_speedMin': s.extremeLeanSpeedMin.toDouble(),
       'extremeLean_angleMin': s.extremeLeanAngleMin.toDouble(),
       'extremeLean_cooldown': s.extremeLeanCooldown.toDouble(),
+      'gearShiftUp_enabled': s.gearShiftUpEnabled,
+      'gearShiftUp_rpm': s.gearShiftUpRpm.toDouble(),
+      'gearShiftDown_enabled': s.gearShiftDownEnabled,
+      'gearShiftDown_rpm': s.gearShiftDownRpm.toDouble(),
     };
     _draft = Map.from(_original);
   }
@@ -121,6 +125,14 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
           (_draft['extremeLean_angleMin'] as double).toInt(),
       'settings_events_extremeLean_cooldown':
           (_draft['extremeLean_cooldown'] as double).toInt(),
+      'settings_events_gearShiftUp_enabled':
+          _draft['gearShiftUp_enabled'] as bool,
+      'settings_events_gearShiftUp_rpm':
+          (_draft['gearShiftUp_rpm'] as double).toInt(),
+      'settings_events_gearShiftDown_enabled':
+          _draft['gearShiftDown_enabled'] as bool,
+      'settings_events_gearShiftDown_rpm':
+          (_draft['gearShiftDown_rpm'] as double).toInt(),
     });
     if (mounted) setState(() => _original = Map.from(_draft));
     if (mounted) CyberToast.show(context, '骑行事件设置已保存');
@@ -518,6 +530,51 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
                 valueFormatter: (v) => '${v.toInt()} s',
                 onChanged: (v) =>
                     setState(() => _draft['extremeLean_cooldown'] = v),
+              ),
+            ],
+          ),
+
+          const SettingsDivider(),
+
+          // ── 升档提醒 ──
+          _buildEventSection(
+            icon: Icons.arrow_circle_up,
+            title: '升档提醒',
+            enabledKey: 'gearShiftUp_enabled',
+            children: [
+              SettingsSliderField(
+                label: '升档 RPM 阈值（5秒均值高于此值触发）',
+                hint: '无冷却时间，均值回落后可再次触发',
+                value: _draft['gearShiftUp_rpm'],
+                defaultValue: 8000,
+                min: 4000,
+                max: 13000,
+                divisions: 90,
+                valueFormatter: (v) => '${v.toInt()} rpm',
+                onChanged: (v) => setState(() => _draft['gearShiftUp_rpm'] = v),
+              ),
+            ],
+          ),
+
+          const SettingsDivider(),
+
+          // ── 降档提醒 ──
+          _buildEventSection(
+            icon: Icons.arrow_circle_down,
+            title: '降档提醒',
+            enabledKey: 'gearShiftDown_enabled',
+            children: [
+              SettingsSliderField(
+                label: '降档 RPM 阈值（5秒均值低于此值触发）',
+                hint: '无冷却时间，均值回升后可再次触发',
+                value: _draft['gearShiftDown_rpm'],
+                defaultValue: 2500,
+                min: 800,
+                max: 5000,
+                divisions: 84,
+                valueFormatter: (v) => '${v.toInt()} rpm',
+                onChanged: (v) =>
+                    setState(() => _draft['gearShiftDown_rpm'] = v),
               ),
             ],
           ),
