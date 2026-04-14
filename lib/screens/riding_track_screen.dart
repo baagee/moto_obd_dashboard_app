@@ -95,7 +95,8 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
       }).toList();
 
       // 数据加载完成后一次性构建事件 Marker 缓存（避免每次 build 重建）
-      final eventMarkers = _buildEventMarkersFromData(events, gcjPoints, waypoints);
+      final eventMarkers =
+          _buildEventMarkersFromData(events, gcjPoints, waypoints);
 
       setState(() {
         _allWaypoints = waypoints;
@@ -240,7 +241,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     }
   }
 
-  /// 生成速度渐变 Polyline 列表（含 glow 叠层，结果按 zoom 整数级缓存）
+  /// 生成速度渐变 Polyline 列表（已关闭 glow 层优化性能，结果按 zoom 整数级缓存）
   List<Polyline> _buildGradientPolylines(double zoom) {
     // zoom 取整后未变化时直接复用缓存
     final zoomKey = zoom.floorToDouble();
@@ -257,22 +258,46 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
       final avgSpeed = (_allWaypoints[i1].speed + _allWaypoints[i2].speed) / 2;
       final color = _speedToColor(avgSpeed);
       final pts = [_cachedGcjPoints[i1], _cachedGcjPoints[i2]];
-      // 底层 glow：宽线低透明度，模拟霓虹发光晕
-      polylines.add(Polyline(
-        points: pts,
-        color: color.withOpacity(0.25),
-        strokeWidth: 10.0,
-      ));
-      // 上层主线：细线全亮度
+
+      // ❌ 已关闭 glow 层（Polyline 数量减半，性能优化）
+      // 原来每个线段生成 2 条 Polyline（glow + 主线），导致渲染压力大
+      // polylines.add(Polyline(
+      //   points: pts,
+      //   color: color.withOpacity(0.25),
+      //   strokeWidth: 10.0,
+      // ));
+
+      // 主线：增加宽度到 4.0 补偿视觉效果
       polylines.add(Polyline(
         points: pts,
         color: color,
-        strokeWidth: 3.0,
+        strokeWidth: 4.0, // 从 3.0 提升到 4.0
       ));
     }
     _cachedPolylines = polylines;
     _cachedPolylineZoom = zoomKey;
     return polylines;
+  }
+
+  /// 二分查找最近轨迹点索引（轨迹点按 timestamp 升序排列）
+  /// 时间复杂度 O(logN)，替代原来的 O(N) 线性搜索
+  int _findNearestWaypointIndex(List<RidingWaypoint> waypoints, int timestamp) {
+    int lo = 0, hi = waypoints.length - 1;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (waypoints[mid].timestamp < timestamp) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    // 检查 lo-1 是否更近
+    if (lo > 0) {
+      final d1 = (waypoints[lo].timestamp - timestamp).abs();
+      final d0 = (waypoints[lo - 1].timestamp - timestamp).abs();
+      if (d0 < d1) return lo - 1;
+    }
+    return lo;
   }
 
   /// 一次性构建事件 Marker 列表（在数据加载完成后调用一次，结果缓存到 _cachedEventMarkers）
@@ -284,16 +309,9 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     if (gcjPoints.isEmpty || waypoints.isEmpty) return [];
     final markers = <Marker>[];
     for (final event in events) {
-      // 找最近轨迹点（使用传入的数据，不依赖成员变量）
-      int minDiff = (waypoints.first.timestamp - event.timestamp).abs();
-      int minIdx = 0;
-      for (int i = 1; i < waypoints.length; i++) {
-        final diff = (waypoints[i].timestamp - event.timestamp).abs();
-        if (diff < minDiff) {
-          minDiff = diff;
-          minIdx = i;
-        }
-      }
+      // 二分查找最近轨迹点（O(logN)，原为 O(N) 线性搜索）
+      final minIdx = _findNearestWaypointIndex(waypoints, event.timestamp);
+      final minDiff = (waypoints[minIdx].timestamp - event.timestamp).abs();
       if (minDiff > 30000) continue;
       if (minIdx >= gcjPoints.length) continue;
       final pos = gcjPoints[minIdx];
@@ -303,22 +321,14 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         point: pos,
         width: 32,
         height: 32,
-        child: GestureDetector(
-          onTap: () => _showEventDetail(context, event),
-          child: Container(
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.9),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.5),
-                  blurRadius: 6,
-                  spreadRadius: 1,
-                ),
-              ],
+        child: RepaintBoundary(
+          child: GestureDetector(
+            onTap: () => _showEventDetail(context, event),
+            child: CircleAvatar(
+              radius: 16,
+              backgroundColor: color,
+              child: Icon(icon, color: Colors.white, size: 15),
             ),
-            child: Icon(icon, color: Colors.white, size: 15),
           ),
         ),
       ));
@@ -470,36 +480,37 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         PolylineLayer(
           polylines: _buildGradientPolylines(_currentZoom),
         ),
-        // 骑行事件 Marker（数据加载时一次性构建，地图交互时直接复用）
-        MarkerLayer(markers: _cachedEventMarkers),
-        // 起点 Marker
+        // 合并所有 Marker 到单个 Layer（性能优化：减少 Layer 数量）
         MarkerLayer(
           markers: [
+            // 骑行事件 Marker（20+ 个）
+            ..._cachedEventMarkers,
+            // 起点 Marker
             Marker(
               point: _cachedGcjPoints.first,
               width: 20,
               height: 20,
-              child: _TrackPin(
-                  color: const Color(0xFF00F5FF), icon: Icons.flag_outlined),
+              child: const RepaintBoundary(
+                child: _TrackPin(
+                  color: Color(0xFF00F5FF),
+                  icon: Icons.flag_outlined,
+                ),
+              ),
             ),
-          ],
-        ),
-        // 终点 Marker
-        MarkerLayer(
-          markers: [
+            // 终点 Marker
             Marker(
               point: _cachedGcjPoints.last,
               width: 20,
               height: 20,
-              child: _TrackPin(
-                  color: const Color(0xFFFF2D87), icon: Icons.sports_score),
+              child: const RepaintBoundary(
+                child: _TrackPin(
+                  color: Color(0xFFFF2D87),
+                  icon: Icons.sports_score,
+                ),
+              ),
             ),
-          ],
-        ),
-        // 游标位置圆点（拖动速度曲线图时联动）
-        if (_cursorIndex != null && _cursorIndex! < _cachedGcjPoints.length)
-          MarkerLayer(
-            markers: [
+            // 游标位置圆点（拖动速度曲线图时联动）
+            if (_cursorIndex != null && _cursorIndex! < _cachedGcjPoints.length)
               Marker(
                 point: _cachedGcjPoints[_cursorIndex!],
                 width: 20,
@@ -520,8 +531,8 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
                   ),
                 ),
               ),
-            ],
-          ),
+          ],
+        ),
       ],
     );
   }

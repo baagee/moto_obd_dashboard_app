@@ -46,6 +46,8 @@ class _SpeedChartState extends State<SpeedChart> {
   late double _maxSpeed;
   // 总时长（秒）
   late double _totalSeconds;
+  // 缓存的 bars（数据不变时直接复用，避免游标拖动每帧重建）
+  List<LineChartBarData>? _cachedBars;
 
   @override
   void initState() {
@@ -85,16 +87,25 @@ class _SpeedChartState extends State<SpeedChart> {
     keySet.add(maxSpeedIdx);
 
     // 每个事件最近的 waypoint（30s 内才纳入）
+    // 使用二分查找 O(logN)，替代原来的 O(N) 线性搜索
     for (final event in widget.events) {
-      int minDiff = (wps[0].timestamp - event.timestamp).abs();
-      int minIdx = 0;
-      for (int i = 1; i < total; i++) {
-        final diff = (wps[i].timestamp - event.timestamp).abs();
-        if (diff < minDiff) {
-          minDiff = diff;
-          minIdx = i;
+      int lo = 0, hi = total - 1;
+      while (lo < hi) {
+        final mid = (lo + hi) >> 1;
+        if (wps[mid].timestamp < event.timestamp) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
         }
       }
+      // 检查 lo-1 是否更近
+      int minIdx = lo;
+      if (lo > 0) {
+        final d1 = (wps[lo].timestamp - event.timestamp).abs();
+        final d0 = (wps[lo - 1].timestamp - event.timestamp).abs();
+        if (d0 < d1) minIdx = lo - 1;
+      }
+      final minDiff = (wps[minIdx].timestamp - event.timestamp).abs();
       if (minDiff < 30000) keySet.add(minIdx);
     }
 
@@ -128,6 +139,8 @@ class _SpeedChartState extends State<SpeedChart> {
     _spots = spots;
     _maxSpeed = effectiveMax < 10 ? 100 : effectiveMax * 1.1;
     _totalSeconds = spots.last.x;
+    // 数据变化时清空 bars 缓存
+    _cachedBars = null;
   }
 
   /// 将图表内 localDx 换算为最近的 waypoint 索引
@@ -283,7 +296,7 @@ class _SpeedChartState extends State<SpeedChart> {
                   rightTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false)),
                 ),
-                lineBarsData: _buildColoredBars(),
+                lineBarsData: _cachedBars ??= _buildColoredBars(),
                 // 事件竖线标记
                 extraLinesData: ExtraLinesData(
                   verticalLines: [

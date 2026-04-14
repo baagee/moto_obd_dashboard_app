@@ -1,17 +1,3 @@
-
-# 获取当前versionCode
-#VERSION_LINE=$(grep -m1 "^version:" pubspec.yaml)
-#VERSION_NAME=$(echo $VERSION_LINE | cut -d' ' -f2 | cut -d'+' -f1)
-#VERSION_CODE=$(echo $VERSION_LINE | cut -d'+' -f2)
-#
-## 自增 versionCode
-#NEW_VERSION_CODE=$((VERSION_CODE + 1))
-#
-## 修改 pubspec.yaml
-#sed -i '' "s/version: $VERSION_NAME+$VERSION_CODE/version: $VERSION_NAME+$NEW_VERSION_CODE/" pubspec.yaml
-#
-#echo "📦 new version: $VERSION_NAME+$NEW_VERSION_CODE"
-
 flutter clean
 flutter pub get
 flutter build apk --debug

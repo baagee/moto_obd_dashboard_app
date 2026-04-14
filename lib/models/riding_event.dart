@@ -76,7 +76,7 @@ class RidingEvent {
       timestamp: timestamp ?? DateTime.now(),
       additionalData: {
         'speedChangeRate': speedChangeRate,
-        'condition': 'rpm > 6300 && speed rapidly increasing',
+        // 'condition': 'rpm > 6300 && speed rapidly increasing',
       },
     );
   }
@@ -98,7 +98,7 @@ class RidingEvent {
         'avgSpeed': avgSpeed,
         'avgLoad': avgLoad,
         'throttleStability': throttleStability,
-        'condition': 'speed 70-100 km/h, load < 30%, throttle stable',
+        // 'condition': 'speed 70-100 km/h, load < 30%, throttle stable',
       },
     );
   }
@@ -116,7 +116,7 @@ class RidingEvent {
       timestamp: timestamp ?? DateTime.now(),
       additionalData: {
         "coolantTemp": coolantTemp,
-        'condition': 'coolant temperature > 110°C',
+        // 'condition': 'coolant temperature > 110°C',
       },
     );
   }
@@ -137,7 +137,7 @@ class RidingEvent {
       additionalData: {
         'voltage': voltage,
         'anomalyType': anomalyType, // 'low' or 'high'
-        'condition': 'voltage < 11.5V or voltage > 15.3V',
+        // 'condition': 'voltage < 11.5V or voltage > 15.3V',
       },
     );
   }
@@ -155,7 +155,7 @@ class RidingEvent {
       timestamp: timestamp ?? DateTime.now(),
       additionalData: {
         'durationMinutes': duration.inMinutes,
-        'condition': 'continuous running time > 1.5 hours',
+        // 'condition': 'continuous running time > 1.5 hours',
       },
     );
   }
@@ -173,7 +173,7 @@ class RidingEvent {
       timestamp: timestamp ?? DateTime.now(),
       additionalData: {
         "engineLoad": engineLoad,
-        'condition': 'engine load > 70%',
+        // 'condition': 'engine load > 70%',
       },
     );
   }
@@ -193,7 +193,7 @@ class RidingEvent {
       additionalData: {
         'coolantTemp': coolantTemp,
         'vehicleSpeed': vehicleSpeed,
-        'condition': 'coolant temperature < 70°C and engine RPM > 6000',
+        // 'condition': 'coolant temperature < 70°C and engine RPM > 6000',
       },
     );
   }
@@ -213,7 +213,7 @@ class RidingEvent {
       additionalData: {
         'intakeAirTemp': intakeAirTemp,
         'vehicleSpeed': vehicleSpeed,
-        'condition': 'intake air temperature < 5°C and vehicle speed > 40 km/h',
+        // 'condition': 'intake air temperature < 5°C and vehicle speed > 40 km/h',
       },
     );
   }
@@ -242,7 +242,7 @@ class RidingEvent {
         'direction': direction,
         'speedThreshold': speedThreshold,
         'angleThreshold': angleThreshold,
-        'condition': 'speed >= 60 km/h && |leanAngle| >= 20°',
+        // 'condition': 'speed >= 60 km/h && |leanAngle| >= 20°',
       },
     );
   }
