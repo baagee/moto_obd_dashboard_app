@@ -1048,6 +1048,110 @@ class SettingsSectionTitle extends StatelessWidget {
   }
 }
 
+// ───────────────────────────────────────────────
+
+/// 单选字段（胶囊按钮横排）
+class SettingsRadioField extends StatelessWidget {
+  final String label;
+  final List<String> options;
+  final List<String>? optionLabels;
+  final String currentValue;
+  final ValueChanged<String> onChanged;
+
+  const SettingsRadioField({
+    super.key,
+    required this.label,
+    required this.options,
+    required this.currentValue,
+    required this.onChanged,
+    this.optionLabels,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(label, style: AppTheme.labelMedium),
+          ),
+          Expanded(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: List.generate(options.length, (i) {
+                final val = options[i];
+                final displayLabel =
+                    optionLabels != null && i < optionLabels!.length
+                        ? optionLabels![i]
+                        : val;
+                final selected = currentValue == val;
+                return GestureDetector(
+                  onTap: () => onChanged(val),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? AppTheme.primary20
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: selected
+                            ? AppTheme.primary
+                            : AppTheme.primary30,
+                        width: selected ? 1.5 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: selected
+                                  ? AppTheme.primary
+                                  : AppTheme.textMuted,
+                              width: 1.5,
+                            ),
+                            color: selected
+                                ? AppTheme.primary
+                                : Colors.transparent,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          displayLabel,
+                          style: TextStyle(
+                            color: selected
+                                ? AppTheme.primary
+                                : AppTheme.textSecondary,
+                            fontSize: 12,
+                            fontWeight: selected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ═══════════════════════════════════════════════
 // 设置面板共用工具函数
 // ═══════════════════════════════════════════════

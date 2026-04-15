@@ -276,6 +276,10 @@ class SettingsProvider extends ChangeNotifier {
 
   // ===== 仪表盘显示 =====
 
+  /// 仪表盘风格：'cyberpunk' | 'classic'
+  String get gaugeStyle => _getString('settings_gauge_style', 'cyberpunk');
+  Future<void> setGaugeStyle(String v) => _setString('settings_gauge_style', v);
+
   int get maxRpm => _getInt('settings_display_maxRpm', 12000);
   int get warnRpm => _getInt('settings_display_warnRpm', 7000);
   int get dangerRpm => _getInt('settings_display_dangerRpm', 9000);
@@ -393,6 +397,7 @@ class SettingsProvider extends ChangeNotifier {
       'settings_events_gearShiftDown_rpm',
     ],
     'display': [
+      'settings_gauge_style',
       'settings_display_maxRpm',
       'settings_display_warnRpm',
       'settings_display_dangerRpm',

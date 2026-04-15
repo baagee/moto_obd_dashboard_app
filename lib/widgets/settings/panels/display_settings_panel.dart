@@ -30,6 +30,7 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
   void _loadDraft() {
     final s = context.read<SettingsProvider>();
     _original = {
+      'gaugeStyle': s.gaugeStyle,
       'maxRpm': s.maxRpm.toDouble(),
       'warnRpm': s.warnRpm.toDouble(),
       'dangerRpm': s.dangerRpm.toDouble(),
@@ -42,6 +43,7 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
 
   Future<void> _onSave() async {
     await context.read<SettingsProvider>().setBatch({
+      'settings_gauge_style': _draft['gaugeStyle'],
       'settings_display_maxRpm': (_draft['maxRpm'] as double).toInt(),
       'settings_display_warnRpm': (_draft['warnRpm'] as double).toInt(),
       'settings_display_dangerRpm': (_draft['dangerRpm'] as double).toInt(),
@@ -131,6 +133,18 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
             message: '修改量程后无需重启，仪表盘实时生效。\n'
                 '颜色区间：正常 → 警告（橙/紫）→ 危险（红）。',
           ),
+
+          // ── 风格选择 ──
+          const SettingsSectionTitle('▸  仪表盘风格'),
+          SettingsRadioField(
+            label: '选择风格',
+            options: const ['cyberpunk', 'classic'],
+            optionLabels: const ['赛博朗克风格', '经典风格'],
+            currentValue: _draft['gaugeStyle'],
+            onChanged: (v) => setState(() => _draft['gaugeStyle'] = v),
+          ),
+
+          const SettingsDivider(),
 
           // ── 转速表 RPM ──
           const SettingsSectionTitle('▸  转速表 (RPM)'),

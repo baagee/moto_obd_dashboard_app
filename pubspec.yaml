@@ -40,4 +40,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/audio/
+    - assets/gauges/classic/
     - assets/icon.png
