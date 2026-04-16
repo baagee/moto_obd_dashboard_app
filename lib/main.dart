@@ -12,6 +12,7 @@ import 'providers/navigation_provider.dart';
 import 'providers/settings_provider.dart';
 import 'utils/gear_util.dart';
 import 'services/audio_service.dart';
+import 'services/brightness_service.dart';
 import 'screens/main_container.dart';
 
 void main() async {
@@ -24,6 +25,10 @@ void main() async {
 
   // 加载档位自适应学习值（C1 优化）
   await GSX8SCalculator.loadLearnedRatios();
+
+  // 初始化屏幕最低亮度保障（骑行场景防止系统自动降低亮度）
+  // 亮度阈值在 BrightnessService._minBrightness 中配置
+  BrightnessService().init();
 
   // 强制横屏
   SystemChrome.setPreferredOrientations([

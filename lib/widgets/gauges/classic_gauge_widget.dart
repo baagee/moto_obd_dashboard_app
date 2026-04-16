@@ -206,9 +206,9 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
         final availableSize =
             constraints.maxHeight.clamp(0.0, constraints.maxWidth);
         // 增大半径到 1.14，并下移中心点到 53% 高度位置
-        final radius = availableSize / 2 * 1.14;
+        final radius = availableSize / 2 * 1.13;
         final cx = constraints.maxWidth / 2;
-        final cy = constraints.maxHeight * 0.53; // 下移中心
+        final cy = constraints.maxHeight * 0.58; // 下移中心
         final center = Offset(cx, cy);
 
         // 自检阶段用动画值，完成后用真实 OBD 值
@@ -273,11 +273,11 @@ class _ClassicGaugePainter extends CustomPainter {
   static const double _mainTickLenRatio = 0.10;
   static const double _subTickLenRatio = 0.055;
   static const double _tickInnerRatio = 0.82;
-  static const double _labelRadiusRatio = 0.65;
+  static const double _labelRadiusRatio = 0.68;
 
   // 指针参数
-  static const double _pointerLenRatio = 1.12;
-  static const double _pointerMaxWidthRatio = 0.5;
+  static const double _pointerLenRatio = 0.82;
+  static const double _pointerMaxWidthRatio = 0.33;
 
   _ClassicGaugePainter({
     required this.bgImage,
@@ -305,7 +305,7 @@ class _ClassicGaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // ── 1. 背景图 ──
-    final bgSide = radius * 1.6;
+    final bgSide = radius * 1.2;
     final bgRect =
         Rect.fromCenter(center: center, width: bgSide, height: bgSide);
     final bgSrc = Rect.fromLTWH(
@@ -345,7 +345,8 @@ class _ClassicGaugePainter extends CustomPainter {
       );
 
       final labelR = radius * _labelRadiusRatio;
-      final labelFontSize = (radius * 0.09).clamp(8.0, 14.0);
+      // 控制刻度标签字体大小
+      final labelFontSize = (radius * 0.18).clamp(8.0, 14.0);
       _drawText(
         canvas,
         tickValue.toInt().toString(),
