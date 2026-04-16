@@ -12,8 +12,8 @@ import '../../theme/app_theme.dart';
 // ───────────────────────────────────────────────
 // 常量：270° 弧，起始于左下 135°（逆时针修正后）
 // ───────────────────────────────────────────────
-const double _startAngleDeg = 135.0; // 最小值角度（左下方，逆时针修正后）
-const double _sweepAngleDeg = 270.0; // 总扫描角度
+const double _startAngleDeg = 135.0;
+const double _sweepAngleDeg = 270.0;
 
 const double _startAngleRad = _startAngleDeg * pi / 180;
 const double _sweepAngleRad = _sweepAngleDeg * pi / 180;
@@ -62,16 +62,35 @@ class ClassicGaugeWidget extends StatefulWidget {
   State<ClassicGaugeWidget> createState() => _ClassicGaugeWidgetState();
 }
 
-class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget> {
+class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
+    with SingleTickerProviderStateMixin {
+  // ── 图片资源 ──
   ui.Image? _bgImage;
   ui.Image? _pointerImage;
   bool _loading = true;
   String? _error;
 
+  // ── 自检动画 ──
+  late AnimationController _checkCtrl;
+  late Animation<double> _riseAnim; // 0 → maxValue
+  late Animation<double> _fallAnim; // maxValue → 0
+  bool _selfCheckDone = false;
+  int _maxValueCache = 0; // 图片加载完成时缓存 maxValue 用于动画
+
   @override
   void initState() {
     super.initState();
+    _checkCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
     _loadImages();
+  }
+
+  @override
+  void dispose() {
+    _checkCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadImages() async {
@@ -81,13 +100,38 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget> {
         _loadImage(_bgPaths[key]!),
         _loadImage(_pointerPaths[key]!),
       ]);
-      if (mounted) {
-        setState(() {
-          _bgImage = results[0];
-          _pointerImage = results[1];
-          _loading = false;
-        });
-      }
+      if (!mounted) return;
+
+      // 图片加载完成后读取 maxValue 并初始化动画
+      final settings = context.read<SettingsProvider>();
+      final maxValue = widget.type == GaugeType.rpm
+          ? settings.maxRpm.toDouble()
+          : settings.maxSpeed.toDouble();
+      _maxValueCache = maxValue.toInt();
+
+      _riseAnim = Tween<double>(begin: 0, end: maxValue).animate(
+        CurvedAnimation(
+          parent: _checkCtrl,
+          curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+        ),
+      );
+      _fallAnim = Tween<double>(begin: maxValue, end: 0).animate(
+        CurvedAnimation(
+          parent: _checkCtrl,
+          curve: const Interval(0.6, 1.0, curve: Curves.easeIn),
+        ),
+      );
+
+      setState(() {
+        _bgImage = results[0];
+        _pointerImage = results[1];
+        _loading = false;
+      });
+
+      // 图片就绪后立即启动自检
+      _checkCtrl.forward().whenComplete(() {
+        if (mounted) setState(() => _selfCheckDone = true);
+      });
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -104,6 +148,12 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget> {
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
     return frame.image;
+  }
+
+  // 自检阶段的模拟值
+  int get _selfCheckValue {
+    if (_checkCtrl.value <= 0.6) return _riseAnim.value.round();
+    return _fallAnim.value.round();
   }
 
   @override
@@ -130,52 +180,71 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget> {
     final settings = context.watch<SettingsProvider>();
     final obd = context.watch<OBDDataProvider>();
 
-    final int value;
+    final int obdValue;
     final int maxValue;
     final int warnValue;
     final int dangerValue;
     final String unit;
-    final String label;
+
     if (widget.type == GaugeType.rpm) {
-      value = obd.data.rpm;
+      obdValue = obd.data.rpm;
       maxValue = settings.maxRpm;
       warnValue = settings.warnRpm;
       dangerValue = settings.dangerRpm;
       unit = 'rpm';
-      label = 'RPM';
     } else {
-      value = obd.data.speed;
+      obdValue = obd.data.speed;
       maxValue = settings.maxSpeed;
       warnValue = settings.warnSpeed;
       dangerValue = settings.dangerSpeed;
       unit = 'km/h';
-      label = 'SPEED';
     }
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 留出边距给刻度标签：取宽高较小值，再乘以 0.80 缩小圆尺寸
         // 以高度为基准撑满可视区域，保留刻度标签边距
         final availableSize =
             constraints.maxHeight.clamp(0.0, constraints.maxWidth);
-        final radius = availableSize / 2 * 1;// 控制仪表大小
+        final radius = availableSize / 2 * 1; // 控制仪表大小
         final cx = constraints.maxWidth / 2;
         final cy = constraints.maxHeight / 2;
         final center = Offset(cx, cy);
+
+        // 自检阶段用动画值，完成后用真实 OBD 值
+        if (!_selfCheckDone) {
+          return AnimatedBuilder(
+            animation: _checkCtrl,
+            builder: (context, _) {
+              return CustomPaint(
+                size: Size(constraints.maxWidth, constraints.maxHeight),
+                painter: _ClassicGaugePainter(
+                  bgImage: _bgImage!,
+                  pointerImage: _pointerImage!,
+                  value: _selfCheckValue,
+                  maxValue: _maxValueCache > 0 ? _maxValueCache : maxValue,
+                  warnValue: warnValue,
+                  dangerValue: dangerValue,
+                  center: center,
+                  radius: radius,
+                  unit: unit,
+                ),
+              );
+            },
+          );
+        }
 
         return CustomPaint(
           size: Size(constraints.maxWidth, constraints.maxHeight),
           painter: _ClassicGaugePainter(
             bgImage: _bgImage!,
             pointerImage: _pointerImage!,
-            value: value,
+            value: obdValue,
             maxValue: maxValue,
             warnValue: warnValue,
             dangerValue: dangerValue,
             center: center,
             radius: radius,
             unit: unit,
-            label: label,
           ),
         );
       },
@@ -196,19 +265,19 @@ class _ClassicGaugePainter extends CustomPainter {
   final Offset center;
   final double radius;
   final String unit;
-  final String label;
 
   // 刻度参数
-  static const int _mainTickCount = 10; // 主刻度段数（共 11 个主刻度点）
-  static const int _subTickPerMain = 5; // 每段内的次刻度格数
-  static const double _mainTickLenRatio = 0.10; // 主刻度长度 / 半径
-  static const double _subTickLenRatio = 0.055; // 次刻度长度 / 半径
-  static const double _tickInnerRatio = 0.82; // 刻度内沿 / 半径
-  static const double _labelRadiusRatio = 0.65; // 刻度数值位置 / 半径
+  static const int _mainTickCount = 10;
+  static const int _subTickPerMain = 5;
+  static const double _mainTickLenRatio = 0.10;
+  static const double _subTickLenRatio = 0.055;
+  static const double _tickInnerRatio = 0.82;
+  static const double _labelRadiusRatio = 0.65;
 
-  // 指针参数（指针长 = 半径 × 比例）
-  static const double _pointerLenRatio = 1.10; // 比半径短，给刻度留空间
-  static const double _pointerMaxWidthRatio = 0.35; // 指针最大宽度 / 半径（防止图片过宽）
+  // 指针参数
+  static const double _pointerLenRatio = 1.12;
+  static const double _pointerMaxWidthRatio = 0.5;
+
   _ClassicGaugePainter({
     required this.bgImage,
     required this.pointerImage,
@@ -219,16 +288,13 @@ class _ClassicGaugePainter extends CustomPainter {
     required this.center,
     required this.radius,
     required this.unit,
-    required this.label,
   });
 
-  // 值 → 弧度（Flutter Canvas 顺时针，0° = 右）
   double _valueToAngle(double v) {
     final ratio = (v / maxValue).clamp(0.0, 1.0);
     return _startAngleRad + ratio * _sweepAngleRad;
   }
 
-  // 获取刻度颜色
   Color _tickColor(double tickValue) {
     if (tickValue >= dangerValue) return AppTheme.accentRed;
     if (tickValue >= warnValue) return AppTheme.accentOrange;
@@ -237,23 +303,17 @@ class _ClassicGaugePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // ── 1. 背景图（铺满内切正方形）──
-    final bgSide = radius * 2;
-    final bgRect = Rect.fromCenter(
-      center: center,
-      width: bgSide,
-      height: bgSide,
-    );
+    // ── 1. 背景图 ──
+    final bgSide = radius * 1.6;
+    final bgRect =
+        Rect.fromCenter(center: center, width: bgSide, height: bgSide);
     final bgSrc = Rect.fromLTWH(
-      0,
-      0,
-      bgImage.width.toDouble(),
-      bgImage.height.toDouble(),
-    );
+        0, 0, bgImage.width.toDouble(), bgImage.height.toDouble());
     canvas.drawImageRect(bgImage, bgSrc, bgRect, Paint());
 
     // ── 2. 刻度线 + 数值标签 ──
     _drawTicks(canvas);
+
     // ── 3. 指针 ──
     _drawPointer(canvas);
 
@@ -272,57 +332,40 @@ class _ClassicGaugePainter extends CustomPainter {
       final angle = _valueToAngle(tickValue);
       final color = _tickColor(tickValue);
 
-      // 主刻度线
-      final p1 = Offset(
-        center.dx + mainInner * cos(angle),
-        center.dy + mainInner * sin(angle),
-      );
-      final p2 = Offset(
-        center.dx + mainOuter * cos(angle),
-        center.dy + mainOuter * sin(angle),
-      );
       canvas.drawLine(
-        p1,
-        p2,
+        Offset(center.dx + mainInner * cos(angle),
+            center.dy + mainInner * sin(angle)),
+        Offset(center.dx + mainOuter * cos(angle),
+            center.dy + mainOuter * sin(angle)),
         Paint()
           ..color = color
           ..strokeWidth = 2.0
           ..strokeCap = StrokeCap.round,
       );
 
-      // 数值标签
       final labelR = radius * _labelRadiusRatio;
-      final lx = center.dx + labelR * cos(angle);
-      final ly = center.dy + labelR * sin(angle);
       final labelFontSize = (radius * 0.09).clamp(8.0, 14.0);
       _drawText(
         canvas,
         tickValue.toInt().toString(),
-        Offset(lx, ly),
+        Offset(
+            center.dx + labelR * cos(angle), center.dy + labelR * sin(angle)),
         color: color.withValues(alpha: 0.9),
         fontSize: labelFontSize,
         fontWeight: FontWeight.bold,
       );
 
-      // 次刻度线（最后一个主刻度后不画）
       if (i < _mainTickCount) {
         for (int j = 1; j < _subTickPerMain; j++) {
           final subValue =
               tickValue + (maxValue * j / (_mainTickCount * _subTickPerMain));
           final subAngle = _valueToAngle(subValue);
           final subColor = _tickColor(subValue);
-
-          final s1 = Offset(
-            center.dx + subInner * cos(subAngle),
-            center.dy + subInner * sin(subAngle),
-          );
-          final s2 = Offset(
-            center.dx + subOuter * cos(subAngle),
-            center.dy + subOuter * sin(subAngle),
-          );
           canvas.drawLine(
-            s1,
-            s2,
+            Offset(center.dx + subInner * cos(subAngle),
+                center.dy + subInner * sin(subAngle)),
+            Offset(center.dx + subOuter * cos(subAngle),
+                center.dy + subOuter * sin(subAngle)),
             Paint()
               ..color = subColor.withValues(alpha: 0.6)
               ..strokeWidth = 1.0
@@ -337,35 +380,27 @@ class _ClassicGaugePainter extends CustomPainter {
     final angle = _valueToAngle(value.toDouble());
     final pointerLen = radius * _pointerLenRatio;
 
-    // 指针宽度：按图片宽高比计算，但不超过最大宽度限制
     final imgW = pointerImage.width.toDouble();
     final imgH = pointerImage.height.toDouble();
     final ratioW = pointerLen * (imgW / imgH);
     final maxW = radius * _pointerMaxWidthRatio;
     final pointerW = ratioW.clamp(0.0, maxW);
+
     final srcRect = Rect.fromLTWH(0, 0, imgW, imgH);
-    // 以图片底部中心为轴（原点），向上绘制
-    final dstRect = Rect.fromLTWH(
-      -pointerW / 2,
-      -pointerLen,
-      pointerW,
-      pointerLen,
-    );
+    final dstRect =
+        Rect.fromLTWH(-pointerW / 2, -pointerLen, pointerW, pointerLen);
+
     canvas.save();
     canvas.translate(center.dx, center.dy);
-    // 旋转：angle 是值对应角度（Flutter Canvas 顺时针，0°=右）
-    // 指针图片竖直向上（-90°偏移）
     canvas.rotate(angle + pi / 2);
     canvas.drawImageRect(pointerImage, srcRect, dstRect, Paint());
     canvas.restore();
   }
 
   void _drawValueText(Canvas canvas) {
-    // 当前数值：圆心正下方
     final valueFontSize = (radius * 0.18).clamp(14.0, 32.0);
     final unitFontSize = (radius * 0.09).clamp(9.0, 16.0);
 
-    // 数值颜色跟随状态
     final Color valueColor;
     if (value >= dangerValue) {
       valueColor = AppTheme.accentRed;
@@ -375,27 +410,17 @@ class _ClassicGaugePainter extends CustomPainter {
       valueColor = AppTheme.textPrimary;
     }
 
-    // 数值位置：圆心下方
     final valueY = center.dy + radius * 0.45;
     final unitY = valueY + valueFontSize * 0.9;
 
-    _drawText(
-      canvas,
-      value.toString(),
-      Offset(center.dx, valueY),
-      color: valueColor,
-      fontSize: valueFontSize,
-      fontWeight: FontWeight.bold,
-    );
-
-    _drawText(
-      canvas,
-      unit,
-      Offset(center.dx, unitY),
-      color: AppTheme.textSecondary,
-      fontSize: unitFontSize,
-      fontWeight: FontWeight.w500,
-    );
+    _drawText(canvas, value.toString(), Offset(center.dx, valueY),
+        color: valueColor,
+        fontSize: valueFontSize,
+        fontWeight: FontWeight.bold);
+    _drawText(canvas, unit, Offset(center.dx, unitY),
+        color: AppTheme.textSecondary,
+        fontSize: unitFontSize,
+        fontWeight: FontWeight.w500);
   }
 
   void _drawText(
@@ -408,20 +433,13 @@ class _ClassicGaugePainter extends CustomPainter {
   }) {
     final span = TextSpan(
       text: text,
-      style: TextStyle(
-        color: color,
-        fontSize: fontSize,
-        fontWeight: fontWeight,
-      ),
+      style:
+          TextStyle(color: color, fontSize: fontSize, fontWeight: fontWeight),
     );
-    final painter = TextPainter(
-      text: span,
-      textDirection: TextDirection.ltr,
-    )..layout();
+    final painter = TextPainter(text: span, textDirection: TextDirection.ltr)
+      ..layout();
     painter.paint(
-      canvas,
-      center - Offset(painter.width / 2, painter.height / 2),
-    );
+        canvas, center - Offset(painter.width / 2, painter.height / 2));
   }
 
   @override

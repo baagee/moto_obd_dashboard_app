@@ -139,7 +139,7 @@ class _DisplaySettingsPanelState extends State<DisplaySettingsPanel> {
           SettingsRadioField(
             label: '选择风格',
             options: const ['cyberpunk', 'classic'],
-            optionLabels: const ['赛博朗克风格', '经典风格'],
+            optionLabels: const ['赛博朗克风格', '乌鸦哥招手'],
             currentValue: _draft['gaugeStyle'],
             onChanged: (v) => setState(() => _draft['gaugeStyle'] = v),
           ),
