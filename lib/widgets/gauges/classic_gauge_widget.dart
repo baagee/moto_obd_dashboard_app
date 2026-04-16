@@ -205,9 +205,10 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
         // 以高度为基准撑满可视区域，保留刻度标签边距
         final availableSize =
             constraints.maxHeight.clamp(0.0, constraints.maxWidth);
-        final radius = availableSize / 2 * 1; // 控制仪表大小
+        // 增大半径到 1.14，并下移中心点到 53% 高度位置
+        final radius = availableSize / 2 * 1.14;
         final cx = constraints.maxWidth / 2;
-        final cy = constraints.maxHeight / 2;
+        final cy = constraints.maxHeight * 0.53; // 下移中心
         final center = Offset(cx, cy);
 
         // 自检阶段用动画值，完成后用真实 OBD 值
