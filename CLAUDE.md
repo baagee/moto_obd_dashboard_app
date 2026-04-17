@@ -128,14 +128,15 @@ OBDData copyWith({
 ```
 
 #### 枚举定义
-- 枚举成员使用小写下划线命名风格
+- 枚举成员使用 **camelCase 命名风格**（项目实际惯例）
 - 枚举放在模型文件末尾或单独文件
 
 ```dart
 enum RidingEventType {
-  extremeLean,      // 极端倾角
-  hardBraking,     # 急刹车
-  rapidAcceleration, // 急加速
+  performanceBurst,   // 急加速
+  efficientCruising,  // 高效巡航
+  extremeLean,       // 极端倾角
+  gearShiftUp,       // 换挡
 }
 ```
 
@@ -396,7 +397,13 @@ AppTheme.spacing24  // 24dp
 
 #### 7.3 圆角规范
 
-统一使用 `BorderRadius.circular(12)` 作为卡片圆角，避免混用不同半径。
+使用预定义圆角常量：
+
+```dart
+AppTheme.radiusCard = 2    // 卡片圆角
+AppTheme.radiusButton = 2  // 按钮圆角
+AppTheme.radiusSmall = 0   // 小元素圆角
+```
 
 #### 7.4 禁止事项
 
@@ -421,6 +428,24 @@ AppTheme.spacing24  // 24dp
     <string>UIInterfaceOrientationLandscapeRight</string>
 </array>
 ```
+
+---
+
+## 已知违规 (Technical Debt)
+
+### withOpacity 使用违规
+
+**问题**: 项目中存在 **83 处** `withOpacity()` 调用，违反了"必须使用预定义透明度常量"的规范。
+
+**受影响文件示例**:
+- `lib/widgets/side_stats_panel.dart`
+- `lib/widgets/gauges/classic_gauge_widget.dart`
+- `lib/screens/record_screen.dart` (15处)
+- `lib/screens/logs_screen.dart` (12处)
+- `lib/screens/riding_track_screen.dart` (17处)
+
+**修复优先级**: 高
+**建议**: 逐步替换为 `AppTheme.primary30`、`AppTheme.primary50` 等预定义常量
 
 ---
 
@@ -515,3 +540,4 @@ dependencies:
 - 应用强制横屏方向并隐藏系统 UI 以获得沉浸式体验
 - 新增 Provider、Service、Model 必须遵循上述代码规范
 - 代码提交前必须运行 `flutter analyze` 确保无 error
+- 本文档由代码探索生成，如发现文档与实际实现不一致，请更新本文档

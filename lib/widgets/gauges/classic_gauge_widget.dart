@@ -128,9 +128,11 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
         _loading = false;
       });
 
-      // 图片就绪后立即启动自检
-      _checkCtrl.forward().whenComplete(() {
-        if (mounted) setState(() => _selfCheckDone = true);
+      // 图片就绪后延迟 350ms 启动自检
+      Future.delayed(const Duration(milliseconds: 350), () {
+        _checkCtrl.forward().whenComplete(() {
+          if (mounted) setState(() => _selfCheckDone = true);
+        });
       });
     } catch (e) {
       if (mounted) {

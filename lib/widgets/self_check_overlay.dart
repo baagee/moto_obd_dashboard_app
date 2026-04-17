@@ -100,8 +100,10 @@ class _SelfCheckOverlayState extends State<SelfCheckOverlay>
     );
 
     // 播放动画，完成后通知父组件移除覆盖层
-    _controller.forward().whenComplete(() {
-      if (mounted) widget.onComplete();
+    Future.delayed(const Duration(milliseconds: 200), () {
+      _controller.forward().whenComplete(() {
+        if (mounted) widget.onComplete();
+      });
     });
   }
 
