@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/obd_data_provider.dart';
+import '../theme/app_theme.dart';
 import '../widgets/combined_gauge_card.dart';
 import '../widgets/side_stats_panel.dart';
 import '../widgets/telemetry_chart_card.dart';
@@ -22,8 +23,27 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// 控制自检覆盖层是否显示，APP启动后只播放一次
   bool _showSelfCheck = true;
 
+  /// 控制风格切换提示是否显示
+  bool _showStyleHint = false;
+
   @override
   bool get wantKeepAlive => true;
+
+  /// 长按切换仪表盘风格
+  void _toggleGaugeStyle() {
+    final settings = context.read<SettingsProvider>();
+    final next = settings.gaugeStyle == 'classic' ? 'cyberpunk' : 'classic';
+    settings.setGaugeStyle(next);
+    // 切换回赛博朋克时重新播放自检动画
+    if (next == 'cyberpunk') {
+      setState(() => _showSelfCheck = true);
+    }
+    // 显示风格切换提示，1200ms 后自动消失
+    setState(() => _showStyleHint = true);
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _showStyleHint = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,32 +62,59 @@ class _DashboardScreenState extends State<DashboardScreen>
     final dangerSpeed =
         context.select<SettingsProvider, int>((s) => s.dangerSpeed);
 
-    return Container(
-      color: Colors.transparent,
-      child: Stack(
-        children: [
-          // ── 底层：根据风格切换布局 ──
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: gaugeStyle == 'classic'
-                ? const ClassicDashboardLayout(key: ValueKey('classic'))
-                : const _CyberpunkLayout(key: ValueKey('cyberpunk')),
-          ),
-
-          // ── 顶层：自检动画覆盖层（仅首次，仅赛博朋克风格） ──
-          if (_showSelfCheck && gaugeStyle != 'classic')
-            SelfCheckOverlay(
-              onComplete: () {
-                if (mounted) setState(() => _showSelfCheck = false);
-              },
-              maxRpm: maxRpm,
-              warnRpm: warnRpm,
-              dangerRpm: dangerRpm,
-              maxSpeed: maxSpeed,
-              warnSpeed: warnSpeed,
-              dangerSpeed: dangerSpeed,
+    return GestureDetector(
+      onLongPress: _toggleGaugeStyle,
+      // translucent：长按手势不拦截子 Widget 的点击事件
+      behavior: HitTestBehavior.translucent,
+      child: Container(
+        color: Colors.transparent,
+        child: Stack(
+          children: [
+            // ── 底层：根据风格切换布局 ──
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: gaugeStyle == 'classic'
+                  ? const ClassicDashboardLayout(key: ValueKey('classic'))
+                  : const _CyberpunkLayout(key: ValueKey('cyberpunk')),
             ),
-        ],
+
+            // ── 顶层：自检动画覆盖层（仅首次，仅赛博朋克风格） ──
+            if (_showSelfCheck && gaugeStyle != 'classic')
+              SelfCheckOverlay(
+                onComplete: () {
+                  if (mounted) setState(() => _showSelfCheck = false);
+                },
+                maxRpm: maxRpm,
+                warnRpm: warnRpm,
+                dangerRpm: dangerRpm,
+                maxSpeed: maxSpeed,
+                warnSpeed: warnSpeed,
+                dangerSpeed: dangerSpeed,
+              ),
+
+            // ── 风格切换提示（长按后短暂显示，居中顶部）──
+            Positioned(
+              top: 8,
+              left: 0,
+              right: 0,
+              child: AnimatedOpacity(
+                opacity: _showStyleHint ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                    decoration: AppTheme.surfaceBorder(),
+                    child: Text(
+                      gaugeStyle == 'classic' ? '⚡ 经典风格' : '🌐 赛博朋克',
+                      style: AppTheme.labelMediumPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
