@@ -230,6 +230,7 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
                   center: center,
                   radius: radius,
                   unit: unit,
+                  isRpm: widget.type == GaugeType.rpm,
                 ),
               );
             },
@@ -248,6 +249,7 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
             center: center,
             radius: radius,
             unit: unit,
+            isRpm: widget.type == GaugeType.rpm,
           ),
         );
       },
@@ -268,14 +270,36 @@ class _ClassicGaugePainter extends CustomPainter {
   final Offset center;
   final double radius;
   final String unit;
+  final bool isRpm;
 
   // 刻度参数
-  static const int _mainTickCount = 10;
   static const int _subTickPerMain = 5;
   static const double _mainTickLenRatio = 0.10;
   static const double _subTickLenRatio = 0.055;
   static const double _tickInnerRatio = 0.82;
   static const double _labelRadiusRatio = 0.68;
+
+  /// 计算最优主刻度步长，使刻度值为整洁数（如 1000、2000 或 24、48）
+  int _calcTickStep(int max) {
+    const int targetCount = 10;
+    final rawStep = max / targetCount;
+    final magnitude =
+        pow(10, (log(rawStep) / log(10)).floor()).toInt().clamp(1, max);
+    final candidates = [
+      magnitude,
+      magnitude * 2,
+      magnitude * 5,
+      magnitude * 10,
+    ];
+    for (final step in candidates) {
+      if (step > 0 && max % step == 0) {
+        final count = max ~/ step;
+        if (count >= 6 && count <= 14) return step;
+      }
+    }
+    // 兜底：取第二候选（2×magnitude）
+    return (magnitude * 2).clamp(1, max);
+  }
 
   // 指针参数
   static const double _pointerLenRatio = 0.82;
@@ -291,6 +315,7 @@ class _ClassicGaugePainter extends CustomPainter {
     required this.center,
     required this.radius,
     required this.unit,
+    this.isRpm = false,
   });
 
   double _valueToAngle(double v) {
@@ -314,7 +339,10 @@ class _ClassicGaugePainter extends CustomPainter {
         0, 0, bgImage.width.toDouble(), bgImage.height.toDouble());
     canvas.drawImageRect(bgImage, bgSrc, bgRect, Paint());
 
-    // ── 2. 刻度线 + 数值标签 ──
+    // ── 2. 分段弧形轨道 ──
+    _drawArcTrack(canvas);
+
+    // ── 3. 刻度线 + 数值标签 ──
     _drawTicks(canvas);
 
     // ── 3. 指针 ──
@@ -324,14 +352,74 @@ class _ClassicGaugePainter extends CustomPainter {
     _drawValueText(canvas);
   }
 
+  void _drawArcTrack(Canvas canvas) {
+    // 轨道半径：紧贴主刻度线外端稍外移
+    final trackRadius = radius * (_tickInnerRatio + _mainTickLenRatio + 0.03);
+    final trackStrokeWidth = (radius * 0.045).clamp(3.0, 8.0);
+
+    final arcRect = Rect.fromCenter(
+      center: center,
+      width: trackRadius * 2,
+      height: trackRadius * 2,
+    );
+
+    final normalEnd = _valueToAngle(warnValue.toDouble());
+    final warnEnd = _valueToAngle(dangerValue.toDouble());
+    final dangerEnd = _valueToAngle(maxValue.toDouble());
+
+    final segments = [
+      (_startAngleRad, normalEnd, AppTheme.primary, 0.55),
+      (normalEnd, warnEnd, AppTheme.accentOrange, 0.55),
+      (warnEnd, dangerEnd, AppTheme.accentRed, 0.55),
+    ];
+
+    for (final seg in segments) {
+      final start = seg.$1;
+      final end = seg.$2;
+      final color = seg.$3;
+      final alpha = seg.$4;
+      final sweep = end - start;
+      if (sweep <= 0) continue;
+
+      // 底层：发光散射
+      canvas.drawArc(
+        arcRect,
+        start,
+        sweep,
+        false,
+        Paint()
+          ..color = color.withValues(alpha: alpha * 0.35)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = trackStrokeWidth * 2.5
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+
+      // 上层：清晰轨道线
+      canvas.drawArc(
+        arcRect,
+        start,
+        sweep,
+        false,
+        Paint()
+          ..color = color.withValues(alpha: alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = trackStrokeWidth
+          ..strokeCap = StrokeCap.butt,
+      );
+    }
+  }
+
   void _drawTicks(Canvas canvas) {
+    final step = _calcTickStep(maxValue);
+    final tickCount = maxValue ~/ step;
+
     final mainOuter = radius * (_tickInnerRatio + _mainTickLenRatio);
     final mainInner = radius * _tickInnerRatio;
     final subOuter = radius * (_tickInnerRatio + _subTickLenRatio);
     final subInner = radius * _tickInnerRatio;
 
-    for (int i = 0; i <= _mainTickCount; i++) {
-      final tickValue = (maxValue * i / _mainTickCount).roundToDouble();
+    for (int i = 0; i <= tickCount; i++) {
+      final tickValue = (step * i).toDouble();
       final angle = _valueToAngle(tickValue);
       final color = _tickColor(tickValue);
 
@@ -347,11 +435,13 @@ class _ClassicGaugePainter extends CustomPainter {
       );
 
       final labelR = radius * _labelRadiusRatio;
-      // 控制刻度标签字体大小
-      final labelFontSize = (radius * 0.18).clamp(8.0, 14.0);
+      final labelFontSize = (radius * 0.25).clamp(10.0, 20.0);
+      // rpm 刻度标签除以 1000 显示（1、2、3...12），speed 直接显示原值
+      final labelText =
+          isRpm ? (tickValue ~/ 1000).toString() : tickValue.toInt().toString();
       _drawText(
         canvas,
-        tickValue.toInt().toString(),
+        labelText,
         Offset(
             center.dx + labelR * cos(angle), center.dy + labelR * sin(angle)),
         color: color.withValues(alpha: 0.9),
@@ -359,10 +449,11 @@ class _ClassicGaugePainter extends CustomPainter {
         fontWeight: FontWeight.bold,
       );
 
-      if (i < _mainTickCount) {
+      // 副刻度：步长可被 _subTickPerMain 整除时才绘制
+      if (i < tickCount) {
+        final subStep = step / _subTickPerMain;
         for (int j = 1; j < _subTickPerMain; j++) {
-          final subValue =
-              tickValue + (maxValue * j / (_mainTickCount * _subTickPerMain));
+          final subValue = tickValue + subStep * j;
           final subAngle = _valueToAngle(subValue);
           final subColor = _tickColor(subValue);
           canvas.drawLine(
@@ -402,8 +493,8 @@ class _ClassicGaugePainter extends CustomPainter {
   }
 
   void _drawValueText(Canvas canvas) {
-    final valueFontSize = (radius * 0.18).clamp(14.0, 32.0);
-    final unitFontSize = (radius * 0.09).clamp(9.0, 16.0);
+    final valueFontSize = (radius * 0.2).clamp(14.0, 32.0);
+    final unitFontSize = (radius * 0.1).clamp(9.0, 16.0);
 
     final Color valueColor;
     if (value >= dangerValue) {
@@ -414,14 +505,17 @@ class _ClassicGaugePainter extends CustomPainter {
       valueColor = AppTheme.textPrimary;
     }
 
-    final valueY = center.dy + radius * 0.45;
+    final valueY = center.dy + radius * 0.50;
     final unitY = valueY + valueFontSize * 0.9;
+
+    // rpm 显示实际值；单位行加 ×1000 标识
+    final displayUnit = isRpm ? '×1000  $unit' : unit;
 
     _drawText(canvas, value.toString(), Offset(center.dx, valueY),
         color: valueColor,
         fontSize: valueFontSize,
         fontWeight: FontWeight.bold);
-    _drawText(canvas, unit, Offset(center.dx, unitY),
+    _drawText(canvas, displayUnit, Offset(center.dx, unitY),
         color: AppTheme.textSecondary,
         fontSize: unitFontSize,
         fontWeight: FontWeight.w500);
@@ -453,6 +547,7 @@ class _ClassicGaugePainter extends CustomPainter {
         old.warnValue != warnValue ||
         old.dangerValue != dangerValue ||
         old.radius != radius ||
-        old.center != center;
+        old.center != center ||
+        old.isRpm != isRpm;
   }
 }
