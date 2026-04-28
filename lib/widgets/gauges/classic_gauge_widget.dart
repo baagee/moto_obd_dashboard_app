@@ -10,6 +10,80 @@ import '../../providers/settings_provider.dart';
 import '../../theme/app_theme.dart';
 
 // ───────────────────────────────────────────────
+// 经典风格档位指示器（两表中间上方）
+// ───────────────────────────────────────────────
+class ClassicGearIndicator extends StatelessWidget {
+  const ClassicGearIndicator({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final gear = context.select<OBDDataProvider, int>((p) => p.data.gear);
+    final isNeutral = gear == 0;
+    final glowColor = isNeutral ? AppTheme.accentOrange : AppTheme.accentCyan;
+    final displayText = isNeutral ? 'N' : '$gear';
+
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        color: AppTheme.surface50,
+        border: Border.all(
+          color: glowColor.withValues(alpha: 0.85),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: glowColor.withValues(alpha: 0.55),
+            blurRadius: 8,
+            spreadRadius: -1,
+          ),
+          BoxShadow(
+            color: glowColor.withValues(alpha: 0.20),
+            blurRadius: 18,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'GEAR',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+              color: AppTheme.primary.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 1),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            transitionBuilder: (child, anim) => ScaleTransition(
+              scale: anim,
+              child: FadeTransition(opacity: anim, child: child),
+            ),
+            child: Text(
+              displayText,
+              key: ValueKey(gear),
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                height: 1.0,
+                color: glowColor,
+                shadows: [
+                  Shadow(color: glowColor, blurRadius: 10),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ───────────────────────────────────────────────
 // 常量：270° 弧，起始于左下 135°（逆时针修正后）
 // ───────────────────────────────────────────────
 const double _startAngleDeg = 135.0;
@@ -36,10 +110,23 @@ class ClassicDashboardLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Stack(
       children: [
-        Expanded(child: ClassicGaugeWidget(type: GaugeType.rpm)),
-        Expanded(child: ClassicGaugeWidget(type: GaugeType.speed)),
+        // 底层：两个仪表盘（保持原样）
+        const Row(
+          children: [
+            Expanded(child: ClassicGaugeWidget(type: GaugeType.rpm)),
+            Expanded(child: ClassicGaugeWidget(type: GaugeType.speed)),
+          ],
+        ),
+        // 顶层：档位指示器，水平居中，距底部 12dp
+        const Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: ClassicGearIndicator(),
+          ),
+        ),
       ],
     );
   }

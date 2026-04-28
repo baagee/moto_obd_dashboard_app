@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/riding_record.dart';
 import '../screens/riding_track_screen.dart';
 import '../theme/app_theme.dart';
+import '../utils/riding_score_calculator.dart';
 import 'cyber_dialog.dart';
 import 'cyber_button.dart';
 
@@ -201,6 +202,11 @@ class SwipeableRecordCard extends StatelessWidget {
                   ],
                 ),
               ),
+              // 评分徽章（进行中骑行不展示）
+              if (_buildScoreBadge() case final badge?) ...[
+                badge,
+                const SizedBox(width: 6),
+              ],
               // 查看事件按钮
               GestureDetector(
                 onTap: onViewEvents,
@@ -351,6 +357,33 @@ class SwipeableRecordCard extends StatelessWidget {
       '${maxLean.toStringAsFixed(0)}°$direction',
       '',
       AppTheme.accentPink,
+    );
+  }
+
+  // codeflicker-fix: LOGIC-Issue-001/43xmi9uqvwsam9xer5lb
+  Widget? _buildScoreBadge() {
+    // 进行中的骑行（endTime == null）不展示评分
+    if (record.endTime == null) return null;
+    final score = RidingScoreCalculator.calculate(record);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: score.gradeColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+        border: Border.all(
+          color: score.gradeColor.withValues(alpha: 0.45),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        '${score.totalScore}分',
+        style: TextStyle(
+          color: score.gradeColor,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
     );
   }
 }
