@@ -49,8 +49,16 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
   List<Polyline> _cachedPolylines = [];
   double _cachedPolylineZoom = -1;
 
-  // 事件 Marker 缓存（数据加载后一次性构建，地图交互时直接复用）
-  List<Marker> _cachedEventMarkers = [];
+  // 有效事件列表（过滤掉无对应轨迹点的事件），与三套 Circle 缓存下标一一对应
+  List<_MappedEvent> _mappedEvents = [];
+
+  // 三套 CircleMarker 缓存（按 zoom 档预构建，地图交互时直接取引用，零分配）
+  List<CircleMarker> _circleCacheL0 = []; // zoom < 12：小圆点
+  List<CircleMarker> _circleCacheL1 = []; // 12 <= zoom < 15：中圆点
+  List<CircleMarker> _circleCacheL2 = []; // zoom >= 15：大圆点
+
+  // 当前点击选中的事件（用于高亮叠加层）
+  _MappedEvent? _selectedEvent;
 
   // 加载状态
   bool _isLoading = true;
@@ -94,15 +102,13 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         return LatLng(coords[0], coords[1]);
       }).toList();
 
-      // 数据加载完成后一次性构建事件 Marker 缓存（避免每次 build 重建）
-      final eventMarkers =
-          _buildEventMarkersFromData(events, gcjPoints, waypoints);
+      // 数据加载完成后一次性构建事件圆点缓存（避免每次 build 重建）
+      _buildMappedEvents(events, gcjPoints, waypoints);
 
       setState(() {
         _allWaypoints = waypoints;
         _cachedGcjPoints = gcjPoints;
         _events = events;
-        _cachedEventMarkers = eventMarkers;
         _isLoading = false;
         // 数据更新后清空 polyline 缓存
         _cachedPolylines = [];
@@ -300,40 +306,119 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     return lo;
   }
 
-  /// 一次性构建事件 Marker 列表（在数据加载完成后调用一次，结果缓存到 _cachedEventMarkers）
-  List<Marker> _buildEventMarkersFromData(
+  /// 一次性构建有效事件列表 + 三套 CircleMarker 缓存（数据加载完成后调用一次）
+  void _buildMappedEvents(
     List<RidingRecordEvent> events,
     List<LatLng> gcjPoints,
     List<RidingWaypoint> waypoints,
   ) {
-    if (gcjPoints.isEmpty || waypoints.isEmpty) return [];
-    final markers = <Marker>[];
+    if (gcjPoints.isEmpty || waypoints.isEmpty) return;
+    final mapped = <_MappedEvent>[];
     for (final event in events) {
-      // 二分查找最近轨迹点（O(logN)，原为 O(N) 线性搜索）
-      final minIdx = _findNearestWaypointIndex(waypoints, event.timestamp);
-      final minDiff = (waypoints[minIdx].timestamp - event.timestamp).abs();
-      if (minDiff > 30000) continue;
-      if (minIdx >= gcjPoints.length) continue;
-      final pos = gcjPoints[minIdx];
-      final color = RidingEventItem.colorFromType(event.type);
-      final icon = RidingEventItem.iconFromType(event.type);
-      markers.add(Marker(
-        point: pos,
-        width: 32,
-        height: 32,
-        child: RepaintBoundary(
-          child: GestureDetector(
-            onTap: () => _showEventDetail(context, event),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: color,
-              child: Icon(icon, color: Colors.white, size: 15),
-            ),
-          ),
-        ),
+      // 二分查找最近轨迹点（O(logN)）
+      final idx = _findNearestWaypointIndex(waypoints, event.timestamp);
+      if ((waypoints[idx].timestamp - event.timestamp).abs() > 30000) continue;
+      if (idx >= gcjPoints.length) continue;
+      mapped.add(_MappedEvent(
+        event: event,
+        point: gcjPoints[idx],
+        color: RidingEventItem.colorFromType(event.type),
+        icon: RidingEventItem.iconFromType(event.type),
       ));
     }
-    return markers;
+    _mappedEvents = mapped;
+    // 预构建三套缓存，地图交互时直接取引用，零分配
+    _circleCacheL0 = _buildCircles(radius: 4, borderWidth: 0, opacity: 0.6);
+    _circleCacheL1 = _buildCircles(radius: 8, borderWidth: 1.5, opacity: 0.85);
+    _circleCacheL2 = _buildCircles(radius: 11, borderWidth: 2.0, opacity: 0.95);
+  }
+
+  List<CircleMarker> _buildCircles({
+    required double radius,
+    required double borderWidth,
+    required double opacity,
+  }) {
+    return _mappedEvents
+        .map((e) => CircleMarker(
+              point: e.point,
+              radius: radius,
+              color: e.color.withOpacity(opacity),
+              borderColor: borderWidth > 0
+                  ? Colors.white.withOpacity(0.6)
+                  : Colors.transparent,
+              borderStrokeWidth: borderWidth,
+              useRadiusInMeter: false, // 屏幕像素，缩放时大小固定
+            ))
+        .toList();
+  }
+
+  /// 按 zoom 档返回对应缓存引用（不重建对象，零分配）
+  List<CircleMarker> _getCircleCache(double zoom) {
+    if (zoom < 12) return _circleCacheL0;
+    if (zoom < 15) return _circleCacheL1;
+    return _circleCacheL2;
+  }
+
+  /// 选中态高亮 Marker（圆环 + icon），最多同时存在 1 个
+  Marker _buildSelectedEventMarker(_MappedEvent me) {
+    return Marker(
+      point: me.point,
+      width: 44,
+      height: 44,
+      child: RepaintBoundary(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // 外发光环
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: me.color, width: 2),
+                color: me.color.withOpacity(0.15),
+              ),
+            ),
+            // 中心 icon
+            Icon(me.icon, color: me.color, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// onTap 命中检测（屏幕像素空间，精度高且与缩放无关）
+  static const double _kHitRadiusPx = 28.0;
+
+  void _handleMapTap(TapPosition tapPos) {
+    if (_currentZoom < 12 || _mappedEvents.isEmpty) {
+      if (_selectedEvent != null) setState(() => _selectedEvent = null);
+      return;
+    }
+    final tapPx = tapPos.relative;
+    if (tapPx == null) return;
+
+    double minDistSq = double.infinity;
+    _MappedEvent? nearest;
+
+    for (final me in _mappedEvents) {
+      final pt = _mapController.camera.latLngToScreenOffset(me.point);
+      final dx = pt.dx - tapPx.dx;
+      final dy = pt.dy - tapPx.dy;
+      final distSq = dx * dx + dy * dy;
+      if (distSq < minDistSq) {
+        minDistSq = distSq;
+        nearest = me;
+      }
+    }
+
+    const hitSq = _kHitRadiusPx * _kHitRadiusPx;
+    if (nearest != null && minDistSq <= hitSq) {
+      setState(() => _selectedEvent = nearest);
+      _showEventDetail(context, nearest.event);
+    } else {
+      if (_selectedEvent != null) setState(() => _selectedEvent = null);
+    }
   }
 
   @override
@@ -472,19 +557,29 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
             }
           });
         },
+        // 全局 onTap：替代每个 Marker 的 GestureDetector，减少命中测试压力
+        onTap: (tapPos, _) => _handleMapTap(tapPos),
       ),
       children: [
-        // 底图（根据样式切换）
+        // 1. 底图（根据样式切换）
         _buildTileLayer(),
-        // 速度渐变轨迹折线
+
+        // 2. 速度渐变轨迹折线
         PolylineLayer(
           polylines: _buildGradientPolylines(_currentZoom),
         ),
-        // 合并所有 Marker 到单个 Layer（性能优化：减少 Layer 数量）
+
+        // 3. 事件圆点（纯 Canvas 绘制，零 Widget 树，三档 zoom 分级）
+        if (_mappedEvents.isNotEmpty)
+          CircleLayer(circles: _getCircleCache(_currentZoom)),
+
+        // 4. 选中事件高亮圆环 + icon（最多 1 个 Marker，仅 zoom >= 12 且有选中时）
+        if (_selectedEvent != null && _currentZoom >= 12)
+          MarkerLayer(markers: [_buildSelectedEventMarker(_selectedEvent!)]),
+
+        // 5. 起点 / 终点 / 游标（固定 2~3 个，与事件层分离，各自 RepaintBoundary 缓存）
         MarkerLayer(
           markers: [
-            // 骑行事件 Marker（20+ 个）
-            ..._cachedEventMarkers,
             // 起点 Marker
             Marker(
               point: _cachedGcjPoints.first,
@@ -935,4 +1030,19 @@ class _WaypointBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 有效事件 + 对应地图位置 + 渲染属性（与三套 CircleMarker 缓存一一对应）
+class _MappedEvent {
+  final RidingRecordEvent event;
+  final LatLng point;
+  final Color color;
+  final IconData icon;
+
+  const _MappedEvent({
+    required this.event,
+    required this.point,
+    required this.color,
+    required this.icon,
+  });
 }

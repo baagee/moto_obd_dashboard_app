@@ -1,6 +1,68 @@
 # CLAUDE.md
 
-本文档为 Claude Code (claude.ai/code) 在本项目中工作时提供指导。
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
 ## 项目概述
 
@@ -335,131 +397,6 @@ static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
 
 ---
 
-### 7. 设计系统
-
-#### 7.1 颜色规范 (AppTheme)
-
-**基础颜色** - 定义在 `lib/theme/app_theme.dart`：
-
-| 常量 | 色值 | 用途 |
-|------|------|------|
-| `primary` | `#0DA6F2` | 主强调色（蓝色） |
-| `backgroundDark` | `#0A1114` | 应用背景 |
-| `surface` | `#162229` | 卡片/面板背景 |
-| `accentCyan` | `#00F2FF` | 青色霓虹强调 |
-| `accentRed` | `#FFFF4D4D` | 危险/错误状态 |
-| `accentOrange` | `#FFFFAB40` | 警告状态 |
-| `accentGreen` | `#FF00E676` | 成功/正常状态 |
-| `accentPurple` | `#FF9C27B0` | 速度警告 |
-| `accentPink` | `#FFE91E63` | 仪表指针 |
-| `slateGray` | `#FF1E293B` | 进度条背景/深色分隔线 |
-| `textPrimary` | `#FFFFFFFF` | 主要文字 |
-| `textSecondary` | `#FF9CA3AF` | 次要文字 |
-| `textMuted` | `#FF6B7280` | 弱化文字 |
-
-**预定义透明度变体** - **必须使用这些常量，禁止使用 `withOpacity()`**：
-
-```dart
-// primary 透明度变体
-AppTheme.primary60   // 0.6 opacity
-AppTheme.primary50   // 0.5 opacity
-AppTheme.primary40   // 0.4 opacity
-AppTheme.primary30   // 0.3 opacity
-AppTheme.primary20   // 0.2 opacity
-AppTheme.primary10   // 0.1 opacity
-
-// surface 透明度变体
-AppTheme.surface40   // 0.4 opacity
-
-// backgroundDark 透明度变体
-AppTheme.backgroundDark30  // 0.3 opacity
-AppTheme.backgroundDark50  // 0.5 opacity
-
-// 其他透明度
-AppTheme.accentCyan20     // 0.2 opacity
-AppTheme.accentOrange20   // 0.2 opacity
-```
-
-#### 7.2 间距规范
-
-使用预定义间距常量，禁止硬编码数值：
-
-```dart
-AppTheme.spacing2   // 2dp
-AppTheme.spacing4   // 4dp
-AppTheme.spacing6   // 6dp
-AppTheme.spacing8   // 8dp
-AppTheme.spacing12  // 12dp
-AppTheme.spacing16  // 16dp
-AppTheme.spacing20  // 20dp
-AppTheme.spacing24  // 24dp
-```
-
-#### 7.3 圆角规范
-
-使用预定义圆角常量：
-
-```dart
-AppTheme.radiusCard = 2    // 卡片圆角
-AppTheme.radiusButton = 2  // 按钮圆角
-AppTheme.radiusSmall = 0   // 小元素圆角
-```
-
-#### 7.4 禁止事项
-
-- **禁止**使用 `withOpacity()` - 必须使用预定义透明度常量
-- **禁止**硬编码颜色 hex 值 - 必须使用 `AppTheme.*` 常量
-- **禁止**在 CustomPainter 中使用原始 hex 值 - 必须引用 AppTheme 常量
-
-#### 7.5 平台横屏配置
-
-**Android** - `android/app/src/main/AndroidManifest.xml`:
-```xml
-<activity
-    android:screenOrientation="landscape"
-    ... />
-```
-
-**iOS** - `ios/Runner/Info.plist`:
-```xml
-<key>UISupportedInterfaceOrientations</key>
-<array>
-    <string>UIInterfaceOrientationLandscapeLeft</string>
-    <string>UIInterfaceOrientationLandscapeRight</string>
-</array>
-```
-
----
-
-## 已知违规 (Technical Debt)
-
-### withOpacity 使用违规
-
-**问题**: 项目中存在 **83 处** `withOpacity()` 调用，违反了"必须使用预定义透明度常量"的规范。
-
-**受影响文件示例**:
-- `lib/widgets/side_stats_panel.dart`
-- `lib/widgets/gauges/classic_gauge_widget.dart`
-- `lib/screens/record_screen.dart` (15处)
-- `lib/screens/logs_screen.dart` (12处)
-- `lib/screens/riding_track_screen.dart` (17处)
-
-**修复优先级**: 高
-**建议**: 逐步替换为 `AppTheme.primary30`、`AppTheme.primary50` 等预定义常量
-
----
-
-## Flutter Expert 技能约束
-
-本项目在 `.agents/skills/flutter-expert/SKILL.md` 中有自定义技能。**必须遵守以下约束**：
-
-- 尽可能使用 const 构造函数
-- 使用 `Consumer<Provider>` 监听 widgets 中的状态变化
-- **禁止**在 `build()` 方法中构建 widgets（应分离为独立方法）
-- **禁止**使用 `setState` 管理应用级状态
-
----
-
 ## 重要规范
 
 ### 日志系统
@@ -514,25 +451,6 @@ AppTheme.radiusSmall = 0   // 小元素圆角
 
 ---
 
-## 外部依赖
-
-```yaml
-dependencies:
-  flutter:
-    sdk: flutter
-  cupertino_icons: ^1.0.6
-  google_fonts: ^6.1.0
-  fl_chart: ^0.66.0
-  provider: ^6.1.1
-  permission_handler: ^11.0.0
-  flutter_blue_plus: ^1.32.0
-  android_intent_plus: ^4.0.2
-  share_plus: ^7.0.0
-  path_provider: ^2.1.0
-```
-
----
-
 ## 重要说明
 
 - 项目中使用中文和用户交流
@@ -541,3 +459,137 @@ dependencies:
 - 新增 Provider、Service、Model 必须遵循上述代码规范
 - 代码提交前必须运行 `flutter analyze` 确保无 error
 - 本文档由代码探索生成，如发现文档与实际实现不一致，请更新本文档
+
+<!-- rtk-instructions v2 -->
+# RTK (Rust Token Killer) - Token-Optimized Commands
+
+## Golden Rule
+
+**Always prefix commands with `rtk`**. If RTK has a dedicated filter, it uses it. If not, it passes through unchanged. This means RTK is always safe to use.
+
+**Important**: Even in command chains with `&&`, use `rtk`:
+```bash
+# ❌ Wrong
+git add . && git commit -m "msg" && git push
+
+# ✅ Correct
+rtk git add . && rtk git commit -m "msg" && rtk git push
+```
+
+## RTK Commands by Workflow
+
+### Build & Compile (80-90% savings)
+```bash
+rtk cargo build         # Cargo build output
+rtk cargo check         # Cargo check output
+rtk cargo clippy        # Clippy warnings grouped by file (80%)
+rtk tsc                 # TypeScript errors grouped by file/code (83%)
+rtk lint                # ESLint/Biome violations grouped (84%)
+rtk prettier --check    # Files needing format only (70%)
+rtk next build          # Next.js build with route metrics (87%)
+```
+
+### Test (90-99% savings)
+```bash
+rtk cargo test          # Cargo test failures only (90%)
+rtk vitest run          # Vitest failures only (99.5%)
+rtk playwright test     # Playwright failures only (94%)
+rtk test <cmd>          # Generic test wrapper - failures only
+```
+
+### Git (59-80% savings)
+```bash
+rtk git status          # Compact status
+rtk git log             # Compact log (works with all git flags)
+rtk git diff            # Compact diff (80%)
+rtk git show            # Compact show (80%)
+rtk git add             # Ultra-compact confirmations (59%)
+rtk git commit          # Ultra-compact confirmations (59%)
+rtk git push            # Ultra-compact confirmations
+rtk git pull            # Ultra-compact confirmations
+rtk git branch          # Compact branch list
+rtk git fetch           # Compact fetch
+rtk git stash           # Compact stash
+rtk git worktree        # Compact worktree
+```
+
+Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
+
+### GitHub (26-87% savings)
+```bash
+rtk gh pr view <num>    # Compact PR view (87%)
+rtk gh pr checks        # Compact PR checks (79%)
+rtk gh run list         # Compact workflow runs (82%)
+rtk gh issue list       # Compact issue list (80%)
+rtk gh api              # Compact API responses (26%)
+```
+
+### JavaScript/TypeScript Tooling (70-90% savings)
+```bash
+rtk pnpm list           # Compact dependency tree (70%)
+rtk pnpm outdated       # Compact outdated packages (80%)
+rtk pnpm install        # Compact install output (90%)
+rtk npm run <script>    # Compact npm script output
+rtk npx <cmd>           # Compact npx command output
+rtk prisma              # Prisma without ASCII art (88%)
+```
+
+### Files & Search (60-75% savings)
+```bash
+rtk ls <path>           # Tree format, compact (65%)
+rtk read <file>         # Code reading with filtering (60%)
+rtk grep <pattern>      # Search grouped by file (75%)
+rtk find <pattern>      # Find grouped by directory (70%)
+```
+
+### Analysis & Debug (70-90% savings)
+```bash
+rtk err <cmd>           # Filter errors only from any command
+rtk log <file>          # Deduplicated logs with counts
+rtk json <file>         # JSON structure without values
+rtk deps                # Dependency overview
+rtk env                 # Environment variables compact
+rtk summary <cmd>       # Smart summary of command output
+rtk diff                # Ultra-compact diffs
+```
+
+### Infrastructure (85% savings)
+```bash
+rtk docker ps           # Compact container list
+rtk docker images       # Compact image list
+rtk docker logs <c>     # Deduplicated logs
+rtk kubectl get         # Compact resource list
+rtk kubectl logs        # Deduplicated pod logs
+```
+
+### Network (65-70% savings)
+```bash
+rtk curl <url>          # Compact HTTP responses (70%)
+rtk wget <url>          # Compact download output (65%)
+```
+
+### Meta Commands
+```bash
+rtk gain                # View token savings statistics
+rtk gain --history      # View command history with savings
+rtk discover            # Analyze Claude Code sessions for missed RTK usage
+rtk proxy <cmd>         # Run command without filtering (for debugging)
+rtk init                # Add RTK instructions to CLAUDE.md
+rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
+```
+
+## Token Savings Overview
+
+| Category | Commands | Typical Savings |
+|----------|----------|-----------------|
+| Tests | vitest, playwright, cargo test | 90-99% |
+| Build | next, tsc, lint, prettier | 70-87% |
+| Git | status, log, diff, add, commit | 59-80% |
+| GitHub | gh pr, gh run, gh issue | 26-87% |
+| Package Managers | pnpm, npm, npx | 70-90% |
+| Files | ls, read, grep, find | 60-75% |
+| Infrastructure | docker, kubectl | 85% |
+| Network | curl, wget | 65-70% |
+
+Overall average: **60-90% token reduction** on common development operations.
+<!-- /rtk-instructions -->
