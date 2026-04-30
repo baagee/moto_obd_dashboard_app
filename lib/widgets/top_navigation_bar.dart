@@ -62,7 +62,8 @@ class TopNavigationBar extends StatelessWidget {
                           ),
                         ),
                         TextSpan(
-                          text: 'OBD_v2.0',
+                          text: String.fromEnvironment('APP_VERSION',
+                              defaultValue: 'OBD_v2.0'),
                           style: TextStyle(
                             color: AppTheme.primary,
                             fontSize: 9,

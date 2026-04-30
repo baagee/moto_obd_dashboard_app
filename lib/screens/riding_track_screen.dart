@@ -588,7 +588,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
               child: const RepaintBoundary(
                 child: _TrackPin(
                   color: Color(0xFF00F5FF),
-                  icon: Icons.flag_outlined,
+                  label: '起',
                 ),
               ),
             ),
@@ -600,7 +600,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
               child: const RepaintBoundary(
                 child: _TrackPin(
                   color: Color(0xFFFF2D87),
-                  icon: Icons.sports_score,
+                  label: '终',
                 ),
               ),
             ),
@@ -867,9 +867,9 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
 /// 起/终点图钉
 class _TrackPin extends StatelessWidget {
   final Color color;
-  final IconData icon;
+  final String label;
 
-  const _TrackPin({required this.color, required this.icon});
+  const _TrackPin({required this.color, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -886,7 +886,17 @@ class _TrackPin extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(icon, color: Colors.white, size: 10),
+      child: Center(
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            height: 1,
+          ),
+        ),
+      ),
     );
   }
 }
