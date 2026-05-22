@@ -6,6 +6,7 @@ import '../widgets/settings/panels/display_settings_panel.dart';
 import '../widgets/settings/panels/bluetooth_settings_panel.dart';
 import '../widgets/settings/panels/api_settings_panel.dart';
 import '../widgets/settings/panels/advanced_settings_panel.dart';
+import '../widgets/settings/panels/engine_sound_settings_panel.dart';
 
 /// 设置页面
 ///
@@ -29,6 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _NavGroup(icon: Icons.notifications_active_outlined, label: '骑行事件'),
     _NavGroup(icon: Icons.speed_outlined, label: '仪表盘'),
     _NavGroup(icon: Icons.bluetooth_outlined, label: '蓝牙'),
+    _NavGroup(icon: Icons.graphic_eq_outlined, label: '声浪系统'),
     _NavGroup(icon: Icons.api_outlined, label: '第三方服务'),
     _NavGroup(icon: Icons.tune_outlined, label: '高级设置'),
   ];
@@ -57,6 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 EventsSettingsPanel(),
                 DisplaySettingsPanel(),
                 BluetoothSettingsPanel(),
+                EngineSoundSettingsPanel(),
                 ApiSettingsPanel(),
                 AdvancedSettingsPanel(),
               ],

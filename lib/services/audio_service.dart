@@ -18,6 +18,19 @@ class AudioService extends ChangeNotifier {
 
   void Function(String, LogType, String)? _logCallback;
 
+  /// 声浪系统激活标志
+  /// 当 EngineSoundProvider 启动声浪时设为 true，playAsset 将跳过播放
+  bool _engineSoundActive = false;
+
+  /// 由 EngineSoundProvider 调用，启动/停止声浪时设置
+  void setEngineSoundActive(bool active) {
+    _engineSoundActive = active;
+    notifyListeners();
+  }
+
+  /// 声浪是否正在激活
+  bool get engineSoundActive => _engineSoundActive;
+
   AudioService({LogProvider? logProvider}) {
     if (logProvider != null) {
       _logCallback = createLogger(logProvider);
@@ -65,6 +78,11 @@ class AudioService extends ChangeNotifier {
     String assetPath, {
     int Function()? getDurationMs,
   }) async {
+    // 声浪开启时，跳过事件提醒，避免与声浪互相干扰
+    if (_engineSoundActive) {
+      _logCallback?.call(_source, LogType.info, '声浪激活中，跳过提醒音: $assetPath');
+      return;
+    }
     // 停止上一个（会 release 焦点）
     await stop();
 

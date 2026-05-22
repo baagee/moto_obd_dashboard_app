@@ -334,6 +334,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.4.6"
+  flutter_soloud:
+    dependency: "direct main"
+    description:
+      name: flutter_soloud
+      sha256: c1f678187c9f11d22edde1fbcfe0fd51d932b7fc9098c609cb2ff071a5e3dc7a
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "2.1.7"
   flutter_test:
     dependency: "direct dev"
     description: flutter

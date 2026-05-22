@@ -295,6 +295,39 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setDangerSpeed(int v) =>
       _setInt('settings_display_dangerSpeed', v);
 
+  // ===== 声浪系统 =====
+
+  /// 声浪系统开关
+  bool get engineSoundEnabled =>
+      _getBool('settings_engineSound_enabled', false);
+
+  /// 音量 0.0 ~ 1.0
+  double get engineSoundVolume =>
+      _getDouble('settings_engineSound_volume', 0.75);
+
+  /// 风格：'i4' | 'v4' | 'i6' | 'v8'
+  String get engineSoundStyle =>
+      _getString('settings_engineSound_style', 'i4');
+
+  /// 随机扰动量 0.0 ~ 1.0
+  double get engineSoundWobble =>
+      _getDouble('settings_engineSound_wobble', 0.40);
+
+  /// 排气混合比 0.0 ~ 1.0
+  double get engineSoundExhaust =>
+      _getDouble('settings_engineSound_exhaust', 0.50);
+
+  Future<void> setEngineSoundEnabled(bool v) =>
+      _setBool('settings_engineSound_enabled', v);
+  Future<void> setEngineSoundVolume(double v) =>
+      _setDouble('settings_engineSound_volume', v);
+  Future<void> setEngineSoundStyle(String v) =>
+      _setString('settings_engineSound_style', v);
+  Future<void> setEngineSoundWobble(double v) =>
+      _setDouble('settings_engineSound_wobble', v);
+  Future<void> setEngineSoundExhaust(double v) =>
+      _setDouble('settings_engineSound_exhaust', v);
+
   // ===== 第三方服务 =====
 
   /// 高德 Web 服务 API Key
@@ -407,6 +440,13 @@ class SettingsProvider extends ChangeNotifier {
     ],
     'api': [
       'settings_api_amapKey',
+    ],
+    'engineSound': [
+      'settings_engineSound_enabled',
+      'settings_engineSound_volume',
+      'settings_engineSound_style',
+      'settings_engineSound_wobble',
+      'settings_engineSound_exhaust',
     ],
     'advanced': [
       'settings_advanced_sensorAlpha',

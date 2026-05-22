@@ -10,6 +10,7 @@ import 'providers/riding_stats_provider.dart';
 import 'providers/riding_record_provider.dart';
 import 'providers/navigation_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/engine_sound_provider.dart';
 import 'utils/gear_util.dart';
 import 'services/audio_service.dart';
 import 'services/brightness_service.dart';
@@ -151,6 +152,30 @@ void main() async {
                   audioService: context.read<AudioService>(),
                   ridingRecordProvider: context.read<RidingRecordProvider>(),
                   settingsProvider: settings,
+                );
+          },
+        ),
+
+        // 发动机声浪 Provider（依赖 OBDDataProvider + SettingsProvider + AudioService）
+        ChangeNotifierProxyProvider3<OBDDataProvider, SettingsProvider,
+            AudioService, EngineSoundProvider>(
+          create: (context) {
+            final provider = EngineSoundProvider(
+              obdData: context.read<OBDDataProvider>(),
+              settings: context.read<SettingsProvider>(),
+              audioService: context.read<AudioService>(),
+            );
+            // 后台初始化（合成 PCM + 启动 SoLoud），不阻塞 UI
+            provider.init();
+            return provider;
+          },
+          update: (context, obdData, settings, audioService, previous) {
+            previous?.updateSettings(settings);
+            return previous ??
+                EngineSoundProvider(
+                  obdData: obdData,
+                  settings: settings,
+                  audioService: audioService,
                 );
           },
         ),

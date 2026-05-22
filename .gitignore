@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+.claude
+.codeflicker
+.agents
+.planning
+.playwright-cli
+.superpowers
+# Vibe Code runtime and dependencies
+.codeflicker/runtime/
+.codeflicker/hooks/node_modules/
+.codeflicker/hooks/package-lock.json
