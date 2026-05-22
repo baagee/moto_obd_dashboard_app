@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/engine_sound_style.dart';
+import '../models/obd_data.dart';
+import '../providers/log_provider.dart';
+import '../providers/loggable.dart';
 import '../providers/obd_data_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/audio_service.dart';
@@ -22,6 +25,10 @@ class EngineSoundProvider extends ChangeNotifier {
 
   late final EngineSoundSynthesizer _synth;
   late final EngineSoundEngine _engine;
+
+  static const String _source = 'EngineSound';
+
+  void Function(String source, LogType type, String message)? _logCallback;
 
   // 状态
   bool _isReady = false; // PCM 合成完成 + SoLoud 就绪
@@ -50,11 +57,32 @@ class EngineSoundProvider extends ChangeNotifier {
     required OBDDataProvider obdData,
     required SettingsProvider settings,
     required AudioService audioService,
+    LogProvider? logProvider,
   })  : _obdData = obdData,
         _settings = settings,
         _audioService = audioService {
+    if (logProvider != null) {
+      _logCallback = createLogger(logProvider);
+    }
     _synth = EngineSoundSynthesizer();
-    _engine = EngineSoundEngine(synth: _synth);
+    _engine = EngineSoundEngine(
+      synth: _synth,
+      logCallback: _logCallback,
+    );
+    // 监听设备连接状态：断开时立即停止声浪
+    _obdData.addListener(_onConnectionChanged);
+  }
+
+  void _log(LogType type, String message) {
+    _logCallback?.call(_source, type, message);
+  }
+
+  /// 设备断开时自动停止声浪
+  void _onConnectionChanged() {
+    if (!_obdData.isDeviceConnected && _isPlaying) {
+      _log(LogType.info, '设备断开，自动停止声浪');
+      stopEngineSound();
+    }
   }
 
   // ───────────────────────────────────────────────
@@ -65,15 +93,15 @@ class EngineSoundProvider extends ChangeNotifier {
   /// 在 main.dart 中启动后台初始化（不阻塞 UI）
   Future<void> init() async {
     try {
-      debugPrint('[EngineSoundProvider] 开始 PCM 合成...');
+      _log(LogType.info, '开始 PCM 合成...');
       await _synth.init(); // ~200~500ms 在 Dart 中执行
       await _engine.initSoLoud();
       _isReady = _engine.isInitialized;
-      debugPrint('[EngineSoundProvider] 初始化完成，ready=$_isReady');
+      _log(LogType.success, '初始化完成，ready=$_isReady');
     } catch (e) {
       _initError = e.toString();
       _isReady = false;
-      debugPrint('[EngineSoundProvider] 初始化失败: $e');
+      _log(LogType.error, '初始化失败: $e');
     }
     notifyListeners();
 
@@ -103,7 +131,7 @@ class EngineSoundProvider extends ChangeNotifier {
     _isPlaying = true;
     _startPolling();
     notifyListeners();
-    debugPrint('[EngineSoundProvider] 声浪已启动: ${style.name}');
+    _log(LogType.info, '声浪已启动: ${style.name}');
   }
 
   /// 停止声浪播放
@@ -118,7 +146,7 @@ class EngineSoundProvider extends ChangeNotifier {
 
     _isPlaying = false;
     notifyListeners();
-    debugPrint('[EngineSoundProvider] 声浪已停止');
+    _log(LogType.info, '声浪已停止');
   }
 
   /// 切换开关（供 SettingsProvider 联动）
@@ -244,6 +272,7 @@ class EngineSoundProvider extends ChangeNotifier {
 
   @override
   Future<void> dispose() async {
+    _obdData.removeListener(_onConnectionChanged);
     _stopPolling();
     await _engine.stop();
     _audioService.setEngineSoundActive(false);

@@ -1,7 +1,7 @@
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 import '../models/engine_sound_style.dart';
+import '../models/obd_data.dart';
 import 'engine_sound_synthesizer.dart';
 
 /// 发动机声浪播放引擎（SoLoud 驱动）
@@ -17,6 +17,11 @@ import 'engine_sound_synthesizer.dart';
 /// 不与 AudioService（audioplayers）共享引擎实例。
 class EngineSoundEngine {
   final EngineSoundSynthesizer _synth;
+
+  static const String _source = 'EngineSound';
+
+  /// 日志回调，由 EngineSoundProvider 通过 createLogger(logProvider) 注入
+  void Function(String source, LogType type, String message)? logCallback;
 
   SoLoud? _soLoud;
   bool _isInitialized = false;
@@ -35,7 +40,7 @@ class EngineSoundEngine {
   AudioSource? _upshiftSource;
   AudioSource? _downshiftSource;
 
-  // 当前风格 id（可供调试/日志使用）
+  // 当前风格 id（可供日志使用）
   String _currentStyleId = 'i4';
 
   String get currentStyleId => _currentStyleId;
@@ -52,9 +57,16 @@ class EngineSoundEngine {
   // 当前播放速度
   double _currentPlaySpeed = 1.0;
 
-  EngineSoundEngine({required EngineSoundSynthesizer synth}) : _synth = synth;
+  EngineSoundEngine({
+    required EngineSoundSynthesizer synth,
+    this.logCallback,
+  }) : _synth = synth;
 
   bool get isInitialized => _isInitialized;
+
+  void _log(LogType type, String message) {
+    logCallback?.call(_source, type, message);
+  }
 
   // ───────────────────────────────────────────────
   // 初始化 SoLoud
@@ -69,9 +81,9 @@ class EngineSoundEngine {
         bufferSize: 512, // 低延迟缓冲区
       );
       _isInitialized = true;
-      debugPrint('[EngineSoundEngine] SoLoud 初始化成功');
+      _log(LogType.success, 'SoLoud 初始化成功');
     } catch (e) {
-      debugPrint('[EngineSoundEngine] SoLoud 初始化失败: $e');
+      _log(LogType.error, 'SoLoud 初始化失败: $e');
       _isInitialized = false;
     }
   }
@@ -134,16 +146,16 @@ class EngineSoundEngine {
         );
       }
 
-      debugPrint('[EngineSoundEngine] 开始播放风格: ${style.name}');
+      _log(LogType.info, '开始播放风格: ${style.name}');
     } catch (e) {
-      debugPrint('[EngineSoundEngine] 启动失败: $e');
+      _log(LogType.error, '启动失败: $e');
     }
   }
 
   /// 停止所有播放
   Future<void> stop() async {
     await _stopCurrentVoices();
-    debugPrint('[EngineSoundEngine] 停止播放');
+    _log(LogType.info, '停止播放');
   }
 
   // ───────────────────────────────────────────────
@@ -242,7 +254,7 @@ class EngineSoundEngine {
     try {
       await _soLoud!.play(source, volume: _masterVolume * 0.8);
     } catch (e) {
-      debugPrint('[EngineSoundEngine] SFX 播放失败: $e');
+      _log(LogType.warning, 'SFX 播放失败: $e');
     }
   }
 
@@ -325,7 +337,7 @@ class EngineSoundEngine {
       }
       _soLoud?.deinit();
     } catch (e) {
-      debugPrint('[EngineSoundEngine] dispose 异常: $e');
+      _log(LogType.warning, 'dispose 异常: $e');
     }
     _isInitialized = false;
   }

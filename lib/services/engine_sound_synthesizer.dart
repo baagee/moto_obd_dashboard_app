@@ -213,30 +213,44 @@ class EngineSoundSynthesizer {
     return out;
   }
 
-  /// 不对称软限幅（distAmt 控制强度）
-  /// 正半周比负半周更强限幅（模拟爆发冲程 > 排气冲程）
+  /// 不对称软限幅（对齐 demo.html makeAsymDist 指数公式）
+  /// 正半周（爆发冲程）更强限幅，负半周（排气冲程）较弱
+  /// distAmt 建议 3~6；atan 在此范围失真过多已弃用
   double _asymSoftClip(double x, double distAmt) {
+    final k = math.max(distAmt, 0.5);
     if (x >= 0) {
-      // 正半周：更强压缩
-      return math.atan(x * distAmt * 1.2) / (math.pi / 2.0);
+      return 1.0 - math.exp(-k * x * 0.8);
     } else {
-      return math.atan(x * distAmt) / (math.pi / 2.0);
+      return -(1.0 - math.exp(k * x * 0.45));
     }
   }
 
-  /// 生成点火脉冲包络表（sawtooth → WaveShaper → 快速起跳+指数衰减）
+  /// 生成点火脉冲包络表（对齐 demo.html makePulseCurve）
+  ///
+  /// sharpness: 0=圆滑, 1=极锐利（单缸特征）
+  ///
+  /// atkFrac = 0.04 - sharpness×0.032  →  上升段占比 0.8%~4%（极短）
+  /// decK    = 2.0  + sharpness×7.0    →  衰减速度
+  /// minVal  = 0.28 - sharpness×0.27   →  冲击间最低音量（≥0.01，不到 0！）
+  ///
+  /// 修复：原实现上升段占 15%（太宽），衰减到 0（导致突变爆音）
   Float64List _buildPulseEnvTable(int size, double sharpness) {
     final table = Float64List(size);
-    // 0~sharpness: 快速上升到 1.0
-    // sharpness~1.0: 指数衰减
-    final riseEnd = (size * sharpness * 0.15).toInt().clamp(1, size - 1);
-    for (int i = 0; i < riseEnd; i++) {
-      table[i] = i / riseEnd.toDouble();
-    }
-    final decayLen = size - riseEnd;
-    final decK = 8.0 + sharpness * 6.0; // 锐度越高，衰减越快
-    for (int i = 0; i < decayLen; i++) {
-      table[riseEnd + i] = math.exp(-decK * i / decayLen);
+    final atkFrac = 0.04 - sharpness * 0.032; // 0.008 ~ 0.040
+    final decK = 2.0 + sharpness * 7.0; // 2.0 ~ 9.0
+    final minVal = (0.28 - sharpness * 0.27).clamp(0.01, 0.28); // 0.01 ~ 0.28
+
+    for (int i = 0; i < size; i++) {
+      final x = i / (size - 1).toDouble();
+      double v;
+      if (x < atkFrac) {
+        v = x / atkFrac; // 快速线性上升到 1.0
+      } else {
+        // 指数衰减
+        v = math.exp(-(x - atkFrac) / (1.0 - atkFrac) * decK);
+      }
+      // minVal 保底：冲击间保持持续底噪，避免音量突变
+      table[i] = minVal + v * (1.0 - minVal);
     }
     return table;
   }
@@ -262,13 +276,14 @@ class EngineSoundSynthesizer {
     final sampleCount = sampleRate * toneDurationSec;
     final firingHz = style.firingHz(refRpm);
 
-    // 预计算表
+    // 预计算脉冲包络和音高游走表
     const pulseTableSize = 4096;
     final pulseEnvTable = _buildPulseEnvTable(pulseTableSize, style.pulseSharpness);
     final wobbleTable = _buildWobbleTable(sampleCount, style.wobbleHz, style.wobbleCents);
 
-    // 噪声（用于 AM 调制，每个谐波独立 BPF 后使用）
-    final rawNoise = _coloredNoise(sampleCount, style.noiseColor);
+    // 预合成全局粉红噪声（所有谐波共用，各自经独立 BPF 后做 AM）
+    // 修复 2A：使用宽带粉红噪声源，每个谐波取各自带限版本
+    final globalPink = _coloredNoise(sampleCount, style.noiseColor);
 
     // 谐波随机相位（固定种子保证可重现）
     final rng2 = math.Random(99);
@@ -277,14 +292,31 @@ class EngineSoundSynthesizer {
       (_) => rng2.nextDouble() * 2.0 * math.pi,
     );
 
+    // 预计算每个谐波的带限噪声（BPF 中心频率 = 谐波频率，Q=1.5）
+    // 修复 2A：避免宽带噪声直接乘到各谐波，防止高频噪声边带
+    final harmonicNoises = <Float64List>[];
+    for (final h in style.harmonics) {
+      final centerHz = (firingHz * h.mult).clamp(20.0, 20000.0);
+      final filtered = _bpf(globalPink, centerHz, 1.5);
+      // 归一化带限噪声，防止 BPF 增益不一致
+      double mx = filtered.fold(0.0, (p, e) => e.abs() > p ? e.abs() : p);
+      if (mx > 1e-6) {
+        for (int i = 0; i < filtered.length; i++) {
+          filtered[i] /= mx;
+        }
+      }
+      harmonicNoises.add(filtered);
+    }
+
     final samples = Float64List(sampleCount);
 
     for (int i = 0; i < sampleCount; i++) {
       final t = i / sampleRate.toDouble();
 
-      // 点火脉冲包络索引
-      final pulseIdx = ((i * firingHz / sampleRate * pulseTableSize).toInt()) %
-          pulseTableSize;
+      // 点火脉冲包络索引（按点火频率在包络表中循环读取）
+      final pulseIdx =
+          ((i * firingHz / sampleRate * pulseTableSize).toInt()) %
+              pulseTableSize;
       final pulseEnv = pulseEnvTable[pulseIdx];
 
       double toneSample = 0.0;
@@ -299,19 +331,22 @@ class EngineSoundSynthesizer {
         // 振荡器信号
         double osc = h.amp * math.sin(2.0 * math.pi * freqHz * t + phases[k]);
 
-        // 噪声 AM 调制：BPF 滤到谐波中心频率附近（用近似：取 rawNoise 加权）
-        // 简化版：直接使用 rawNoise × noiseAM + DC 偏置作为 AM 增益
-        final noiseAM = rawNoise[i] * style.noiseAM * 0.5 +
-            (1.0 - style.noiseAM * 0.3); // DC offset 保证信号不被完全关断
-        osc *= noiseAM;
+        // 噪声 AM 调制（修复 2A）：
+        //   AM 增益 = DC_offset + 带限噪声 × noiseAM × 0.5
+        //   DC_offset = 1.0 - noiseAM×0.3（保证信号不被完全关断）
+        //   带限噪声已经过 BPF 滤到该谐波频段，不含跨频段宽带成分
+        final bandNoise = harmonicNoises[k][i];
+        final dcOffset = 1.0 - style.noiseAM * 0.3;
+        final amGain = dcOffset + bandNoise * style.noiseAM * 0.5;
+        osc *= amGain;
 
-        // 不对称软限幅（distAmt 极低，只取谐波特性）
+        // 不对称软限幅（修复 2C：指数公式，失真极低）
         osc = _asymSoftClip(osc, style.distAmt);
 
         toneSample += osc;
       }
 
-      // 应用点火脉冲包络
+      // 应用点火脉冲包络（包含 minVal 保底，避免突变）
       toneSample *= pulseEnv;
 
       samples[i] = toneSample;
@@ -319,7 +354,7 @@ class EngineSoundSynthesizer {
 
     // 峰值归一化到 0.85
     double mx = samples.fold(0.0, (p, e) => e.abs() > p ? e.abs() : p);
-    if (mx > 0) {
+    if (mx > 1e-6) {
       for (int i = 0; i < sampleCount; i++) {
         samples[i] = samples[i] / mx * 0.85;
       }

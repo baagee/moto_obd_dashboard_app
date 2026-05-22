@@ -156,12 +156,13 @@ void main() async {
           },
         ),
 
-        // 发动机声浪 Provider（依赖 OBDDataProvider + SettingsProvider + AudioService）
-        ChangeNotifierProxyProvider3<OBDDataProvider, SettingsProvider,
-            AudioService, EngineSoundProvider>(
+        // 发动机声浪 Provider（依赖 OBDDataProvider + LogProvider + SettingsProvider + AudioService）
+        ChangeNotifierProxyProvider4<OBDDataProvider, LogProvider,
+            SettingsProvider, AudioService, EngineSoundProvider>(
           create: (context) {
             final provider = EngineSoundProvider(
               obdData: context.read<OBDDataProvider>(),
+              logProvider: context.read<LogProvider>(),
               settings: context.read<SettingsProvider>(),
               audioService: context.read<AudioService>(),
             );
@@ -169,11 +170,13 @@ void main() async {
             provider.init();
             return provider;
           },
-          update: (context, obdData, settings, audioService, previous) {
+          update: (context, obdData, logProvider, settings, audioService,
+              previous) {
             previous?.updateSettings(settings);
             return previous ??
                 EngineSoundProvider(
                   obdData: obdData,
+                  logProvider: logProvider,
                   settings: settings,
                   audioService: audioService,
                 );
