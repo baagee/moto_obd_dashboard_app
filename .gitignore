@@ -50,6 +50,5 @@ app.*.map.json
 .playwright-cli
 .superpowers
 # Vibe Code runtime and dependencies
-.codeflicker/runtime/
-.codeflicker/hooks/node_modules/
-.codeflicker/hooks/package-lock.json
+html
+test
