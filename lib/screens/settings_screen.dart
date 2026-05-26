@@ -98,55 +98,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          ...List.generate(_groups.length, (i) {
-            final group = _groups[i];
-            final isSelected = _selectedIndex == i;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedIndex = i),
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.primary.withValues(alpha: 0.1)
-                      : Colors.transparent,
-                  border: Border(
-                    left: BorderSide(
-                      color: isSelected ? AppTheme.primary : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      group.icon,
-                      size: 16,
-                      color: isSelected
-                          ? AppTheme.primary
-                          : AppTheme.textSecondary,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        group.label,
-                        style: TextStyle(
-                          color: isSelected
-                              ? AppTheme.primary
-                              : AppTheme.textSecondary,
-                          fontSize: 13,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.normal,
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: List.generate(_groups.length, (i) {
+                  final group = _groups[i];
+                  final isSelected = _selectedIndex == i;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedIndex = i),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppTheme.primary.withValues(alpha: 0.1)
+                            : Colors.transparent,
+                        border: Border(
+                          left: BorderSide(
+                            color: isSelected
+                                ? AppTheme.primary
+                                : Colors.transparent,
+                            width: 2,
+                          ),
                         ),
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            group.icon,
+                            size: 16,
+                            color: isSelected
+                                ? AppTheme.primary
+                                : AppTheme.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              group.label,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? AppTheme.primary
+                                    : AppTheme.textSecondary,
+                                fontSize: 13,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  );
+                }),
               ),
-            );
-          }),
+            ),
+          ),
         ],
       ),
     );
