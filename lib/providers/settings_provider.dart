@@ -303,7 +303,7 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 音量 0.0 ~ 1.0
   double get engineSoundVolume =>
-      _getDouble('settings_engineSound_volume', 0.75);
+      _getDouble('settings_engineSound_volume', 1.0);
 
   /// 风格：'i4' | 'v4' | 'i6' | 'v8'
   String get engineSoundStyle =>

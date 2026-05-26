@@ -49,10 +49,10 @@ class EngineSoundEngine {
   static const int _refRpm = EngineSoundSynthesizer.refRpm;
 
   // 音量参数
-  double _masterVolume = 0.75;
-  double _toneVolume = 0.75;
-  double _noiseVolume = 0.30;
-  double _exhVolume = 0.20;
+  double _masterVolume = 1.0;
+  double _toneVolume = 0.90;
+  double _noiseVolume = 0.35;
+  double _exhVolume = 0.25;
 
   // 当前播放速度
   double _currentPlaySpeed = 1.0;
@@ -81,6 +81,8 @@ class EngineSoundEngine {
         bufferSize: 512, // 低延迟缓冲区
       );
       _isInitialized = true;
+      // 全局软件增益：允许超过 1.0，骑行环境噪声大需要更高输出
+      _soLoud!.setGlobalVolume(2.0);
       _log(LogType.success, 'SoLoud 初始化成功');
     } catch (e) {
       _log(LogType.error, 'SoLoud 初始化失败: $e');
@@ -175,26 +177,38 @@ class EngineSoundEngine {
   }) {
     if (!_isInitialized || _soLoud == null) return;
 
-    // 1. 计算播放速度
-    // playSpeed = (rpm / refRpm)^0.85
+    // 1. 计算播放速度：(rpm/refRpm)^0.65
+    // 指数 0.65（原 0.85）：高速时变速幅度更小，减少频谱上移
+    // rpm=9000: 0.85→ ×2.58，0.65→ ×2.10，频谱上移减少约 20%
     final double playSpeed = rpm > 0
-        ? math.pow(rpm / _refRpm.toDouble(), 0.85).toDouble()
+        ? math.pow(rpm / _refRpm.toDouble(), 0.65).toDouble()
         : 0.3;
-    _currentPlaySpeed = playSpeed.clamp(0.1, 5.0);
+    _currentPlaySpeed = playSpeed.clamp(0.1, 3.5);
 
     // 2. 计算各层音量
-    // 油门/负载控制谐波/噪声比例
     final double throttleNorm = throttle / 100.0;
     final double loadNorm = load / 100.0;
 
     // tone 层：主音调，随油门增强
-    _toneVolume = (0.55 + throttleNorm * 0.35).clamp(0.0, 1.0);
+    // 高速时（playSpeed>1.5）buffer 被变速拉到高频区域，轻微降音量防止刺耳
+    final double toneHiSpeedAttn = playSpeed > 1.5
+        ? (1.0 - (playSpeed - 1.5) / 3.5 * 0.30).clamp(0.55, 1.0)
+        : 1.0;
+    _toneVolume = (0.70 + throttleNorm * 0.30).clamp(0.0, 1.0) * toneHiSpeedAttn;
 
-    // noise 层：机械噪声，随负载变化
-    _noiseVolume = (0.20 + loadNorm * 0.25).clamp(0.0, 1.0);
+    // noise 层：机械噪声
+    // 变速播放时噪声高频成分被上移，最刺耳 → 高速时大幅衰减
+    // playSpeed=1.0 → ×1.0；playSpeed=2.0 → ×0.4；playSpeed=3.0 → ×0.16
+    final double noiseHiSpeedAttn = playSpeed > 1.0
+        ? math.pow(0.40, playSpeed - 1.0).toDouble().clamp(0.10, 1.0)
+        : 1.0;
+    _noiseVolume = (0.22 + loadNorm * 0.22).clamp(0.0, 0.50) * noiseHiSpeedAttn;
 
-    // exh 层：排气声，收油时增强
-    _exhVolume = (0.12 + decelBoost * 0.50).clamp(0.0, 0.70);
+    // exh 层：排气声，收油时增强；高速时也轻微衰减
+    final double exhHiSpeedAttn = playSpeed > 1.5
+        ? (1.0 - (playSpeed - 1.5) / 4.0 * 0.40).clamp(0.45, 1.0)
+        : 1.0;
+    _exhVolume = (0.18 + decelBoost * 0.55).clamp(0.0, 0.75) * exhHiSpeedAttn;
 
     // 3. 应用到 SoLoud
     _applyParams();
@@ -224,9 +238,15 @@ class EngineSoundEngine {
     }
   }
 
-  /// 设置主音量（0.0~1.0）
+  /// 设置主音量
+  /// [volume] 来自设置滑块（0.0~1.0），内部映射到 0.0~4.0 倍增益
+  /// 骑行环境噪声大，需要较高增益才能听清
   void setMasterVolume(double volume) {
-    _masterVolume = volume.clamp(0.0, 1.0);
+    // 非线性映射：前半段（0~0.5）线性到 0~1.0，后半段（0.5~1.0）到 1.0~4.0
+    // 让用户感知更线性，同时提供足够的最大输出
+    _masterVolume = volume <= 0.5
+        ? volume * 2.0
+        : 1.0 + (volume - 0.5) * 6.0;
     _applyParams();
   }
 

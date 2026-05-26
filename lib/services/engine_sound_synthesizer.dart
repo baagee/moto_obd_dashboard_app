@@ -4,53 +4,42 @@ import '../models/engine_sound_style.dart';
 
 /// 发动机声浪 PCM 合成器
 ///
-/// 在 App 启动时（init()）预先在后台线程合成所有风格的 WAV buffer，
-/// 供 EngineSoundEngine 通过 flutter_soloud 加载和播放。
-///
-/// 每种风格合成 3 个 buffer（在 refRpm=3000 下）：
-///   - tone_buffer:  振荡器谐波叠加 PCM（2秒循环，44100Hz，16bit mono）
-///   - noise_buffer: 粉红噪声 PCM（3秒循环，44100Hz，16bit mono）
-///   - exh_buffer:   排气共振峰噪声 PCM（2秒循环，44100Hz，16bit mono）
-///
-/// SFX buffer（换挡音效，风格无关）：
-///   - upshift_sfx:   升档音效（0.38s）
-///   - downshift_sfx: 降档/回火音效（0.55s）
-///
-/// 合成原理：混合合成架构
-///   振荡器 → 噪声 AM 调制 → 点火脉冲包络 → 不对称软限幅
+/// 合成原理（对齐 demo.html v5 混合合成）：
+///   振荡器（累积相位，避免相位跳变）
+///     → 噪声 AM 调制（BPF 带限噪声）
+///     → 点火脉冲包络（minVal 保底）
+///     → 不对称软限幅（低失真指数公式）
+///     → 峰值归一化
 class EngineSoundSynthesizer {
   static const int sampleRate = 44100;
   static const int refRpm = 3000;
 
-  // tone_buffer 2秒，noise_buffer 3秒，exh_buffer 2秒
   static const int toneDurationSec = 2;
   static const int noiseDurationSec = 3;
   static const int exhDurationSec = 2;
 
-  // SFX 时长
   static const double upshiftDurationSec = 0.38;
   static const double downshiftDurationSec = 0.55;
 
-  final math.Random _rng = math.Random(42); // 固定种子保证重现性
+  final math.Random _rng = math.Random(42);
 
-  // 各风格的合成 buffer（key = styleId）
   final Map<String, Uint8List> _toneBuffers = {};
   final Map<String, Uint8List> _noiseBuffers = {};
   final Map<String, Uint8List> _exhBuffers = {};
 
-  // SFX（换挡音效，风格无关，使用 i4 exhFreqs[0] 作为默认）
   Uint8List? _upshiftBuffer;
   Uint8List? _downshiftBuffer;
 
-  // ── getter ──
   Uint8List? getToneBuffer(String styleId) => _toneBuffers[styleId];
+
   Uint8List? getNoiseBuffer(String styleId) => _noiseBuffers[styleId];
+
   Uint8List? getExhBuffer(String styleId) => _exhBuffers[styleId];
+
   Uint8List? get upshiftBuffer => _upshiftBuffer;
+
   Uint8List? get downshiftBuffer => _downshiftBuffer;
 
-  /// 初始化：在后台 Isolate 中合成所有 buffer
-  /// 调用方应 await 此方法（约 200~500ms）
   Future<void> init() async {
     for (final style in EngineStyles.all) {
       _toneBuffers[style.id] = _synthToneBuffer(style);
@@ -62,53 +51,46 @@ class EngineSoundSynthesizer {
   }
 
   // ───────────────────────────────────────────────
-  // 合成辅助工具
+  // PCM → WAV 封装
   // ───────────────────────────────────────────────
 
-  /// 将 PCM samples（-1.0~1.0）打包成 16bit mono WAV bytes
   Uint8List _pcmToWav(Float64List samples) {
     final numSamples = samples.length;
-    final dataSize = numSamples * 2; // 16bit = 2 bytes/sample
+    final dataSize = numSamples * 2;
     final totalSize = 44 + dataSize;
-
     final bytes = ByteData(totalSize);
-    int offset = 0;
-
-    // RIFF 头
-    _writeStr(bytes, offset, 'RIFF');
-    offset += 4;
-    bytes.setUint32(offset, totalSize - 8, Endian.little);
-    offset += 4;
-    _writeStr(bytes, offset, 'WAVE');
-    offset += 4;
-    _writeStr(bytes, offset, 'fmt ');
-    offset += 4;
-    bytes.setUint32(offset, 16, Endian.little); // chunk size
-    offset += 4;
-    bytes.setUint16(offset, 1, Endian.little); // PCM = 1
-    offset += 2;
-    bytes.setUint16(offset, 1, Endian.little); // mono
-    offset += 2;
-    bytes.setUint32(offset, sampleRate, Endian.little);
-    offset += 4;
-    bytes.setUint32(offset, sampleRate * 2, Endian.little); // byte rate
-    offset += 4;
-    bytes.setUint16(offset, 2, Endian.little); // block align
-    offset += 2;
-    bytes.setUint16(offset, 16, Endian.little); // bits per sample
-    offset += 2;
-    _writeStr(bytes, offset, 'data');
-    offset += 4;
-    bytes.setUint32(offset, dataSize, Endian.little);
-    offset += 4;
-
-    // PCM data（clamp 到 int16 范围）
+    int o = 0;
+    _writeStr(bytes, o, 'RIFF');
+    o += 4;
+    bytes.setUint32(o, totalSize - 8, Endian.little);
+    o += 4;
+    _writeStr(bytes, o, 'WAVE');
+    o += 4;
+    _writeStr(bytes, o, 'fmt ');
+    o += 4;
+    bytes.setUint32(o, 16, Endian.little);
+    o += 4;
+    bytes.setUint16(o, 1, Endian.little);
+    o += 2; // PCM
+    bytes.setUint16(o, 1, Endian.little);
+    o += 2; // mono
+    bytes.setUint32(o, sampleRate, Endian.little);
+    o += 4;
+    bytes.setUint32(o, sampleRate * 2, Endian.little);
+    o += 4;
+    bytes.setUint16(o, 2, Endian.little);
+    o += 2;
+    bytes.setUint16(o, 16, Endian.little);
+    o += 2;
+    _writeStr(bytes, o, 'data');
+    o += 4;
+    bytes.setUint32(o, dataSize, Endian.little);
+    o += 4;
     for (int i = 0; i < numSamples; i++) {
       final v = (samples[i] * 32767.0).clamp(-32768.0, 32767.0).toInt();
-      bytes.setInt16(offset, v, Endian.little);
-      offset += 2;
+      bytes.setInt16(o, v, Endian.little);
+      o += 2;
     }
-
     return bytes.buffer.asUint8List();
   }
 
@@ -118,73 +100,96 @@ class EngineSoundSynthesizer {
     }
   }
 
-  /// 生成粉红噪声（Voss-McCartney 算法，6级）
+  // ───────────────────────────────────────────────
+  // 噪声生成
+  // ───────────────────────────────────────────────
+
+  /// 粉红噪声（Paul Kellett 6-阶递推公式）
   Float64List _pinkNoise(int count) {
     final out = Float64List(count);
-    final rows = List<double>.filled(6, 0.0);
-    double running = 0.0;
+    double b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
     for (int i = 0; i < count; i++) {
-      final bits = i ^ (i - 1); // 发生变化的 bit
-      for (int j = 0; j < 6; j++) {
-        if ((bits >> j) & 1 == 1) {
-          final newVal = _rng.nextDouble() * 2.0 - 1.0;
-          running += newVal - rows[j];
-          rows[j] = newVal;
-        }
-      }
-      out[i] = running / 6.0;
+      final w = _rng.nextDouble() * 2.0 - 1.0;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.96900 * b2 + w * 0.1538520;
+      b3 = 0.86650 * b3 + w * 0.3104856;
+      b4 = 0.55000 * b4 + w * 0.5329522;
+      b5 = -0.7616 * b5 - w * 0.0168980;
+      out[i] = (b0 + b1 + b2 + b3 + b4 + b5 + w * 0.5362) * 0.11;
     }
     // 归一化
-    double mx = out.fold(0.0, (p, e) => e.abs() > p ? e.abs() : p);
-    if (mx > 0) {
-      for (int i = 0; i < count; i++) {
-        out[i] /= mx;
-      }
+    double mx = 0.0;
+    for (final v in out) {
+      if (v.abs() > mx) mx = v.abs();
+    }
+    if (mx > 1e-9) {
+      for (int i = 0; i < count; i++) out[i] /= mx;
     }
     return out;
   }
 
-  /// 生成"着色"噪声：noiseColor 0=白 1=棕（粉红为 0.5）
-  /// 实现：白噪声 + noiseColor 权重的粉红噪声混合，再做简单 LP 滤波实现棕化
+  /// 着色噪声：noiseColor 0=偏白, 1=偏棕
+  /// 实现：白+粉（0.5处最纯粉红），棕化在 >0.5 段通过额外积分实现
   Float64List _coloredNoise(int count, double noiseColor) {
-    final white = Float64List(count);
-    for (int i = 0; i < count; i++) {
-      white[i] = _rng.nextDouble() * 2.0 - 1.0;
-    }
-    if (noiseColor <= 0.01) return white;
-
+    // 先生成高质量粉红噪声（Paul Kellett 公式）
     final pink = _pinkNoise(count);
-    final out = Float64List(count);
-    // 棕化：累积积分
-    double integral = 0.0;
-    final brownPow = (noiseColor - 0.5).clamp(0.0, 0.5) / 0.5;
-    for (int i = 0; i < count; i++) {
-      integral = integral * 0.999 + white[i] * 0.001;
-      final brown = integral;
-      final pinkMix = pink[i] * noiseColor.clamp(0.0, 1.0);
-      final brownMix = brown * brownPow;
-      out[i] = white[i] * (1.0 - noiseColor) + pinkMix + brownMix;
-    }
-    // 归一化
-    double mx = out.fold(0.0, (p, e) => e.abs() > p ? e.abs() : p);
-    if (mx > 0) {
+    if (noiseColor <= 0.5) {
+      // 白噪声 → 粉红噪声线性插值
+      final t = noiseColor * 2.0; // 0→1
+      final out = Float64List(count);
       for (int i = 0; i < count; i++) {
-        out[i] /= mx;
+        final w = _rng.nextDouble() * 2.0 - 1.0;
+        out[i] = w * (1.0 - t) + pink[i] * t;
       }
+      _normalize(out, 1.0);
+      return out;
+    } else {
+      // 粉红噪声 → 棕噪声：对粉红积分
+      final t = (noiseColor - 0.5) * 2.0; // 0→1
+      final brown = Float64List(count);
+      double acc = 0.0;
+      for (int i = 0; i < count; i++) {
+        acc = acc * 0.998 + pink[i] * 0.002;
+        brown[i] = acc;
+      }
+      _normalize(brown, 1.0);
+      final out = Float64List(count);
+      for (int i = 0; i < count; i++) {
+        out[i] = pink[i] * (1.0 - t) + brown[i] * t;
+      }
+      _normalize(out, 1.0);
+      return out;
     }
-    return out;
   }
 
-  /// 简单双极点带通滤波（Butterworth 近似）
-  Float64List _bpf(Float64List input, double centerHz, double qFactor) {
+  void _normalize(Float64List buf, double targetPeak) {
+    double mx = 0.0;
+    for (final v in buf) {
+      if (v.abs() > mx) mx = v.abs();
+    }
+    if (mx > 1e-9) {
+      final scale = targetPeak / mx;
+      for (int i = 0; i < buf.length; i++) buf[i] *= scale;
+    }
+  }
+
+  // ───────────────────────────────────────────────
+  // 滤波器
+  // ───────────────────────────────────────────────
+
+  /// 双二阶带通滤波（标准 Audio EQ Cookbook BPF）
+  Float64List _bpf(Float64List input, double centerHz, double q) {
     final out = Float64List(input.length);
     final w0 = 2.0 * math.pi * centerHz / sampleRate;
-    final alpha = math.sin(w0) / (2.0 * qFactor);
-    final b0 = alpha;
-    final b1 = 0.0; // b1 = 0 for BPF
-    final b2 = -alpha;
+    final cosW0 = math.cos(w0);
+    final sinW0 = math.sin(w0);
+    final alpha = sinW0 / (2.0 * q);
+    final b0 = sinW0 / 2.0; // = (sinW0/2)*1 = alpha * q / q... 简化
+    final b1 = 0.0;
+    final b2 = -sinW0 / 2.0;
     final a0 = 1.0 + alpha;
-    final a1 = -2.0 * math.cos(w0);
+    final a1 = -2.0 * cosW0;
     final a2 = 1.0 - alpha;
     double x1 = 0, x2 = 0, y1 = 0, y2 = 0;
     for (int i = 0; i < input.length; i++) {
@@ -199,7 +204,7 @@ class EngineSoundSynthesizer {
     return out;
   }
 
-  /// 简单低通滤波
+  /// 一阶低通滤波
   Float64List _lpf(Float64List input, double cutoffHz) {
     final out = Float64List(input.length);
     final rc = 1.0 / (2.0 * math.pi * cutoffHz);
@@ -207,15 +212,18 @@ class EngineSoundSynthesizer {
     final alpha = dt / (rc + dt);
     double prev = 0.0;
     for (int i = 0; i < input.length; i++) {
-      prev = prev + alpha * (input[i] - prev);
+      prev += alpha * (input[i] - prev);
       out[i] = prev;
     }
     return out;
   }
 
-  /// 不对称软限幅（对齐 demo.html makeAsymDist 指数公式）
-  /// 正半周（爆发冲程）更强限幅，负半周（排气冲程）较弱
-  /// distAmt 建议 3~6；atan 在此范围失真过多已弃用
+  // ───────────────────────────────────────────────
+  // 软限幅（对齐 demo.html makeAsymDist）
+  // ───────────────────────────────────────────────
+
+  /// 不对称指数软限幅，输出范围严格在 (-1, 1)
+  /// distAmt 3~6：轻度谐波染色，无明显失真感
   double _asymSoftClip(double x, double distAmt) {
     final k = math.max(distAmt, 0.5);
     if (x >= 0) {
@@ -225,226 +233,201 @@ class EngineSoundSynthesizer {
     }
   }
 
-  /// 生成点火脉冲包络表（对齐 demo.html makePulseCurve）
-  ///
-  /// sharpness: 0=圆滑, 1=极锐利（单缸特征）
-  ///
-  /// atkFrac = 0.04 - sharpness×0.032  →  上升段占比 0.8%~4%（极短）
-  /// decK    = 2.0  + sharpness×7.0    →  衰减速度
-  /// minVal  = 0.28 - sharpness×0.27   →  冲击间最低音量（≥0.01，不到 0！）
-  ///
-  /// 修复：原实现上升段占 15%（太宽），衰减到 0（导致突变爆音）
+  // ───────────────────────────────────────────────
+  // 点火脉冲包络（对齐 demo.html makePulseCurve）
+  // ───────────────────────────────────────────────
+
+  /// atkFrac: 上升段占比（极短，0.8%~4%）
+  /// decK:    衰减系数（越高间隙越静）
+  /// minVal:  冲击间最低音量（保底，防止突变）
   Float64List _buildPulseEnvTable(int size, double sharpness) {
     final table = Float64List(size);
-    final atkFrac = 0.04 - sharpness * 0.032; // 0.008 ~ 0.040
-    final decK = 2.0 + sharpness * 7.0; // 2.0 ~ 9.0
-    final minVal = (0.28 - sharpness * 0.27).clamp(0.01, 0.28); // 0.01 ~ 0.28
-
+    final atkFrac = 0.04 - sharpness * 0.032; // 0.008~0.040
+    final decK = 2.0 + sharpness * 7.0; // 2.0~9.0
+    final minVal = (0.28 - sharpness * 0.27).clamp(0.01, 0.28);
     for (int i = 0; i < size; i++) {
       final x = i / (size - 1).toDouble();
-      double v;
+      final double v;
       if (x < atkFrac) {
-        v = x / atkFrac; // 快速线性上升到 1.0
+        v = x / atkFrac;
       } else {
-        // 指数衰减
         v = math.exp(-(x - atkFrac) / (1.0 - atkFrac) * decK);
       }
-      // minVal 保底：冲击间保持持续底噪，避免音量突变
       table[i] = minVal + v * (1.0 - minVal);
     }
     return table;
   }
 
-  /// 生成慢速 LFO 游走表（wobbleHz, wobbleCents）
-  Float64List _buildWobbleTable(int count, double wobbleHz, double wobbleCents) {
-    final table = Float64List(count);
-    for (int i = 0; i < count; i++) {
-      final t = i / sampleRate;
-      // 多层低频 LFO 叠加，模拟随机游走
-      table[i] = wobbleCents *
-          (math.sin(2 * math.pi * wobbleHz * t) * 0.5 +
-              math.sin(2 * math.pi * wobbleHz * 0.37 * t) * 0.3 +
-              math.sin(2 * math.pi * wobbleHz * 1.73 * t) * 0.2);
-    }
-    return table;
-  }
-
   // ───────────────────────────────────────────────
-  // Tone Buffer：振荡器谐波叠加 + 噪声 AM 调制 + 点火脉冲包络
+  // Tone Buffer（核心修复：累积相位 + 噪声 AM BPF）
   // ───────────────────────────────────────────────
   Uint8List _synthToneBuffer(EngineStyleConfig style) {
     final sampleCount = sampleRate * toneDurationSec;
     final firingHz = style.firingHz(refRpm);
 
-    // 预计算脉冲包络和音高游走表
     const pulseTableSize = 4096;
-    final pulseEnvTable = _buildPulseEnvTable(pulseTableSize, style.pulseSharpness);
-    final wobbleTable = _buildWobbleTable(sampleCount, style.wobbleHz, style.wobbleCents);
+    final pulseEnvTable =
+        _buildPulseEnvTable(pulseTableSize, style.pulseSharpness);
 
-    // 预合成全局粉红噪声（所有谐波共用，各自经独立 BPF 后做 AM）
-    // 修复 2A：使用宽带粉红噪声源，每个谐波取各自带限版本
+    // 全局粉红噪声源（供各谐波 BPF 使用）
     final globalPink = _coloredNoise(sampleCount, style.noiseColor);
 
-    // 谐波随机相位（固定种子保证可重现）
-    final rng2 = math.Random(99);
-    final phases = List<double>.generate(
-      style.harmonics.length,
-      (_) => rng2.nextDouble() * 2.0 * math.pi,
-    );
-
-    // 预计算每个谐波的带限噪声（BPF 中心频率 = 谐波频率，Q=1.5）
-    // 修复 2A：避免宽带噪声直接乘到各谐波，防止高频噪声边带
+    // 预计算每个谐波的带限噪声（BPF Q=1.5，中心=谐波基频）
+    // 注意：BPF 中心频率使用 refRpm 下的静态频率（buffer 是固定速度的）
     final harmonicNoises = <Float64List>[];
     for (final h in style.harmonics) {
-      final centerHz = (firingHz * h.mult).clamp(20.0, 20000.0);
+      final centerHz = (firingHz * h.mult).clamp(20.0, 18000.0);
       final filtered = _bpf(globalPink, centerHz, 1.5);
-      // 归一化带限噪声，防止 BPF 增益不一致
-      double mx = filtered.fold(0.0, (p, e) => e.abs() > p ? e.abs() : p);
-      if (mx > 1e-6) {
-        for (int i = 0; i < filtered.length; i++) {
-          filtered[i] /= mx;
-        }
-      }
+      _normalize(filtered, 1.0);
       harmonicNoises.add(filtered);
     }
 
     final samples = Float64List(sampleCount);
 
-    for (int i = 0; i < sampleCount; i++) {
-      final t = i / sampleRate.toDouble();
+    // 每个谐波维护独立的累积相位（修复根因1：消除相位跳变）
+    // wobble 通过直接修改每帧的角频率增量实现，而非修改频率后乘 t
+    final phases = List<double>.filled(style.harmonics.length, 0.0);
+    // wobble LFO 状态（每谐波一个，频率略有差异）
+    final wobbleLfoPhases = List<double>.filled(style.harmonics.length, 0.0);
+    final wobbleLfoRates = List<double>.generate(
+      style.harmonics.length,
+      (i) => style.wobbleHz * (0.7 + i * 0.4) * 2.0 * math.pi / sampleRate,
+    );
 
-      // 点火脉冲包络索引（按点火频率在包络表中循环读取）
-      final pulseIdx =
-          ((i * firingHz / sampleRate * pulseTableSize).toInt()) %
-              pulseTableSize;
+    // 点火脉冲包络的累积相位（同样使用相位积分器）
+    double pulsePhase = 0.0;
+    final pulsePhaseInc = firingHz / sampleRate; // 每采样点增量（0~1）
+
+    for (int i = 0; i < sampleCount; i++) {
+      // 点火脉冲包络（查表）
+      final pulseIdx = (pulsePhase * pulseTableSize).toInt() % pulseTableSize;
       final pulseEnv = pulseEnvTable[pulseIdx];
+      pulsePhase += pulsePhaseInc;
+      if (pulsePhase >= 1.0) pulsePhase -= 1.0;
 
       double toneSample = 0.0;
+
       for (int k = 0; k < style.harmonics.length; k++) {
         final h = style.harmonics[k];
-        final baseFreq = firingHz * h.mult;
 
-        // 微音高游走：cents → 频率偏移
-        final wobbleCents = wobbleTable[i];
+        // 更新 wobble LFO
+        wobbleLfoPhases[k] += wobbleLfoRates[k];
+        if (wobbleLfoPhases[k] > 2.0 * math.pi) {
+          wobbleLfoPhases[k] -= 2.0 * math.pi;
+        }
+        final wobbleCents = style.wobbleCents * math.sin(wobbleLfoPhases[k]);
+
+        // 本帧频率（含 wobble 微扰动）
+        final baseFreq = firingHz * h.mult;
         final freqHz = baseFreq * math.pow(2.0, wobbleCents / 1200.0);
 
-        // 振荡器信号
-        double osc = h.amp * math.sin(2.0 * math.pi * freqHz * t + phases[k]);
+        // 累积相位（修复根因1：每帧增量 = 2π×f/sr，保证连续性）
+        phases[k] += 2.0 * math.pi * freqHz / sampleRate;
+        if (phases[k] > 2.0 * math.pi) phases[k] -= 2.0 * math.pi;
 
-        // 噪声 AM 调制（修复 2A）：
-        //   AM 增益 = DC_offset + 带限噪声 × noiseAM × 0.5
-        //   DC_offset = 1.0 - noiseAM×0.3（保证信号不被完全关断）
-        //   带限噪声已经过 BPF 滤到该谐波频段，不含跨频段宽带成分
+        // 振荡器（纯正弦，无额外 phases[k] 初始相位）
+        double osc = h.amp * math.sin(phases[k]);
+
+        // 噪声 AM 调制（带限噪声，DC 偏置保证不会静音）
         final bandNoise = harmonicNoises[k][i];
         final dcOffset = 1.0 - style.noiseAM * 0.3;
-        final amGain = dcOffset + bandNoise * style.noiseAM * 0.5;
+        // amGain 范围：dcOffset-noiseAM*0.5 ~ dcOffset+noiseAM*0.5
+        // 以 i4 为例：noiseAM=0.68 → dcOffset=0.796, 范围 [0.456, 1.136]
+        // ★ 钳制到 [0.05, 1.5] 防止 AM 增益过大导致信号溢出
+        final amGain =
+            (dcOffset + bandNoise * style.noiseAM * 0.5).clamp(0.05, 1.5);
         osc *= amGain;
 
-        // 不对称软限幅（修复 2C：指数公式，失真极低）
+        // 软限幅之前先限制幅度到合理范围（修复根因4：防止硬削波）
+        osc = osc.clamp(-2.0, 2.0);
         osc = _asymSoftClip(osc, style.distAmt);
 
         toneSample += osc;
       }
 
-      // 应用点火脉冲包络（包含 minVal 保底，避免突变）
+      // 应用点火脉冲包络
       toneSample *= pulseEnv;
 
       samples[i] = toneSample;
     }
 
-    // 峰值归一化到 0.85
-    double mx = samples.fold(0.0, (p, e) => e.abs() > p ? e.abs() : p);
-    if (mx > 1e-6) {
-      for (int i = 0; i < sampleCount; i++) {
-        samples[i] = samples[i] / mx * 0.85;
-      }
-    }
-
-    return _pcmToWav(samples);
+    // 二阶低通截频（两次叠加 = -12dB/oct，截止 1500Hz）
+    // 充分利用 PCM 动态范围（归一化到 1.0），由前端 masterVolume + globalVolume 控制实际音量
+    var lpfSamples = _lpf(samples, 1500.0);
+    lpfSamples = _lpf(lpfSamples, 1500.0);
+    _normalize(lpfSamples, 1.0);
+    return _pcmToWav(lpfSamples);
   }
 
   // ───────────────────────────────────────────────
-  // Noise Buffer：粉红噪声 + 机械底噪（LPF）
+  // Noise Buffer（修复根因2：只保留低频成分）
   // ───────────────────────────────────────────────
   Uint8List _synthNoiseBuffer(EngineStyleConfig style) {
     final sampleCount = sampleRate * noiseDurationSec;
-    final rawNoise = _coloredNoise(sampleCount, style.noiseColor);
-    final mechNoise = _lpf(rawNoise, style.mechFreq);
+
+    // 机械底噪：粉红噪声 → 低通滤波（截止 = mechFreq）
+    // 修复根因2：原来直接用宽带 rawNoise × 0.3，改为只用低通滤波后的版本
+    final pink = _pinkNoise(sampleCount);
+    final mechNoise = _lpf(pink, style.mechFreq.toDouble());
+
+    // 额外的质感层：粉红噪声 → BPF（中心=mechFreq×2，宽带 Q=0.8）增加些许中低频纹理
+    final textureBpf = _bpf(pink, style.mechFreq * 2.0, 0.8);
+
     final samples = Float64List(sampleCount);
-
     for (int i = 0; i < sampleCount; i++) {
-      // 主噪声 + 机械底噪
-      samples[i] = rawNoise[i] * 0.3 + mechNoise[i] * style.mechAmp;
+      // 机械底噪（主体）+ 中低频纹理（少量）
+      // 完全去掉宽带白/粉红成分，只保留带限内容
+      samples[i] = mechNoise[i] * style.mechAmp * 3.0 +
+          textureBpf[i] * style.mechAmp * 1.5;
     }
 
-    double mx = samples.fold(0.0, (p, e) => e.abs() > p ? e.abs() : p);
-    if (mx > 0) {
-      for (int i = 0; i < sampleCount; i++) {
-        samples[i] = samples[i] / mx * 0.5;
-      }
-    }
-
+    _normalize(samples, 0.45);
     return _pcmToWav(samples);
   }
 
   // ───────────────────────────────────────────────
-  // Exh Buffer：排气管共振峰噪声
+  // Exh Buffer
   // ───────────────────────────────────────────────
   Uint8List _synthExhBuffer(EngineStyleConfig style) {
     final sampleCount = sampleRate * exhDurationSec;
     final rawNoise = _pinkNoise(sampleCount);
-    final samples = Float64List(sampleCount);
-
-    // 叠加多个排气共振峰（BPF 滤波）
     final mixed = Float64List(sampleCount);
+
+    // 串联 peaking + lpf，对齐 demo 的多共振峰结构
     for (int fi = 0; fi < style.exhFreqs.length; fi++) {
       final freq = style.exhFreqs[fi];
-      final ampDecay = math.pow(0.6, fi).toDouble(); // 高频共振峰幅度递减
-      final filtered = _bpf(rawNoise, freq, 4.0);
+      // Q 越高共振峰越窄，fi=0 最宽（Q=6），fi=2 最窄（Q=12）
+      final q = 6.0 + fi * 3.0;
+      final ampDecay = math.pow(0.65, fi).toDouble();
+      final filtered = _bpf(rawNoise, freq, q);
+      // 每个共振峰后面加一个 lpf 截掉高频毛刺（截止=freq×5）
+      final smoothed = _lpf(filtered, freq * 5.0);
       for (int i = 0; i < sampleCount; i++) {
-        mixed[i] += filtered[i] * ampDecay;
+        mixed[i] += smoothed[i] * ampDecay;
       }
     }
 
-    // 再经 LPF 平滑
-    final lpfed = _lpf(mixed, style.exhFreqs.last * 2.0);
-    for (int i = 0; i < sampleCount; i++) {
-      samples[i] = lpfed[i];
-    }
-
-    double mx = samples.fold(0.0, (p, e) => e.abs() > p ? e.abs() : p);
-    if (mx > 0) {
-      for (int i = 0; i < sampleCount; i++) {
-        samples[i] = samples[i] / mx * 0.70;
-      }
-    }
-
-    return _pcmToWav(samples);
+    _normalize(mixed, 0.65);
+    return _pcmToWav(mixed);
   }
 
   // ───────────────────────────────────────────────
-  // SFX：换挡音效（纯噪声合成）
+  // SFX
   // ───────────────────────────────────────────────
 
-  /// 升档音效（0.38s）：粉红噪声 × 快速衰减(decK=11) + 排气最低共振频×0.12
-  Uint8List _synthUpshiftSfx() {
-    return _synthSfx(
-      durationSec: upshiftDurationSec,
-      decK: 11.0,
-      toneFreq: EngineStyles.i4.exhFreqs[0], // 175 Hz
-      toneAmp: 0.12,
-    );
-  }
+  Uint8List _synthUpshiftSfx() => _synthSfx(
+        durationSec: upshiftDurationSec,
+        decK: 11.0,
+        toneFreq: EngineStyles.i4.exhFreqs[0],
+        toneAmp: 0.12,
+      );
 
-  /// 降档/回火音效（0.55s）：粉红噪声 × 慢速衰减(decK=6.5) + 排气最低共振频×0.12
-  Uint8List _synthDownshiftSfx() {
-    return _synthSfx(
-      durationSec: downshiftDurationSec,
-      decK: 6.5,
-      toneFreq: EngineStyles.i4.exhFreqs[0], // 175 Hz
-      toneAmp: 0.12,
-    );
-  }
+  Uint8List _synthDownshiftSfx() => _synthSfx(
+        durationSec: downshiftDurationSec,
+        decK: 6.5,
+        toneFreq: EngineStyles.i4.exhFreqs[0],
+        toneAmp: 0.12,
+      );
 
   Uint8List _synthSfx({
     required double durationSec,
@@ -453,24 +436,25 @@ class EngineSoundSynthesizer {
     required double toneAmp,
   }) {
     final sampleCount = (sampleRate * durationSec).toInt();
-    final rawNoise = _pinkNoise(sampleCount);
+    // SFX 也用粉红噪声（不用白噪声），减少高频刺耳感
+    final pink = _pinkNoise(sampleCount);
+    // BPF 在低频区保留排气感
+    final filtered = _bpf(pink, toneFreq * 2.0, 1.2);
     final samples = Float64List(sampleCount);
+
+    double tonePhase = 0.0;
+    final toneInc = 2.0 * math.pi * toneFreq / sampleRate;
 
     for (int i = 0; i < sampleCount; i++) {
       final t = i / sampleRate.toDouble();
-      final env = math.exp(-decK * t / durationSec); // 指数衰减包络
-      // 噪声 + 少量音调提示
-      final tone = toneAmp * math.sin(2.0 * math.pi * toneFreq * t);
-      samples[i] = (rawNoise[i] * (1.0 - toneAmp) + tone) * env;
+      final env = math.exp(-decK * t / durationSec);
+      tonePhase += toneInc;
+      if (tonePhase > 2.0 * math.pi) tonePhase -= 2.0 * math.pi;
+      final tone = toneAmp * math.sin(tonePhase);
+      samples[i] = (filtered[i] * (1.0 - toneAmp) + tone) * env;
     }
 
-    double mx = samples.fold(0.0, (p, e) => e.abs() > p ? e.abs() : p);
-    if (mx > 0) {
-      for (int i = 0; i < sampleCount; i++) {
-        samples[i] = samples[i] / mx * 0.80;
-      }
-    }
-
+    _normalize(samples, 0.75);
     return _pcmToWav(samples);
   }
 }

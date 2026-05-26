@@ -162,7 +162,7 @@ class _EngineSoundSettingsPanelState extends State<EngineSoundSettingsPanel> {
               SettingsSliderField(
                 label: '主音量',
                 value: _draft['volume'],
-                defaultValue: 0.75,
+                defaultValue: 1.0,
                 min: 0.0,
                 max: 1.0,
                 divisions: 20,
@@ -210,6 +210,12 @@ class _EngineSoundSettingsPanelState extends State<EngineSoundSettingsPanel> {
       return SettingsBanner(
         message: msg,
         type: SettingsBannerType.warning,
+      );
+    }
+    if (ep.isPreviewMode) {
+      return const SettingsBanner(
+        message: '🔊 试听中...  怠速 → 拉转速至红线（约 4 秒）',
+        type: SettingsBannerType.info,
       );
     }
     if (ep.isPlaying) {
@@ -275,15 +281,14 @@ class _EngineSoundSettingsPanelState extends State<EngineSoundSettingsPanel> {
             runSpacing: 8,
             children: EngineStyles.all.map((style) {
               final isSelected = settings.engineSoundStyle == style.id;
+              final isPreviewing = isSelected && ep.isPreviewMode;
               return _StyleChip(
                 style: style,
                 isSelected: isSelected,
+                isPreviewing: isPreviewing,
                 onTap: ep.isReady
                     ? () async {
-                        await ep.setStyle(style.id);
-                        if (mounted) {
-                          CyberToast.show(context, '已切换至 ${style.name}');
-                        }
+                        await ep.previewStyle(style.id);
                       }
                     : null,
               );
@@ -372,11 +377,13 @@ class _EngineSoundSettingsPanelState extends State<EngineSoundSettingsPanel> {
 class _StyleChip extends StatelessWidget {
   final EngineStyleConfig style;
   final bool isSelected;
+  final bool isPreviewing;
   final VoidCallback? onTap;
 
   const _StyleChip({
     required this.style,
     required this.isSelected,
+    this.isPreviewing = false,
     this.onTap,
   });
 
@@ -399,10 +406,24 @@ class _StyleChip extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(
-              _iconFor(style.id),
-              size: 20,
-              color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+            Stack(
+              alignment: Alignment.topRight,
+              children: [
+                Icon(
+                  _iconFor(style.id),
+                  size: 20,
+                  color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+                ),
+                if (isPreviewing)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 0, top: 0),
+                    child: Icon(
+                      Icons.volume_up,
+                      size: 10,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
@@ -415,9 +436,9 @@ class _StyleChip extends StatelessWidget {
               ),
             ),
             Text(
-              '${style.cyls} 缸',
-              style: const TextStyle(
-                color: AppTheme.textMuted,
+              isPreviewing ? '试听中' : '${style.cyls} 缸',
+              style: TextStyle(
+                color: isPreviewing ? AppTheme.primary : AppTheme.textMuted,
                 fontSize: 10,
               ),
             ),

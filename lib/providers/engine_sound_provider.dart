@@ -20,6 +20,7 @@ import '../services/engine_sound_synthesizer.dart';
 ///   3. 检测换挡事件，触发 SFX
 ///   4. 检测急减速回火，触发 decelPop
 ///   5. 与 AudioService 互斥（声浪开启时屏蔽事件提醒音频）
+///   6. 支持风格试听（previewStyle）：在无 OBD 数据时自动播放演示序列
 class EngineSoundProvider extends ChangeNotifier {
   final OBDDataProvider _obdData;
   final SettingsProvider _settings;
@@ -36,6 +37,11 @@ class EngineSoundProvider extends ChangeNotifier {
   bool _isReady = false; // PCM 合成完成 + SoLoud 就绪
   bool _isPlaying = false;
   String? _initError;
+
+  // 试听状态
+  bool _isPreviewMode = false;
+  Timer? _previewTimer; // 演示序列驱动 Timer
+  int _previewStep = 0; // 当前演示步骤索引
 
   // 上一帧状态（用于换挡/回火检测）
   int _prevGear = 0;
@@ -55,9 +61,29 @@ class EngineSoundProvider extends ChangeNotifier {
   // 100ms 轮询定时器
   Timer? _pollTimer;
 
+  // ── 演示序列（拉转速）──
+  // 每帧 100ms，共 40 帧 = 4.0s
+  // [rpm, throttle, load]
+  static const List<List<int>> _previewSequence = [
+    // 0.0~0.5s：怠速起步
+    [1200, 5, 10], [1300, 5, 10], [1400, 8, 12], [1600, 10, 15], [1800, 15, 18],
+    // 0.5~1.5s：缓慢加速
+    [2200, 25, 30], [2800, 35, 38], [3400, 45, 48], [4100, 55, 56], [4800, 65, 64],
+    // 1.0~2.5s：持续拉转
+    [5400, 72, 70], [6000, 78, 75], [6600, 82, 80], [7100, 86, 83], [7600, 88, 86],
+    // 2.5~3.0s：接近红线
+    [8000, 90, 88], [8300, 92, 89], [8600, 93, 90], [8800, 94, 91], [9000, 95, 92],
+    // 3.0~4.0s：红线区保持
+    [9000, 94, 91], [9000, 94, 91], [9000, 93, 91], [9000, 93, 90], [9000, 92, 90],
+    [9000, 92, 90], [9000, 92, 89], [9000, 91, 89], [9000, 91, 89], [9000, 91, 88],
+    [9000, 90, 88], [9000, 90, 88], [9000, 90, 87], [9000, 90, 87], [9000, 90, 87],
+    [9000, 90, 86], [9000, 90, 86], [9000, 89, 86], [9000, 89, 85], [9000, 89, 85],
+  ];
+
   // Getters
   bool get isReady => _isReady;
   bool get isPlaying => _isPlaying;
+  bool get isPreviewMode => _isPreviewMode;
   String? get initError => _initError;
 
   EngineSoundProvider({
@@ -86,12 +112,10 @@ class EngineSoundProvider extends ChangeNotifier {
   // 初始化（App 启动时在后台完成）
   // ───────────────────────────────────────────────
 
-  /// 初始化合成器 + SoLoud，完成后启动轮询
-  /// 在 main.dart 中后台调用（不阻塞 UI）
   Future<void> init() async {
     try {
       _log(LogType.info, '开始 PCM 合成...');
-      await _synth.init(); // ~200~500ms 在 Dart 中执行
+      await _synth.init();
       await _engine.initSoLoud();
       _isReady = _engine.isInitialized;
       _log(LogType.success, '初始化完成，ready=$_isReady');
@@ -102,30 +126,28 @@ class EngineSoundProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    // 初始化完成后启动轮询，由轮询根据转速自动启停声浪
     if (_isReady && _settings.engineSoundEnabled) {
       _startPolling();
     }
   }
 
   // ───────────────────────────────────────────────
-  // 开启/关闭（手动控制，供设置页使用）
+  // 开启/关闭
   // ───────────────────────────────────────────────
 
-  /// 开启声浪（仅启动轮询，实际播放由轮询检测到 rpm>0 后触发）
   Future<void> startEngineSound() async {
     if (!_isReady) return;
+    _cancelPreview(); // 开启 OBD 模式时取消试听
     _startPolling();
     _log(LogType.info, '声浪功能已开启，等待转速数据...');
   }
 
-  /// 停止声浪播放并停止轮询
   Future<void> stopEngineSound() async {
+    _cancelPreview();
     _stopPolling();
     await _stopPlayback();
   }
 
-  /// 切换开关（供设置页联动）
   Future<void> setEnabled(bool enabled) async {
     await _settings.setEngineSoundEnabled(enabled);
     if (enabled) {
@@ -135,20 +157,107 @@ class EngineSoundProvider extends ChangeNotifier {
     }
   }
 
-  /// 切换风格（立即生效）
   Future<void> setStyle(String styleId) async {
     await _settings.setEngineSoundStyle(styleId);
-    if (_isPlaying) {
-      // 重启新风格
+    if (_isPlaying && !_isPreviewMode) {
+      // OBD 驱动中：重启新风格
       await _stopPlayback();
       await _startPlayback();
     }
+    // 试听模式中切换风格由 previewStyle 处理
   }
 
-  /// 设置主音量（立即生效）
   Future<void> setVolume(double volume) async {
     await _settings.setEngineSoundVolume(volume);
     _engine.setMasterVolume(volume);
+  }
+
+  // ───────────────────────────────────────────────
+  // 风格试听（设置页使用）
+  // ───────────────────────────────────────────────
+
+  /// 试听指定风格
+  ///
+  /// 若 OBD 正在输出转速数据（引擎运转中），则仅切换风格，不触发试听序列。
+  /// 否则播放 4 秒演示序列（怠速→拉转→巡航→收油），结束后自动停止。
+  Future<void> previewStyle(String styleId) async {
+    if (!_isReady) return;
+
+    // 切换风格配置
+    await _settings.setEngineSoundStyle(styleId);
+
+    // 若当前 OBD 有真实转速，只切换风格，不播试听
+    if (_obdData.data.rpm > 0 && !_isPreviewMode) {
+      if (_isPlaying) {
+        await _stopPlayback();
+        await _startPlayback();
+      }
+      _log(LogType.info, '有OBD转速，切换风格: $styleId');
+      return;
+    }
+
+    // ── 触发试听演示序列 ──
+    _cancelPreview(); // 取消上一次试听（支持快速切换）
+
+    if (_isPlaying && !_isPreviewMode) {
+      // OBD 驱动播放中，先停止
+      await _stopPlayback();
+    }
+
+    _log(LogType.info, '开始试听: $styleId');
+    _isPreviewMode = true;
+    _previewStep = 0;
+
+    // 启动播放
+    await _startPlayback();
+
+    // 推第一帧参数，让声音立刻有"感觉"
+    _applyPreviewFrame(0);
+
+    // 启动演示序列 Timer（每 100ms 推一帧）
+    _previewTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
+      _previewStep++;
+      if (_previewStep >= _previewSequence.length) {
+        // 演示结束，自动停止
+        _finishPreview();
+        return;
+      }
+      _applyPreviewFrame(_previewStep);
+    });
+
+    notifyListeners();
+  }
+
+  void _applyPreviewFrame(int step) {
+    final frame = _previewSequence[step];
+    final rpm = frame[0];
+    final throttle = frame[1];
+    final load = frame[2];
+    final decelBoost =
+        (throttle < 10 && rpm > 2000) ? (1.0 - throttle / 10.0) : 0.0;
+    _engine.update(
+      rpm: rpm,
+      throttle: throttle,
+      load: load,
+      decelBoost: decelBoost,
+    );
+  }
+
+  void _finishPreview() {
+    _cancelPreview();
+    _stopPlayback();
+    _log(LogType.info, '试听结束');
+    notifyListeners();
+  }
+
+  void _cancelPreview() {
+    _previewTimer?.cancel();
+    _previewTimer = null;
+    if (_isPreviewMode) {
+      _isPreviewMode = false;
+      _previewStep = 0;
+      notifyListeners();
+    }
   }
 
   // ───────────────────────────────────────────────
@@ -187,7 +296,7 @@ class EngineSoundProvider extends ChangeNotifier {
   }
 
   // ───────────────────────────────────────────────
-  // 100ms 轮询驱动
+  // 100ms 轮询驱动（OBD 模式）
   // ───────────────────────────────────────────────
 
   void _startPolling() {
@@ -203,6 +312,19 @@ class EngineSoundProvider extends ChangeNotifier {
   }
 
   void _onOBDUpdate() {
+    // 试听模式下，OBD 轮询不干预播放，但若真实 rpm 出现则中断试听
+    if (_isPreviewMode) {
+      final liveRpm = _obdData.data.rpm;
+      if (liveRpm > 0) {
+        _log(LogType.info, '检测到真实转速 $liveRpm rpm，中断试听');
+        _cancelPreview(); // 中断试听序列
+        // 不停止播放，直接接管参数更新
+        _isPlaying = true; // 已在播放中
+      } else {
+        return; // 试听中，OBD 无数据，跳过
+      }
+    }
+
     final data = _obdData.data;
     final int rpm = data.rpm;
     final int throttle = data.throttle;
@@ -211,14 +333,12 @@ class EngineSoundProvider extends ChangeNotifier {
 
     // ── 根据转速自动启停 ──────────────────────────────
     if (rpm > 0) {
-      // 有转速数据：重置零转速计数，确保声浪在播放
       _zeroRpmFrames = 0;
       if (!_isPlaying) {
         _startPlayback();
-        return; // 本帧先启动，下帧再更新参数
+        return;
       }
     } else {
-      // rpm == 0：累计连续零转速帧数
       _zeroRpmFrames++;
       if (_isPlaying && _zeroRpmFrames >= _zeroRpmStopThreshold) {
         _log(LogType.info, '转速持续为0（${_zeroRpmFrames * 100}ms），停止声浪');
@@ -228,7 +348,6 @@ class EngineSoundProvider extends ChangeNotifier {
         _prevRpm = 0;
         return;
       }
-      // 未达阈值或本来就没在播放，不处理
       if (!_isPlaying) return;
     }
 
@@ -248,7 +367,7 @@ class EngineSoundProvider extends ChangeNotifier {
       _engine.playDecelPop();
     }
 
-    // ── 计算减速增强系数 ──────────────────────────────
+    // ── 减速增强系数 ──────────────────────────────────
     final double decelBoost =
         (throttle < 10 && rpm > 2000) ? (1.0 - throttle / 10.0) : 0.0;
 
@@ -266,28 +385,12 @@ class EngineSoundProvider extends ChangeNotifier {
   }
 
   // ───────────────────────────────────────────────
-  // 预览怠速（设置页使用）
-  // ───────────────────────────────────────────────
-
-  /// 以怠速状态预览当前风格（设置页试听）
-  Future<void> startIdlePreview() async {
-    if (!_isReady) return;
-    if (_isPlaying) return;
-    final style = EngineStyles.fromId(_settings.engineSoundStyle);
-    _audioService.setEngineSoundActive(true);
-    await _engine.start(style);
-    _engine.setMasterVolume(_settings.engineSoundVolume);
-    _engine.update(rpm: 1500, throttle: 5, load: 10, decelBoost: 0.0);
-    _isPlaying = true;
-    notifyListeners();
-  }
-
-  // ───────────────────────────────────────────────
   // 资源释放
   // ───────────────────────────────────────────────
 
   @override
   Future<void> dispose() async {
+    _cancelPreview();
     _stopPolling();
     await _engine.stop();
     _audioService.setEngineSoundActive(false);
