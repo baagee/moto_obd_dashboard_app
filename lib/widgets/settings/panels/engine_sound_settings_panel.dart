@@ -214,7 +214,7 @@ class _EngineSoundSettingsPanelState extends State<EngineSoundSettingsPanel> {
     }
     if (ep.isPreviewMode) {
       return const SettingsBanner(
-        message: '🔊 试听中...  怠速 → 拉转速至红线（约 4 秒）',
+        message: '🔊 试听中...  中段巡航 → 拉转 → 收油（约 5 秒）',
         type: SettingsBannerType.info,
       );
     }

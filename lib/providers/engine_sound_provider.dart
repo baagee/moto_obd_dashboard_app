@@ -13,7 +13,7 @@ import '../services/engine_sound_synthesizer.dart';
 /// 发动机声浪 Provider
 ///
 /// 职责：
-///   1. 每 100ms 轮询 OBDDataProvider，驱动 EngineSoundEngine.update()
+///   1. 每 50ms 轮询 OBDDataProvider，驱动 EngineSoundEngine.update()
 ///   2. 根据转速数据自动启停声浪：
 ///      - rpm > 0（引擎运转）且功能已开启 → 自动启动
 ///      - rpm == 0（无数据 / 引擎停转）   → 自动停止
@@ -37,6 +37,7 @@ class EngineSoundProvider extends ChangeNotifier {
   bool _isReady = false; // PCM 合成完成 + SoLoud 就绪
   bool _isPlaying = false;
   String? _initError;
+  bool _isDisposed = false; // dispose 后置 true，阻止 Timer 回调访问已释放资源
 
   // 试听状态
   bool _isPreviewMode = false;
@@ -50,7 +51,7 @@ class EngineSoundProvider extends ChangeNotifier {
 
   // 连续 rpm==0 的帧数，超过阈值才停止（防止短暂数据抖动误停）
   int _zeroRpmFrames = 0;
-  // 连续 1 帧（100ms）rpm==0 才停止声浪
+  // 连续 1 帧（50ms）rpm==0 才停止声浪
   static const int _zeroRpmStopThreshold = 1;
 
   // 急减速回火检测：油门从 >60% 降至 <10% 且 rpm >4000
@@ -61,23 +62,27 @@ class EngineSoundProvider extends ChangeNotifier {
   // 100ms 轮询定时器
   Timer? _pollTimer;
 
-  // ── 演示序列（拉转速）──
-  // 每帧 100ms，共 40 帧 = 4.0s
+  // ── 演示序列（中段巡航拉转）──
+  // 每帧 100ms，共 50 帧 = 5.0s
+  // 聚焦在最好听的 3000~6500rpm 中转速段，避免从怠速慢爬和红线刺耳区
+  // 节奏：怠速热机(0.6s) → 中转加速(1.4s) → 巡航呼吸(1.5s) → 再拉一波(1.0s) → 收油(0.5s)
   // [rpm, throttle, load]
   static const List<List<int>> _previewSequence = [
-    // 0.0~0.5s：怠速起步
-    [1200, 5, 10], [1300, 5, 10], [1400, 8, 12], [1600, 10, 15], [1800, 15, 18],
-    // 0.5~1.5s：缓慢加速
-    [2200, 25, 30], [2800, 35, 38], [3400, 45, 48], [4100, 55, 56], [4800, 65, 64],
-    // 1.0~2.5s：持续拉转
-    [5400, 72, 70], [6000, 78, 75], [6600, 82, 80], [7100, 86, 83], [7600, 88, 86],
-    // 2.5~3.0s：接近红线
-    [8000, 90, 88], [8300, 92, 89], [8600, 93, 90], [8800, 94, 91], [9000, 95, 92],
-    // 3.0~4.0s：红线区保持
-    [9000, 94, 91], [9000, 94, 91], [9000, 93, 91], [9000, 93, 90], [9000, 92, 90],
-    [9000, 92, 90], [9000, 92, 89], [9000, 91, 89], [9000, 91, 89], [9000, 91, 88],
-    [9000, 90, 88], [9000, 90, 88], [9000, 90, 87], [9000, 90, 87], [9000, 90, 87],
-    [9000, 90, 86], [9000, 90, 86], [9000, 89, 86], [9000, 89, 85], [9000, 89, 85],
+    // 0.0~0.6s：从中低转速入场（引擎已在转）
+    [2200, 20, 22], [2400, 22, 24], [2700, 28, 30], [2900, 32, 34], [3100, 38, 40],
+    [3300, 42, 44],
+    // 0.6~2.0s：流畅加速进入甜蜜区
+    [3700, 52, 52], [4200, 62, 60], [4800, 68, 65], [5300, 74, 70], [5700, 78, 74],
+    [6000, 80, 76], [6200, 82, 78], [6400, 83, 79],
+    // 2.0~3.5s：巡航呼吸感（轻微收油再补油，展示声浪随油门变化）
+    [6400, 83, 79], [6300, 75, 74], [6100, 62, 68], [5900, 50, 60], [5800, 45, 56],
+    [5700, 42, 54], [5800, 50, 58], [6000, 62, 64], [6200, 72, 70], [6400, 80, 76],
+    [6500, 83, 78], [6500, 84, 79], [6400, 83, 78], [6300, 80, 76], [6200, 76, 73],
+    // 3.5~4.5s：再拉一波，展示中高转速力道
+    [6400, 84, 80], [6800, 86, 82], [7200, 88, 84], [7500, 88, 85], [7700, 88, 85],
+    [7800, 88, 85], [7800, 86, 84], [7700, 85, 83], [7600, 83, 82], [7400, 80, 80],
+    // 4.5~5.0s：收油，自然结束
+    [6800, 30, 50], [6000, 12, 38], [5000, 5, 25], [3800, 3, 15], [2800, 3, 12],
   ];
 
   // Getters
@@ -214,8 +219,14 @@ class EngineSoundProvider extends ChangeNotifier {
     // 推第一帧参数，让声音立刻有"感觉"
     _applyPreviewFrame(0);
 
-    // 启动演示序列 Timer（每 100ms 推一帧）
+    // 启动演示序列 Timer（每 50ms 推一帧；序列帧间隔仍为 100ms，每隔一 tick 推进）
+    // 注：previewSequence 按 100ms/帧设计，Timer 50ms 跑，用奇偶跳跃保持等效节奏
+    // 若想保持原节奏不变，此处也可继续用 100ms，不影响正确性
     _previewTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
+      if (_isDisposed) {
+        t.cancel();
+        return;
+      }
       _previewStep++;
       if (_previewStep >= _previewSequence.length) {
         // 演示结束，自动停止
@@ -296,12 +307,12 @@ class EngineSoundProvider extends ChangeNotifier {
   }
 
   // ───────────────────────────────────────────────
-  // 100ms 轮询驱动（OBD 模式）
+  // 50ms 轮询驱动（OBD 模式）
   // ───────────────────────────────────────────────
 
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+    _pollTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
       _onOBDUpdate();
     });
   }
@@ -312,6 +323,7 @@ class EngineSoundProvider extends ChangeNotifier {
   }
 
   void _onOBDUpdate() {
+    if (_isDisposed) return; // dispose 后 Timer 可能仍触发一次，快速退出
     // 试听模式下，OBD 轮询不干预播放，但若真实 rpm 出现则中断试听
     if (_isPreviewMode) {
       final liveRpm = _obdData.data.rpm;
@@ -341,7 +353,7 @@ class EngineSoundProvider extends ChangeNotifier {
     } else {
       _zeroRpmFrames++;
       if (_isPlaying && _zeroRpmFrames >= _zeroRpmStopThreshold) {
-        _log(LogType.info, '转速持续为0（${_zeroRpmFrames * 100}ms），停止声浪');
+        _log(LogType.info, '转速持续为0（${_zeroRpmFrames * 50}ms），停止声浪');
         _stopPlayback();
         _prevGear = 0;
         _prevThrottle = 0;
@@ -390,6 +402,7 @@ class EngineSoundProvider extends ChangeNotifier {
 
   @override
   Future<void> dispose() async {
+    _isDisposed = true; // 先置标志，阻止所有 Timer 回调继续执行
     _cancelPreview();
     _stopPolling();
     await _engine.stop();

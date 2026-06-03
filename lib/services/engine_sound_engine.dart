@@ -194,13 +194,19 @@ class EngineSoundEngine {
     final double toneHiSpeedAttn = playSpeed > 1.5
         ? (1.0 - (playSpeed - 1.5) / 3.5 * 0.30).clamp(0.55, 1.0)
         : 1.0;
-    _toneVolume = (0.70 + throttleNorm * 0.30).clamp(0.0, 1.0) * toneHiSpeedAttn;
+    // 低速补偿：tone buffer 截止从 1500Hz 降到 800Hz，低速段音色稍暗，+20% 补偿
+    final double toneLowSpeedBoost =
+        playSpeed < 1.0 ? (1.0 + (1.0 - playSpeed) * 0.20) : 1.0;
+    _toneVolume = (0.70 + throttleNorm * 0.30).clamp(0.0, 1.0) *
+        toneHiSpeedAttn *
+        toneLowSpeedBoost;
 
     // noise 层：机械噪声
-    // 变速播放时噪声高频成分被上移，最刺耳 → 高速时大幅衰减
-    // playSpeed=1.0 → ×1.0；playSpeed=2.0 → ×0.4；playSpeed=3.0 → ×0.16
+    // noise buffer 已经被压到 120Hz 极低频，playSpeed 固定 1.0（见 _applyParams）
+    // 但音量仍需随速度衰减，避免低频持续轰鸣感
+    // 衰减指数 0.25（原 0.40）：更激进，playSpeed=2.0 → ×0.25，playSpeed=2.1 → ×0.20
     final double noiseHiSpeedAttn = playSpeed > 1.0
-        ? math.pow(0.40, playSpeed - 1.0).toDouble().clamp(0.10, 1.0)
+        ? math.pow(0.25, playSpeed - 1.0).toDouble().clamp(0.08, 1.0)
         : 1.0;
     _noiseVolume = (0.22 + loadNorm * 0.22).clamp(0.0, 0.50) * noiseHiSpeedAttn;
 
@@ -224,9 +230,9 @@ class EngineSoundEngine {
         soLoud.setVolume(_toneHandle!, _toneVolume * _masterVolume);
       }
       if (_noiseHandle != null) {
-        // 噪声层的速度变化较小（排气/机械声对速度不那么敏感）
-        soLoud.setRelativePlaySpeed(
-            _noiseHandle!, _currentPlaySpeed * 0.5 + 0.5);
+        // 噪声层 playSpeed 固定为 1.0：noise buffer 已压到 120Hz 极低频
+        // 不跟 RPM 变速，避免低频噪声被拉高到刺耳中频区
+        soLoud.setRelativePlaySpeed(_noiseHandle!, 1.0);
         soLoud.setVolume(_noiseHandle!, _noiseVolume * _masterVolume);
       }
       if (_exhHandle != null) {

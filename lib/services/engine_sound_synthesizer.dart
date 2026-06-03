@@ -1,6 +1,24 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import '../models/engine_sound_style.dart';
+
+// ── Isolate 入口（顶层函数，供 compute() 调用）──────────────────────────────
+// compute() 要求顶层/static 函数；此处接受一个 ignored 参数（compute 必须传参）
+// 返回所有合成结果，key 规则：
+//   'tone_<id>' / 'noise_<id>' / 'exh_<id>' : 各风格 buffer
+//   'upshift' / 'downshift'                 : SFX buffer
+Map<String, Uint8List> _synthAllBuffers(void _) {
+  final synth = EngineSoundSynthesizer._internal();
+  final result = <String, Uint8List>{};
+  for (final style in EngineStyles.all) {
+    result['tone_${style.id}'] = synth._synthToneBuffer(style);
+    result['noise_${style.id}'] = synth._synthNoiseBuffer(style);
+    result['exh_${style.id}'] = synth._synthExhBuffer(style);
+  }
+  result['upshift'] = synth._synthUpshiftSfx();
+  result['downshift'] = synth._synthDownshiftSfx();
+  return result;
+}
 
 /// 发动机声浪 PCM 合成器
 ///
@@ -30,6 +48,12 @@ class EngineSoundSynthesizer {
   Uint8List? _upshiftBuffer;
   Uint8List? _downshiftBuffer;
 
+  /// 默认公开构造函数（主线程持有实例，buffer 通过 init() 异步填充）
+  EngineSoundSynthesizer();
+
+  /// 私有构造函数：仅供 Isolate 顶层函数 _synthAllBuffers 内部使用
+  EngineSoundSynthesizer._internal();
+
   Uint8List? getToneBuffer(String styleId) => _toneBuffers[styleId];
 
   Uint8List? getNoiseBuffer(String styleId) => _noiseBuffers[styleId];
@@ -40,14 +64,18 @@ class EngineSoundSynthesizer {
 
   Uint8List? get downshiftBuffer => _downshiftBuffer;
 
+  /// 在独立 Isolate 中合成所有 PCM buffer，避免阻塞主线程
+  /// compute() 在 release/profile 模式下会真正跑到新线程；
+  /// debug 模式下退化为同线程（Flutter 限制），但不影响正确性
   Future<void> init() async {
+    final result = await compute(_synthAllBuffers, null);
     for (final style in EngineStyles.all) {
-      _toneBuffers[style.id] = _synthToneBuffer(style);
-      _noiseBuffers[style.id] = _synthNoiseBuffer(style);
-      _exhBuffers[style.id] = _synthExhBuffer(style);
+      _toneBuffers[style.id] = result['tone_${style.id}']!;
+      _noiseBuffers[style.id] = result['noise_${style.id}']!;
+      _exhBuffers[style.id] = result['exh_${style.id}']!;
     }
-    _upshiftBuffer = _synthUpshiftSfx();
-    _downshiftBuffer = _synthDownshiftSfx();
+    _upshiftBuffer = result['upshift'];
+    _downshiftBuffer = result['downshift'];
   }
 
   // ───────────────────────────────────────────────
@@ -351,10 +379,12 @@ class EngineSoundSynthesizer {
       samples[i] = toneSample;
     }
 
-    // 二阶低通截频（两次叠加 = -12dB/oct，截止 1500Hz）
-    // 充分利用 PCM 动态范围（归一化到 1.0），由前端 masterVolume + globalVolume 控制实际音量
-    var lpfSamples = _lpf(samples, 1500.0);
-    lpfSamples = _lpf(lpfSamples, 1500.0);
+    // 低通截频（两次叠加 = -12dB/oct，截止 800Hz）
+    // 优化：从 1500Hz 降到 800Hz，防止高速变速（playSpeed≈2.1x）后频谱上移到 3kHz+ 刺耳区
+    // 800Hz × 2.1x = 1680Hz，仍在可接受范围
+    // 截止降低后低速段音色稍暗，由 engine 层做低速音量补偿（+20%）
+    var lpfSamples = _lpf(samples, 800.0);
+    lpfSamples = _lpf(lpfSamples, 800.0);
     _normalize(lpfSamples, 1.0);
     return _pcmToWav(lpfSamples);
   }
@@ -365,10 +395,11 @@ class EngineSoundSynthesizer {
   Uint8List _synthNoiseBuffer(EngineStyleConfig style) {
     final sampleCount = sampleRate * noiseDurationSec;
 
-    // 机械底噪：粉红噪声 → 低通滤波（截止 = mechFreq）
-    // 修复根因2：原来直接用宽带 rawNoise × 0.3，改为只用低通滤波后的版本
+    // 机械底噪：粉红噪声 → 低通滤波（截止 = mechFreq） → 再过 120Hz 极低通
+    // 优化：二次截止到 120Hz，避免 playSpeed 变速后被拉高到中频刺耳区
+    // 即使 playSpeed=2.1x，120Hz → 252Hz，仍在极低频安全范围
     final pink = _pinkNoise(sampleCount);
-    final mechNoise = _lpf(pink, style.mechFreq.toDouble());
+    final mechNoise = _lpf(_lpf(pink, style.mechFreq.toDouble()), 120.0);
 
     // 额外的质感层：粉红噪声 → BPF（中心=mechFreq×2，宽带 Q=0.8）增加些许中低频纹理
     final textureBpf = _bpf(pink, style.mechFreq * 2.0, 0.8);

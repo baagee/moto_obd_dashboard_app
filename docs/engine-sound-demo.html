@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏍️ 引擎声浪 v5 · 混合合成</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#00ff88;font-family:'Courier New',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px}
+h1{font-size:1.5em;margin-bottom:4px;text-shadow:0 0 20px #00ff88;letter-spacing:2px}
+.sub{color:#555;font-size:0.78em;margin-bottom:18px}
+.panel{background:rgba(0,255,136,0.04);border:1px solid #00ff8828;border-radius:10px;padding:16px 20px;margin-bottom:12px;width:100%;max-width:720px}
+.ptitle{font-size:0.72em;color:#00ff8870;letter-spacing:1px;margin-bottom:10px;text-transform:uppercase}
+.gauge-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.rpm-num{font-size:2.8em;font-weight:bold;color:#fff;text-shadow:0 0 25px #00ff88;min-width:140px;text-align:right;letter-spacing:-1px}
+.rpm-u{font-size:0.8em;color:#444}
+.bar-wrap{flex:1;height:10px;background:#0d0d1a;border-radius:5px;overflow:hidden}
+.bar{height:100%;width:0%;border-radius:5px;background:linear-gradient(90deg,#00ff88,#ffcc00,#ff4444);transition:width 0.08s}
+.gbadge{width:46px;height:46px;border-radius:50%;border:2px solid #00ff88;display:flex;align-items:center;justify-content:center;font-size:1.3em;font-weight:bold;color:#fff;background:rgba(0,255,136,0.07);flex-shrink:0}
+.tags{display:flex;gap:7px;flex-wrap:wrap}
+.tag{padding:3px 9px;border-radius:14px;font-size:0.7em;border:1px solid}
+.tg{border-color:#00ff88;color:#00ff88;background:rgba(0,255,136,0.06)}
+.ty{border-color:#ffcc00;color:#ffcc00;background:rgba(255,204,0,0.06)}
+.tr{border-color:#ff4444;color:#ff4444;background:rgba(255,68,68,0.06)}
+.tb{border-color:#4488ff;color:#4488ff;background:rgba(68,136,255,0.06)}
+.td{border-color:#222;color:#444}
+.sgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:10px}
+.sbtn{padding:9px 4px;border-radius:7px;border:1px solid #1a1a1a;background:#080812;color:#555;font-family:'Courier New',monospace;font-size:0.66em;cursor:pointer;text-align:center;transition:all 0.2s;line-height:1.5}
+.sbtn:hover{border-color:#00ff8850;color:#00ff8870}
+.sbtn.on{border-color:#00ff88;background:rgba(0,255,136,0.09);color:#00ff88;box-shadow:0 0 8px rgba(0,255,136,0.12)}
+.sem{font-size:1.3em;display:block;margin-bottom:2px}
+.srow{display:flex;align-items:center;gap:10px;margin-top:7px}
+.slbl{font-size:0.72em;color:#555;width:72px}
+input[type=range]{flex:1;height:4px;-webkit-appearance:none;background:#161616;border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;background:#00ff88;border-radius:50%;cursor:pointer}
+.sval{font-size:0.78em;color:#00ff88;width:36px;text-align:right}
+.brow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.btn{padding:9px 16px;border-radius:6px;border:1px solid #00ff88;background:rgba(0,255,136,0.06);color:#00ff88;font-family:'Courier New',monospace;font-size:0.8em;cursor:pointer;transition:all 0.18s}
+.btn:hover{background:rgba(0,255,136,0.14)}
+.btn:disabled{opacity:0.28;cursor:default}
+.btn-p{background:rgba(0,255,136,0.13);font-weight:bold}
+.btn-s{border-color:#ff4444;color:#ff4444;background:rgba(255,68,68,0.06)}
+.btn-s:hover{background:rgba(255,68,68,0.14)}
+.tl{height:4px;background:#0d0d1a;border-radius:2px;margin-top:10px;overflow:hidden}
+.tlb{height:100%;width:0%;background:linear-gradient(90deg,#00ff88,#ffcc00);border-radius:2px}
+.tll{display:flex;justify-content:space-between;font-size:0.65em;color:#222;margin-top:2px}
+canvas{width:100%;height:68px;border-radius:6px;background:#060610;display:block}
+.log{height:88px;overflow-y:auto;font-size:0.7em;color:#333;line-height:1.85}
+.log .e{padding:0}
+.log .up{color:#00ff88}.log .fi{color:#ffcc00}.log .inf{color:#336699}.log .dn{color:#ff6033}
+</style>
+</head>
+<body>
+<h1>🏍️ ENGINE SOUND <span style="font-size:0.5em;color:#ff6600">v5 · HYBRID</span></h1>
+<p class="sub">混合合成 · 振荡器音调 + 噪声纹理 + 微音高随机扰动 · 消除电子感</p>
+
+<div class="panel">
+  <div class="ptitle">📊 实时状态</div>
+  <div class="gauge-row">
+    <div class="gbadge" id="gb">N</div>
+    <div class="rpm-num"><span id="rv">0</span><span class="rpm-u"> rpm</span></div>
+    <div class="bar-wrap"><div class="bar" id="rb"></div></div>
+  </div>
+  <div class="tags">
+    <span class="tag td" id="tt">油门 0%</span>
+    <span class="tag td" id="tld">负载 0%</span>
+    <span class="tag td" id="tp">待机</span>
+    <span class="tag td" id="te">—</span>
+  </div>
+  <div class="tl"><div class="tlb" id="tlb"></div></div>
+  <div class="tll"><span>1500</span><span>7000</span><span>红线</span></div>
+</div>
+
+<div class="panel">
+  <div class="ptitle">🎛️ 频谱 (0–5kHz)</div>
+  <canvas id="cv" width="700" height="68"></canvas>
+</div>
+
+<div class="panel">
+  <div class="ptitle">🎭 发动机风格</div>
+  <div class="sgrid">
+    <button class="sbtn on" onclick="selStyle('i4',this)"><span class="sem">🔵</span>直列四缸<br><small style="color:#333">CBR / R6</small></button>
+    <button class="sbtn" onclick="selStyle('v4',this)"><span class="sem">🔴</span>V型四缸<br><small style="color:#333">Panigale</small></button>
+    <button class="sbtn" onclick="selStyle('i6',this)"><span class="sem">🟡</span>直列六缸<br><small style="color:#333">BMW S1000</small></button>
+    <button class="sbtn" onclick="selStyle('v8',this)"><span class="sem">🟠</span>V8 美式<br><small style="color:#333">咆哮低频</small></button>
+    <button class="sbtn" onclick="selStyle('s1',this)"><span class="sem">🟢</span>单缸<br><small style="color:#333">律动节拍</small></button>
+  </div>
+  <div class="srow"><span class="slbl">主音量</span><input type="range" min="0" max="100" value="75" oninput="setVol(this.value)"><span class="sval" id="dvol">75%</span></div>
+  <div class="srow"><span class="slbl">随机扰动</span><input type="range" min="0" max="100" value="40" oninput="setWobble(this.value)"><span class="sval" id="dwob">40%</span></div>
+  <div class="srow"><span class="slbl">排气混响</span><input type="range" min="0" max="100" value="50" oninput="setExh(this.value)"><span class="sval" id="dexh">50%</span></div>
+</div>
+
+<div class="panel">
+  <div class="ptitle">▶ 场景演示</div>
+  <div class="brow">
+    <button class="btn btn-p" id="bp" onclick="play()">▶ 完整演示</button>
+    <button class="btn btn-s" id="bs" onclick="stop()" disabled>■ 停止</button>
+    <button class="btn" onclick="play('idle')">怠速</button>
+    <button class="btn" onclick="play('rev')">拉转速</button>
+    <button class="btn" onclick="play('cruise')">巡航</button>
+  </div>
+  <div class="log" id="log"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  ENGINE SOUND v5  —  混合合成（Hybrid Synthesis）
+//
+//  核心洞察（v4的教训）：
+//    纯噪声 → 无音调 → 听不出转速 → 失败
+//    纯振荡器 → 太稳定 → 电子感 → 也不对
+//
+//  正确方案：振荡器 + 噪声 AM调制 + 微音高随机扰动
+//
+//  具体实现：
+//  [1] 音调层（振荡器）：提供转速对应的音高
+//      - 基频 = 点火频率（RPM/60 × cyls/2）
+//      - 谐波叠加（2~4 个，低 modIndex FM 微调音色）
+//
+//  [2] 噪声 AM 调制（关键！）：
+//      - 粉红噪声通过点火频率的方波 AM 调制振荡器
+//      - 不是叠加，而是"相乘"→ 噪声的纹理调制到音调上
+//      - 效果：有音高感，但每次点火冲击的纹理略有不同
+//
+//  [3] 微音高随机游走（Pitch Wobble）：
+//      - 每个谐波加一个极慢的 LFO（0.3~2Hz）随机游走
+//      - 游走幅度 ±0.5%（几乎察觉不到，但消除"完美稳态"）
+//      - 另加高频随机噪声（类似磁带噪声）±0.1%
+//
+//  [4] 不对称软限幅（排气管非线性）：
+//      - 正半周比负半周限幅更强（爆发 > 排气）
+//      - distAmt 只有 3~8，极低，只取其特性不要失真感
+// ══════════════════════════════════════════════════════════════
+
+let AC = null;
+let masterGain, masterComp, analyser;
+let eng = null;
+let animId = null;
+let demoTimer = null;
+let isPlaying = false;
+let curRpm = 0;
+let curStyle = 'i4';
+let wobbleAmt = 0.40;   // 随机扰动量
+let exhRatio  = 0.50;   // 排气混合比
+
+// ── 发动机配方 ──────────────────────────────────────────────
+// cyls:    气缸数
+// maxRpm:  红线
+// harmonics: [{mult, amp}] 谐波组（相对点火基频的倍数）
+//   mult 必须是整数或 0.5 的倍数，使各谐波互相谐和
+// noiseAM:    噪声 AM 调制深度（0~1）—— 关键参数，≥0.5 才有纹理感
+// noiseColor: 0=白, 1=棕（值越大低频越多）
+// wobbleHz:  音高游走的 LFO 速率（Hz）
+// wobbleAmt: 音高游走幅度（cents）
+// exhFreqs:  排气管共振峰中心频率
+// pulseSharpness: 点火冲击脉冲锐度（0~1，越大每次点火越明显）
+const STYLES = {
+  i4: {
+    name:'直列四缸', cyls:4, maxRpm:14000,
+    harmonics:[
+      {mult:2, amp:0.90},   // 2×点火频 = 主音（直列四缸最特征）
+      {mult:4, amp:0.55},   // 4×
+      {mult:6, amp:0.20},   // 6×（高频明亮感）
+    ],
+    noiseAM:0.68, noiseColor:0.45,
+    wobbleHz:1.2, wobbleCents:6,
+    exhFreqs:[175, 350, 700],
+    pulseSharpness:0.72,
+    mechFreq:320, mechAmp:0.055,
+  },
+  v4: {
+    name:'V型四缸', cyls:4, maxRpm:16000,
+    harmonics:[
+      {mult:0.5, amp:0.55},  // 半次频（不均匀点火特征）
+      {mult:1,   amp:0.75},
+      {mult:2,   amp:0.65},
+      {mult:4,   amp:0.40},
+    ],
+    noiseAM:0.72, noiseColor:0.52,
+    wobbleHz:0.8, wobbleCents:9,
+    exhFreqs:[130, 260, 520],
+    pulseSharpness:0.65,
+    mechFreq:260, mechAmp:0.065,
+  },
+  i6: {
+    name:'直列六缸', cyls:6, maxRpm:13000,
+    harmonics:[
+      {mult:3, amp:0.80},   // 3× = 主音
+      {mult:6, amp:1.00},   // 6× = 最强（六缸丝滑感）
+      {mult:9, amp:0.35},
+    ],
+    noiseAM:0.55, noiseColor:0.38,
+    wobbleHz:1.8, wobbleCents:4,
+    exhFreqs:[220, 440, 880],
+    pulseSharpness:0.85,
+    mechFreq:420, mechAmp:0.040,
+  },
+  v8: {
+    name:'V8 美式', cyls:8, maxRpm:8000,
+    harmonics:[
+      {mult:0.5, amp:0.60},  // 极低频咆哮
+      {mult:1,   amp:0.85},
+      {mult:2,   amp:0.55},
+      {mult:4,   amp:0.30},
+    ],
+    noiseAM:0.75, noiseColor:0.65,
+    wobbleHz:0.5, wobbleCents:12,
+    exhFreqs:[92, 184, 368],
+    pulseSharpness:0.55,
+    mechFreq:190, mechAmp:0.080,
+  },
+  s1: {
+    name:'单缸', cyls:1, maxRpm:10000,
+    harmonics:[
+      // 修复：去掉 1.5×（非谐和），保留整数倍谐波
+      // 0.5× = 亚谐波（单缸独有的低频律动）
+      // 1×   = 基频主音（最强，单缸节奏感核心）
+      // 2×   = 二次谐波（排气管泛音，增加厚度）
+      {mult:0.5, amp:0.55},
+      {mult:1,   amp:1.00},  // 单缸基频是绝对主角，amp最高
+      {mult:2,   amp:0.28},
+    ],
+    // 修复：noiseAM 降低，保留清晰节奏脉冲
+    noiseAM:0.45, noiseColor:0.70,
+    wobbleHz:0.4, wobbleCents:12,
+    exhFreqs:[80, 160, 320],
+    // 修复：pulseSharpness 提高到 0.88，冲击要锐利，间隙要静
+    pulseSharpness:0.88,
+    // 修复：mechAmp 降低，背景底噪不能盖过节拍冲击
+    mechFreq:200, mechAmp:0.040,
+  },
+};
+
+// ── AudioContext 初始化 ──────────────────────────────────────
+function initAC() {
+  if (AC) return;
+  AC = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+
+  masterComp = AC.createDynamicsCompressor();
+  masterComp.threshold.value = -22;
+  masterComp.knee.value = 12;
+  masterComp.ratio.value = 4;
+  masterComp.attack.value = 0.004;
+  masterComp.release.value = 0.20;
+
+  masterGain = AC.createGain();
+  masterGain.gain.value = 0.75;
+
+  analyser = AC.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.82;
+
+  masterGain.connect(masterComp);
+  masterComp.connect(analyser);
+  analyser.connect(AC.destination);
+}
+
+// ── 粉红噪声 Buffer ─────────────────────────────────────────
+function makePinkNoise(sec) {
+  const sr = AC.sampleRate;
+  const len = Math.ceil(sr * sec);
+  const buf = AC.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0;
+  for (let i = 0; i < len; i++) {
+    const w = Math.random()*2-1;
+    b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759;
+    b2=0.96900*b2+w*0.1538520; b3=0.86650*b3+w*0.3104856;
+    b4=0.55000*b4+w*0.5329522; b5=-0.7616*b5-w*0.0168980;
+    d[i] = (b0+b1+b2+b3+b4+b5+w*0.5362)*0.11;
+  }
+  const src = AC.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  return src;
+}
+
+// ── 不对称软限幅曲线 ────────────────────────────────────────
+function makeAsymDist(amount) {
+  const n = 512; const curve = new Float32Array(n);
+  const k = Math.max(amount, 0.5);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    // 正半周（爆发冲程）: 较强限幅
+    // 负半周（排气冲程）: 较弱限幅
+    curve[i] = x >= 0
+      ? 1 - Math.exp(-k * x * 0.8)
+      : -(1 - Math.exp(k * x * 0.45));
+  }
+  return curve;
+}
+
+// ── 构建发动机节点图 ─────────────────────────────────────────
+//
+//  图结构（每个谐波）：
+//
+//    [PinkNoise] ──→ [BPF] ──→ [noiseAM_Gain] ──↘
+//    [Oscillator] ──→ [Dist] ──→ [harmoGain]  ──→ [mixGain] → masterGain
+//                                                      ↑
+//    [WobbleLFO] ──→ [WobbleGain] → osc.detune  ──────┘(控制音高微扰)
+//
+//  点火脉冲（AM 调制）：
+//    [PulseOsc(sawtooth)] → [PulseShaper] → [pulseAM_Gain.gain]
+//    [harmonic + noise] → [pulseAM_Gain] → [mixGain]
+//
+function buildEngine(styleName, rpm) {
+  const s = STYLES[styleName];
+  const firingHz = Math.max((rpm / 60) * (s.cyls / 2), 3);
+  const now = AC.currentTime;
+
+  const nodes = { oscs:[], wobLFOs:[], noises:[], pulseOscs:[], mixGains:[], style:s, styleName };
+
+  // 共享的粉红噪声源（所有谐波共用，各自过不同 BPF）
+  const pinkSrc = makePinkNoise(3.0);
+  pinkSrc.start(now);
+  nodes.noises.push(pinkSrc);
+
+  // 共享的脉冲 LFO（模拟点火周期性冲击）
+  // sawtooth → WaveShaper → 成为快速起跳+缓慢衰减的包络
+  const pulseOsc = AC.createOscillator();
+  pulseOsc.type = 'sawtooth';
+  pulseOsc.frequency.value = firingHz;
+  const pulseShaper = AC.createWaveShaper();
+  pulseShaper.curve = makePulseCurve(s.pulseSharpness);
+  pulseOsc.connect(pulseShaper);
+  pulseOsc.start(now);
+  nodes.pulseOscs.push(pulseOsc);
+
+  // 共享的机械背景噪声（低通）
+  const mechSrc = makePinkNoise(2.0);
+  const mechLPF = AC.createBiquadFilter();
+  mechLPF.type = 'lowpass';
+  mechLPF.frequency.value = s.mechFreq;
+  mechLPF.Q.value = 0.8;
+  const mechGain = AC.createGain();
+  mechGain.gain.value = s.mechAmp;
+  mechSrc.connect(mechLPF); mechLPF.connect(mechGain); mechGain.connect(masterGain);
+  mechSrc.start(now);
+  nodes.noises.push(mechSrc);
+  nodes.mechGain = mechGain;
+
+  // 排气共振峰（各风格特有的腔体共振）
+  const exhSrc = makePinkNoise(2.5);
+  exhSrc.start(now);
+  nodes.noises.push(exhSrc);
+  let exhOut = exhSrc;
+  // 串联多个 peaking filter 模拟排气管共振峰
+  s.exhFreqs.forEach((f, i) => {
+    const pk = AC.createBiquadFilter();
+    pk.type = 'peaking';
+    pk.frequency.value = f;
+    pk.Q.value = 8 + i * 3;
+    pk.gain.value = 14 - i * 3;  // 低频峰更强
+    const lpf = AC.createBiquadFilter();
+    lpf.type = 'lowpass';
+    lpf.frequency.value = f * 6;
+    exhOut.connect(pk); pk.connect(lpf);
+    exhOut = lpf;
+  });
+  const exhGain = AC.createGain();
+  exhGain.gain.value = 0;  // 初始静音，由 update 控制
+  exhOut.connect(exhGain); exhGain.connect(masterGain);
+  nodes.exhGain = exhGain;
+
+  // 各谐波
+  s.harmonics.forEach((h, i) => {
+    const carFreq = Math.max(firingHz * h.mult, 1);
+
+    // ① 振荡器（主音调）
+    const osc = AC.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = carFreq;
+    osc.start(now);
+
+    // ② 微音高随机游走 LFO（消除稳态电子感）
+    // 用两个 LFO：慢 LFO（周期性游走）+ 极快随机噪声（磁带抖动感）
+    const slowLFO = AC.createOscillator();
+    slowLFO.type = 'sine';
+    // 每个谐波用不同速率，避免同步游走
+    slowLFO.frequency.value = s.wobbleHz * (0.7 + i * 0.4) + Math.random() * 0.3;
+    const slowLFOGain = AC.createGain();
+    // gain = cents 数量（osc.detune 单位是 cents）
+    slowLFOGain.gain.value = s.wobbleCents * wobbleAmt;
+    slowLFO.connect(slowLFOGain);
+    slowLFOGain.connect(osc.detune);
+    slowLFO.start(now);
+
+    // ③ 噪声纹理 AM 调制（核心！噪声相乘到振荡器，而非叠加）
+    // 粉红噪声 → BPF（中心频率=谐波频率） → 幅度衰减 → 乘法节点（Ring Mod）
+    // Web Audio 实现乘法：用 GainNode，把噪声信号接到 .gain AudioParam
+    const noiseBPF = AC.createBiquadFilter();
+    noiseBPF.type = 'bandpass';
+    noiseBPF.frequency.value = carFreq;
+    noiseBPF.Q.value = 1.5;  // 宽带通（Q 小），让噪声覆盖谐波周围频段
+    pinkSrc.connect(noiseBPF);
+
+    // 噪声 AM 调制：噪声信号 → amGain.gain（AudioParam）
+    // 振荡器 → amGain（GainNode），这样振荡器被噪声调制
+    const amGain = AC.createGain();
+    amGain.gain.value = 0;  // 基础增益 = 0，完全由噪声信号控制
+    osc.connect(amGain);
+    // 噪声控制增益（需要 offset + 噪声）
+    // 用 ConstantSourceNode 提供 DC offset（平均增益）
+    const dcOffset = AC.createConstantSource ? AC.createConstantSource() : null;
+    const noiseScaler = AC.createGain();
+    noiseScaler.gain.value = s.noiseAM * 0.5;  // 噪声调制深度
+    noiseBPF.connect(noiseScaler);
+    if (dcOffset) {
+      dcOffset.offset.value = 1.0 - s.noiseAM * 0.3;  // DC 偏置（防止全静音）
+      noiseScaler.connect(amGain.gain);
+      dcOffset.connect(amGain.gain);
+      dcOffset.start(now);
+    } else {
+      // 降级：直接叠加（Safari 不支持 ConstantSourceNode）
+      noiseScaler.connect(amGain.gain);
+      amGain.gain.value = h.amp * 0.25;
+    }
+
+    // ④ 点火脉冲 AM（在 amGain 输出上叠加脉冲感）
+    const pulseAM = AC.createGain();
+    pulseAM.gain.value = h.amp * 0.28;
+    pulseShaper.connect(pulseAM.gain);  // 脉冲包络控制音量
+    amGain.connect(pulseAM);
+
+    // ⑤ 不对称软限幅（极轻微，只取其谐波特性）
+    const dist = AC.createWaveShaper();
+    dist.curve = makeAsymDist(4 + i * 1.5);
+    dist.oversample = '4x';
+    pulseAM.connect(dist);
+
+    // ⑥ 谐波音量 GainNode（由 updateEngine 实时控制）
+    const hGain = AC.createGain();
+    hGain.gain.value = h.amp * 0.18;
+    dist.connect(hGain);
+    hGain.connect(masterGain);
+
+    nodes.oscs.push({ osc, hGain, slowLFOGain, noiseBPF, amGain, mult: h.mult, amp: h.amp });
+    nodes.wobLFOs.push(slowLFO);
+  });
+
+  nodes.pulseOsc = pulseOsc;
+  nodes.firingHz = firingHz;
+  return nodes;
+}
+
+// ── 脉冲包络曲线（点火冲击形状）────────────────────────────
+// sharpness: 0=圆滑, 1=锐利冲击
+function makePulseCurve(sharpness) {
+  const n = 2048; const curve = new Float32Array(n);
+  // sawtooth 波从 -1 线性升到 +1，WaveShaper 把 x∈[0,1] 映射为点火包络
+  const atkFrac = 0.04 - sharpness * 0.032;  // sharpness↑ → 上升段更短（更锐利）
+  const decK    = 2.0  + sharpness * 7.0;    // sharpness↑ → 衰减更快（间隙更静）
+  // minVal：两次冲击之间的最低音量
+  //   sharpness=0.45 → minVal=0.29（较圆滑，持续有声）
+  //   sharpness=0.88 → minVal=0.02（极锐利，冲击间几乎静音 ← 单缸特征）
+  const minVal  = 0.28 - sharpness * 0.27;
+  for (let i = 0; i < n; i++) {
+    const x = i / (n-1);
+    let v;
+    if (x < atkFrac) {
+      v = x / atkFrac;
+    } else {
+      v = Math.exp(-(x - atkFrac) / (1 - atkFrac) * decK);
+    }
+    curve[i] = Math.max(minVal, minVal + v * (1 - minVal));
+  }
+  return curve;
+}
+
+// ── 销毁引擎节点 ──────────────────────────────────────────────
+function destroyEngine() {
+  if (!eng) return;
+  const t = AC ? AC.currentTime + 0.05 : 0;
+  try {
+    eng.oscs.forEach(o => { o.osc.stop(t); });
+    eng.wobLFOs.forEach(l => l.stop(t));
+    eng.noises.forEach(n => n.stop(t));
+    eng.pulseOscs.forEach(p => p.stop(t));
+    if (eng.pulseOsc) try { eng.pulseOsc.stop(t); } catch(e){}
+  } catch(e){}
+  eng = null;
+}
+
+// ── 实时参数更新 ──────────────────────────────────────────────
+function updateEngine(rpm, throttle, load, decelBoost) {
+  if (!eng || !AC) return;
+  const s = eng.style;
+  const firingHz = Math.max((rpm / 60) * (s.cyls / 2), 3);
+  const now = AC.currentTime;
+  const ramp = 0.05;
+  const r = Math.min(rpm / s.maxRpm, 1);
+  const t = throttle / 100;
+  const l = load / 100;
+
+  // 更新点火脉冲频率
+  eng.pulseOsc.frequency.setTargetAtTime(firingHz, now, ramp * 0.5);
+
+  // 更新各谐波
+  eng.oscs.forEach((o, i) => {
+    const carFreq = Math.max(firingHz * o.mult, 1);
+
+    // 振荡器频率
+    o.osc.frequency.setTargetAtTime(carFreq, now, ramp);
+
+    // 噪声 BPF 跟踪谐波频率
+    o.noiseBPF.frequency.setTargetAtTime(carFreq, now, ramp);
+
+    // 随机扰动幅度（wobbleAmt 滑块控制）
+    o.slowLFOGain.gain.setTargetAtTime(
+      s.wobbleCents * wobbleAmt * (1 + r * 0.5),  // 高转速时扰动稍大
+      now, ramp * 2
+    );
+
+    // 谐波音量：
+    // - 低阶谐波随转速略降（声音变"亮"而非"厚"）
+    // - 高阶谐波随转速增强（高转发亮）
+    const isHigh = o.mult >= 3;
+    const rFactor = isHigh ? (0.2 + r * 0.8) : (0.6 + r * 0.4);
+    const tFactor = 0.4 + t * 0.6;
+    o.hGain.gain.setTargetAtTime(o.amp * 0.18 * rFactor * tFactor, now, ramp);
+  });
+
+  // 机械背景噪声
+  if (eng.mechGain) {
+    eng.mechGain.gain.setTargetAtTime(s.mechAmp * (0.5 + r*0.5), now, 0.08);
+  }
+
+  // 排气共振峰：负载+收油时增强
+  if (eng.exhGain) {
+    const exhVol = s.mechAmp * 3.5 * exhRatio * (l * 0.4 + 0.08 + decelBoost * 1.0);
+    eng.exhGain.gain.setTargetAtTime(exhVol, now, 0.04);
+  }
+}
+
+// ── 换挡音效 ────────────────────────────────────────────────
+function playShiftSfx(isUp) {
+  if (!AC) return;
+  const dur = isUp ? 0.38 : 0.55;
+  const sr = AC.sampleRate;
+  const len = Math.ceil(sr * dur);
+  const buf = AC.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  const s = STYLES[curStyle];
+  const baseF = s.exhFreqs[0];
+  const decK = isUp ? 11 : 6.5;
+  let b0=0,b1=0,b2=0;
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    const env = Math.exp(-t * decK);
+    const w = Math.random()*2-1;
+    b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759; b2=0.96900*b2+w*0.1538520;
+    const pink = (b0+b1+b2)*0.15;
+    // 排气管共振频率提供少量音调感，但主体是噪声
+    const tone = Math.sin(2*Math.PI*baseF*t) * 0.12 * env;
+    d[i] = (pink * 0.88 + tone) * env;
+  }
+  const sfx = AC.createBufferSource();
+  const sg = AC.createGain();
+  sg.gain.value = isUp ? 0.50 : 0.42;
+  sfx.buffer = buf; sfx.connect(sg); sg.connect(masterGain);
+  sfx.start();
+}
+
+// ── 控制函数 ─────────────────────────────────────────────────
+function selStyle(name, btn) {
+  curStyle = name;
+  if (isPlaying) {
+    destroyEngine();
+    eng = buildEngine(name, curRpm || 1500);
+  }
+  document.querySelectorAll('.sbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  addLog(`切换: ${STYLES[name].name}`, 'inf');
+}
+function setVol(v) {
+  document.getElementById('dvol').textContent = v+'%';
+  if (masterGain) masterGain.gain.setTargetAtTime(v/100, AC.currentTime, 0.05);
+}
+function setWobble(v) {
+  document.getElementById('dwob').textContent = v+'%';
+  wobbleAmt = v / 100;
+}
+function setExh(v) {
+  document.getElementById('dexh').textContent = v+'%';
+  exhRatio = v / 100;
+}
+
+function addLog(msg, cls='') {
+  const box = document.getElementById('log');
+  const t = new Date();
+  const ts = `${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+  const d = document.createElement('div');
+  d.className = `e ${cls}`;
+  d.textContent = `[${ts}] ${msg}`;
+  box.prepend(d);
+  while (box.children.length > 40) box.removeChild(box.lastChild);
+}
+
+function updateUI(rpm, gear, thr, ld, phase) {
+  const s = STYLES[curStyle];
+  document.getElementById('rv').textContent = Math.round(rpm).toLocaleString();
+  document.getElementById('rb').style.width = Math.min(rpm/s.maxRpm*100,100)+'%';
+  document.getElementById('gb').textContent = ['N','1','2','3','4','5','6'][gear]||'N';
+  document.getElementById('tt').textContent = `油门 ${thr}%`;
+  document.getElementById('tld').textContent = `负载 ${ld}%`;
+  const ph = document.getElementById('tp');
+  ph.textContent = phase;
+  ph.className = 'tag '+(phase.includes('加速')||phase.includes('冲')?'ty':phase.includes('升档')?'tg':phase.includes('红线')?'tr':'tb');
+  const ev = document.getElementById('te');
+  ev.textContent = `${Math.round(rpm)} rpm`;
+  ev.className = 'tag '+(rpm>8000?'tr':rpm>5000?'ty':'tg');
+}
+
+// ── 频谱可视化 ────────────────────────────────────────────────
+function drawSpec() {
+  animId = requestAnimationFrame(drawSpec);
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const W=cv.width, H=cv.height;
+  ctx.fillStyle='#060610'; ctx.fillRect(0,0,W,H);
+  if (!analyser) return;
+  const bins = analyser.frequencyBinCount;
+  const data = new Uint8Array(bins);
+  analyser.getByteFrequencyData(data);
+  const sr = AC?.sampleRate || 44100;
+  const maxBin = Math.min(Math.floor(5000/sr*bins*2), bins);
+  const grad = ctx.createLinearGradient(0,H,0,0);
+  grad.addColorStop(0,'#00ff88'); grad.addColorStop(0.55,'#ffcc00'); grad.addColorStop(1,'#ff4444');
+  ctx.fillStyle = grad;
+  const bw = W / maxBin;
+  for (let i=0; i<maxBin; i++) {
+    const h=(data[i]/255)*H;
+    ctx.fillRect(i*bw, H-h, Math.max(bw-0.5,1), h);
+  }
+  ctx.fillStyle='#1a1a1a'; ctx.font='9px monospace';
+  [500,1000,2000,3000,5000].forEach(f=>{
+    const x=(f/sr)*bins*2/maxBin*W;
+    ctx.fillText(f>=1000?`${f/1000}k`:`${f}`,x+2,H-2);
+  });
+}
+
+// ── 演示场景 ─────────────────────────────────────────────────
+const DEMO = [
+  {t:0,    rpm:1500, thr:5,  ld:10, gear:0, ph:'怠速',     dc:0   },
+  {t:1200, rpm:1500, thr:5,  ld:10, gear:0, ph:'怠速',     dc:0   },
+  {t:2000, rpm:2300, thr:40, ld:48, gear:1, ph:'一档起步', dc:0   },
+  {t:3200, rpm:3600, thr:60, ld:62, gear:1, ph:'一档加速', dc:0   },
+  {t:4000, rpm:3900, thr:0,  ld:18, gear:1, ph:'收油',     dc:1.0 },
+  {t:4300, rpm:2900, thr:0,  ld:14, gear:2, ph:'升档！',   dc:0.6 },
+  {t:4700, rpm:4300, thr:70, ld:70, gear:2, ph:'二档加速', dc:0   },
+  {t:5700, rpm:6200, thr:82, ld:78, gear:2, ph:'二档冲刺', dc:0   },
+  {t:6400, rpm:7000, thr:0,  ld:20, gear:2, ph:'收油换档', dc:1.0 },
+  {t:6700, rpm:5600, thr:0,  ld:15, gear:3, ph:'升档！',   dc:0.5 },
+  {t:7100, rpm:6500, thr:88, ld:84, gear:3, ph:'三档加速', dc:0   },
+  {t:8200, rpm:8500, thr:95, ld:90, gear:3, ph:'三档冲刺', dc:0   },
+  {t:9400, rpm:10000,thr:100,ld:96, gear:3, ph:'红线拉爆！',dc:0  },
+  {t:10200,rpm:7500, thr:0,  ld:18, gear:3, ph:'收油',     dc:1.0 },
+  {t:11200,rpm:3500, thr:0,  ld:10, gear:2, ph:'滑行',     dc:0.3 },
+  {t:12200,rpm:1500, thr:5,  ld:8,  gear:0, ph:'回到怠速', dc:0   },
+];
+const DEMO_DUR = 13200;
+
+function play(mode) {
+  if (isPlaying) stop();
+  initAC();
+  if (AC.state==='suspended') AC.resume();
+  curRpm = 1500;
+  eng = buildEngine(curStyle, curRpm);
+  isPlaying = true;
+  document.getElementById('bp').disabled = true;
+  document.getElementById('bs').disabled = false;
+  addLog(`▶ ${STYLES[curStyle].name} | ${mode||'完整演示'}`, 'inf');
+  drawSpec();
+  if (mode==='idle') runIdle();
+  else if (mode==='rev') runRev();
+  else if (mode==='cruise') runCruise();
+  else runFull();
+}
+
+function stop() {
+  isPlaying = false;
+  clearInterval(demoTimer); clearTimeout(demoTimer);
+  cancelAnimationFrame(animId);
+  destroyEngine();
+  document.getElementById('bp').disabled = false;
+  document.getElementById('bs').disabled = true;
+  document.getElementById('rv').textContent = '0';
+  document.getElementById('rb').style.width = '0%';
+  document.getElementById('tlb').style.width = '0%';
+  document.getElementById('gb').textContent = 'N';
+  document.getElementById('tp').textContent = '已停止'; document.getElementById('tp').className='tag td';
+  document.getElementById('te').textContent = '—'; document.getElementById('te').className='tag td';
+  addLog('■ 停止', 'inf');
+}
+
+function runFull() {
+  let lastGear=0, t0=performance.now();
+  function tick() {
+    if (!isPlaying) return;
+    const el = performance.now()-t0;
+    document.getElementById('tlb').style.width=Math.min(el/DEMO_DUR*100,100)+'%';
+    let si=DEMO.length-2;
+    for (let i=0;i<DEMO.length-1;i++) {
+      if(el>=DEMO[i].t&&el<DEMO[i+1].t){si=i;break;}
+    }
+    const a=DEMO[si], b=DEMO[Math.min(si+1,DEMO.length-1)];
+    const lp=a.t===b.t?1:Math.min((el-a.t)/(b.t-a.t),1);
+    const lerp=(x,y,p)=>x+(y-x)*p;
+    const rpm=lerp(a.rpm,b.rpm,lp);
+    const thr=Math.round(lerp(a.thr,b.thr,lp));
+    const ld=Math.round(lerp(a.ld,b.ld,lp));
+    const dc=lerp(a.dc,b.dc,lp);
+    if(a.gear!==lastGear&&lastGear!==0&&a.gear!==0){
+      const up=a.gear>lastGear;
+      playShiftSfx(up);
+      addLog((up?`⬆ 升档 ${lastGear}→${a.gear}`:`⬇ 降档`)+` | ${Math.round(rpm)}rpm`, up?'up':'dn');
+    }
+    lastGear=a.gear; curRpm=rpm;
+    if(eng) updateEngine(rpm,thr,ld,dc);
+    updateUI(rpm,a.gear,thr,ld,a.ph);
+    if(el<DEMO_DUR) demoTimer=requestAnimationFrame(tick);
+    else setTimeout(stop,600);
+  }
+  demoTimer=requestAnimationFrame(tick);
+}
+
+function runIdle() {
+  let t=0; addLog('怠速模式…','inf');
+  function tick(){
+    if(!isPlaying)return; t+=16;
+    const rpm=1500+Math.sin(t*0.003)*80+Math.sin(t*0.013)*25+Math.random()*18;
+    curRpm=rpm;
+    if(eng) updateEngine(rpm,5,10,0);
+    updateUI(rpm,0,5,10,'怠速');
+    document.getElementById('tlb').style.width=((t%5000)/5000*100)+'%';
+    demoTimer=requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function runRev(){
+  let rpm=1600,dir=1,gear=1; addLog('拉转速…','inf');
+  function tick(){
+    if(!isPlaying)return;
+    rpm+=dir*80;
+    const s=STYLES[curStyle];
+    if(rpm>s.maxRpm*0.92){dir=-1;playShiftSfx(false);addLog('收油回火','dn');}
+    if(rpm<1900){dir=1;gear=Math.min(gear+1,6);playShiftSfx(true);addLog(`升 ${gear} 档`,'up');}
+    const thr=dir>0?85:0, ld=dir>0?78:12;
+    curRpm=rpm;
+    if(eng) updateEngine(rpm,thr,ld,dir<0?0.9:0);
+    updateUI(rpm,gear,thr,ld,dir>0?'加速中':'收油');
+    document.getElementById('tlb').style.width=Math.min(rpm/s.maxRpm*100,100)+'%';
+    demoTimer=setTimeout(()=>requestAnimationFrame(tick),45);
+  }
+  tick();
+}
+
+function runCruise(){
+  let t=0; addLog('5档巡航…','inf');
+  function tick(){
+    if(!isPlaying)return; t+=16;
+    const rpm=5000+Math.sin(t*0.0008)*180+Math.random()*50;
+    const thr=38+Math.sin(t*0.0003)*8;
+    curRpm=rpm;
+    if(eng) updateEngine(rpm,Math.round(thr),44,0);
+    updateUI(rpm,5,Math.round(thr),44,'高速巡航');
+    document.getElementById('tlb').style.width=((t%7000)/7000*100)+'%';
+    demoTimer=requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+window.addEventListener('load',()=>{
+  drawSpec();
+  addLog('v5 混合合成引擎就绪','inf');
+  addLog('🎧 戴耳机体验最佳','inf');
+});
+</script>
+</body></html>
