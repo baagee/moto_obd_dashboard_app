@@ -42,8 +42,8 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
   // 骑行事件
   List<RidingRecordEvent> _events = [];
 
-  // 当前缩放级别（用于抽稀）
-  double _currentZoom = 14.0;
+  // 当前缩放级别（ValueNotifier 驱动局部重建，避免整页 setState）
+  final ValueNotifier<double> _zoomNotifier = ValueNotifier(14.0);
 
   // Polyline 缓存（zoom 等级不变时直接复用，避免每帧重建）
   List<Polyline> _cachedPolylines = [];
@@ -79,6 +79,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _zoomNotifier.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -247,7 +248,7 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     }
   }
 
-  /// 生成速度渐变 Polyline 列表（已关闭 glow 层优化性能，结果按 zoom 整数级缓存）
+  /// 生成速度渐变 Polyline 列表（同色连续段合并为单条多点 Polyline，按 zoom 整数级缓存）
   List<Polyline> _buildGradientPolylines(double zoom) {
     // zoom 取整后未变化时直接复用缓存
     final zoomKey = zoom.floorToDouble();
@@ -258,31 +259,47 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     if (sampledIdx.length < 2) return [];
 
     final polylines = <Polyline>[];
-    for (int i = 0; i < sampledIdx.length - 1; i++) {
+
+    // 遍历采样段，颜色相同的连续段合并为一条多点 Polyline
+    int segStart = 0;
+    final firstAvgSpeed =
+        (_allWaypoints[sampledIdx[0]].speed + _allWaypoints[sampledIdx[1]].speed) / 2;
+    Color segColor = _speedToColor(firstAvgSpeed);
+
+    for (int i = 1; i < sampledIdx.length - 1; i++) {
       final i1 = sampledIdx[i];
       final i2 = sampledIdx[i + 1];
       final avgSpeed = (_allWaypoints[i1].speed + _allWaypoints[i2].speed) / 2;
       final color = _speedToColor(avgSpeed);
-      final pts = [_cachedGcjPoints[i1], _cachedGcjPoints[i2]];
 
-      // ❌ 已关闭 glow 层（Polyline 数量减半，性能优化）
-      // 原来每个线段生成 2 条 Polyline（glow + 主线），导致渲染压力大
-      // polylines.add(Polyline(
-      //   points: pts,
-      //   color: color.withOpacity(0.25),
-      //   strokeWidth: 10.0,
-      // ));
-
-      // 主线：增加宽度到 4.0 补偿视觉效果
-      polylines.add(Polyline(
-        points: pts,
-        color: color,
-        strokeWidth: 4.0, // 从 3.0 提升到 4.0
-      ));
+      if (color != segColor) {
+        // 颜色变化，flush 当前段（覆盖 sampledIdx[segStart] 到 sampledIdx[i]）
+        polylines.add(_buildMergedPolyline(sampledIdx, segStart, i + 1, segColor));
+        segStart = i;
+        segColor = color;
+      }
     }
+    // flush 最后一段
+    polylines.add(
+        _buildMergedPolyline(sampledIdx, segStart, sampledIdx.length, segColor));
+
     _cachedPolylines = polylines;
     _cachedPolylineZoom = zoomKey;
     return polylines;
+  }
+
+  /// 构建从 sampledIdx[start] 到 sampledIdx[end-1] 的多点 Polyline（同色合并段）
+  Polyline _buildMergedPolyline(
+      List<int> sampledIdx, int start, int end, Color color) {
+    final points = <LatLng>[];
+    for (int j = start; j < end; j++) {
+      points.add(_cachedGcjPoints[sampledIdx[j]]);
+    }
+    return Polyline(
+      points: points,
+      color: color,
+      strokeWidth: 4.0,
+    );
   }
 
   /// 二分查找最近轨迹点索引（轨迹点按 timestamp 升序排列）
@@ -391,7 +408,8 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
   static const double _kHitRadiusPx = 28.0;
 
   void _handleMapTap(TapPosition tapPos) {
-    if (_currentZoom < 12 || _mappedEvents.isEmpty) {
+    final zoom = _zoomNotifier.value;
+    if (zoom < 12 || _mappedEvents.isEmpty) {
       if (_selectedEvent != null) setState(() => _selectedEvent = null);
       return;
     }
@@ -487,9 +505,14 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
             Positioned(
               left: 8,
               bottom: _kChartHeight + 8,
-              child: _WaypointBadge(
-                count: _allWaypoints.length,
-                zoom: _currentZoom,
+              child: ValueListenableBuilder<double>(
+                valueListenable: _zoomNotifier,
+                builder: (context, zoom, _) {
+                  return _WaypointBadge(
+                    count: _allWaypoints.length,
+                    zoom: zoom,
+                  );
+                },
               ),
             ),
         ],
@@ -548,12 +571,12 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
       mapController: _mapController,
       options: MapOptions(
         initialCenter: _cachedGcjPoints.first,
-        initialZoom: _currentZoom,
+        initialZoom: _zoomNotifier.value,
         onPositionChanged: (camera, _) {
           _debounceTimer?.cancel();
           _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-            if (mounted && camera.zoom != _currentZoom) {
-              setState(() => _currentZoom = camera.zoom);
+            if (mounted && camera.zoom != _zoomNotifier.value) {
+              _zoomNotifier.value = camera.zoom;
             }
           });
         },
@@ -564,18 +587,29 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         // 1. 底图（根据样式切换）
         _buildTileLayer(),
 
-        // 2. 速度渐变轨迹折线
-        PolylineLayer(
-          polylines: _buildGradientPolylines(_currentZoom),
+        // 2~4. zoom 相关图层（PolylineLayer/CircleLayer/选中Marker），用 ValueListenableBuilder 局部重建
+        ValueListenableBuilder<double>(
+          valueListenable: _zoomNotifier,
+          builder: (context, zoom, _) {
+            return Stack(
+              children: [
+                // 2. 速度渐变轨迹折线
+                PolylineLayer(
+                  polylines: _buildGradientPolylines(zoom),
+                ),
+
+                // 3. 事件圆点（纯 Canvas 绘制，零 Widget 树，三档 zoom 分级）
+                if (_mappedEvents.isNotEmpty)
+                  CircleLayer(circles: _getCircleCache(zoom)),
+
+                // 4. 选中事件高亮圆环 + icon（最多 1 个 Marker，仅 zoom >= 12 且有选中时）
+                if (_selectedEvent != null && zoom >= 12)
+                  MarkerLayer(
+                      markers: [_buildSelectedEventMarker(_selectedEvent!)]),
+              ],
+            );
+          },
         ),
-
-        // 3. 事件圆点（纯 Canvas 绘制，零 Widget 树，三档 zoom 分级）
-        if (_mappedEvents.isNotEmpty)
-          CircleLayer(circles: _getCircleCache(_currentZoom)),
-
-        // 4. 选中事件高亮圆环 + icon（最多 1 个 Marker，仅 zoom >= 12 且有选中时）
-        if (_selectedEvent != null && _currentZoom >= 12)
-          MarkerLayer(markers: [_buildSelectedEventMarker(_selectedEvent!)]),
 
         // 5. 起点 / 终点 / 游标（固定 2~3 个，与事件层分离，各自 RepaintBoundary 缓存）
         MarkerLayer(

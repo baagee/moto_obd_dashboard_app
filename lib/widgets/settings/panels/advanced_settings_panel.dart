@@ -30,9 +30,6 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
   void _loadDraft() {
     final s = context.read<SettingsProvider>();
     _original = {
-      'sensorAlpha': s.sensorAlpha,
-      'movingAverageWindow': s.movingAverageWindow.toDouble(),
-      'deadzoneThreshold': s.deadzoneThreshold,
       'minMoveDistance': s.minMoveDistance,
       'maxGpsGapSeconds': s.maxGpsGapSeconds.toDouble(),
       'minRidingDistance': s.minRidingDistance.toDouble(),
@@ -43,11 +40,6 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
 
   Future<void> _onSave() async {
     await context.read<SettingsProvider>().setBatch({
-      'settings_advanced_sensorAlpha': _draft['sensorAlpha'] as double,
-      'settings_advanced_movingAverageWindow':
-          (_draft['movingAverageWindow'] as double).toInt(),
-      'settings_advanced_deadzoneThreshold':
-          _draft['deadzoneThreshold'] as double,
       'settings_advanced_minMoveDistance': _draft['minMoveDistance'] as double,
       'settings_advanced_maxGpsGapSeconds':
           (_draft['maxGpsGapSeconds'] as double).toInt(),
@@ -135,48 +127,10 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SettingsBanner(
-            message: '以下参数面向调试用途，修改不当可能影响倾角精度和骑行事件检测。\n'
+            message: '以下参数面向调试用途，修改不当可能影响骑行事件检测。\n'
                 '如无特殊需求，请勿更改默认值。',
             type: SettingsBannerType.danger,
           ),
-
-          // ── 传感器滤波 ──
-          const SettingsSectionTitle('▸  传感器滤波参数'),
-          SettingsSliderField(
-            label: '低通滤波系数 (alpha)',
-            hint: '越大噪声越少但响应越慢，建议 0.90-0.99',
-            value: _draft['sensorAlpha'],
-            defaultValue: 0.98,
-            min: 0.80,
-            max: 0.99,
-            divisions: 19,
-            valueFormatter: (v) => v.toStringAsFixed(2),
-            onChanged: (v) => setState(() => _draft['sensorAlpha'] = v),
-          ),
-          SettingsSliderField(
-            label: '移动平均窗口大小',
-            hint: '倾角计算使用的历史点数，越大越平滑',
-            value: _draft['movingAverageWindow'],
-            defaultValue: 5,
-            min: 2,
-            max: 20,
-            divisions: 18,
-            valueFormatter: (v) => '${v.toInt()} 点',
-            onChanged: (v) => setState(() => _draft['movingAverageWindow'] = v),
-          ),
-          SettingsSliderField(
-            label: '倾角死区阈值',
-            hint: '变化量小于此值视为无效抖动',
-            value: _draft['deadzoneThreshold'],
-            defaultValue: 1.0,
-            min: 0.1,
-            max: 5.0,
-            divisions: 49,
-            valueFormatter: (v) => '${v.toStringAsFixed(1)} °',
-            onChanged: (v) => setState(() => _draft['deadzoneThreshold'] = v),
-          ),
-
-          const SettingsDivider(),
 
           // ── GPS 过滤 ──
           const SettingsSectionTitle('▸  GPS 轨迹过滤'),

@@ -12,8 +12,7 @@ class CombinedGaugeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 精确订阅 OBDDataProvider 中仪表盘实际用到的 5 个字段
-    // updateLeanAngle (66Hz) 不触发此 Widget 重建
+    // 精确订阅 OBDDataProvider 中仪表盘实际用到的字段
     final rpm = context.select<OBDDataProvider, int>((p) => p.data.rpm);
     final speed = context.select<OBDDataProvider, int>((p) => p.data.speed);
     final coolantTemp =

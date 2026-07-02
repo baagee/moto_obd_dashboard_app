@@ -12,8 +12,6 @@ class OBDDataProvider extends ChangeNotifier {
   static const int defaultGear = 0;
   static const int defaultThrottle = 0;
   static const int defaultLoad = 0;
-  static const int defaultLeanAngle = 0;
-  static const String defaultLeanDirection = 'NONE';
   static const int defaultPressure = 0;
   static const double defaultVoltage = 0.0;
   static const int defaultCoolantTemp = 0;
@@ -29,8 +27,6 @@ class OBDDataProvider extends ChangeNotifier {
     gear: defaultGear,
     throttle: defaultThrottle,
     load: defaultLoad,
-    leanAngle: defaultLeanAngle,
-    leanDirection: defaultLeanDirection,
     pressure: defaultPressure,
     voltage: defaultVoltage,
     coolantTemp: defaultCoolantTemp,
@@ -134,8 +130,6 @@ class OBDDataProvider extends ChangeNotifier {
       gear: defaultGear,
       throttle: defaultThrottle,
       load: defaultLoad,
-      leanAngle: defaultLeanAngle,
-      leanDirection: defaultLeanDirection,
       pressure: defaultPressure,
       voltage: defaultVoltage,
       coolantTemp: defaultCoolantTemp,
@@ -151,25 +145,6 @@ class OBDDataProvider extends ChangeNotifier {
     if (!connected) {
       resetData();
     }
-    notifyListeners();
-  }
-
-  /// 更新倾角数据（由 SensorService 调用）
-  void updateLeanAngle(int angle, String direction) {
-    _data = _data.copyWith(
-      leanAngle: angle,
-      leanDirection: direction,
-    );
-    notifyListeners();
-  }
-
-  /// 零点校准（将当前角度设为零点）
-  void calibrateLeanAngle() {
-    // 校准后角度归零
-    _data = _data.copyWith(
-      leanAngle: 0,
-      leanDirection: 'NONE',
-    );
     notifyListeners();
   }
 }

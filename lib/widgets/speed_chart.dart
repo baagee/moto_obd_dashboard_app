@@ -48,6 +48,8 @@ class _SpeedChartState extends State<SpeedChart> {
   late double _totalSeconds;
   // 缓存的 bars（数据不变时直接复用，避免游标拖动每帧重建）
   List<LineChartBarData>? _cachedBars;
+  // 缓存的事件竖线（events 和 waypoints 不变时复用）
+  List<VerticalLine>? _cachedEventLines;
 
   @override
   void initState() {
@@ -139,29 +141,36 @@ class _SpeedChartState extends State<SpeedChart> {
     _spots = spots;
     _maxSpeed = effectiveMax < 10 ? 100 : effectiveMax * 1.1;
     _totalSeconds = spots.last.x;
-    // 数据变化时清空 bars 缓存
+    // 数据变化时清空缓存
     _cachedBars = null;
+    _cachedEventLines = null;
   }
 
   /// 将图表内 localDx 换算为最近的 waypoint 索引
   int _dxToWaypointIndex(double localDx, double chartWidth) {
     if (_spots.isEmpty || chartWidth <= 0) return 0;
-    // localDx 对应的时间比例
     const leftPad = 28.0; // 与 titlesData left padding 对应
     const rightPad = 8.0;
     final plotWidth = chartWidth - leftPad - rightPad;
     final ratio = ((localDx - leftPad) / plotWidth).clamp(0.0, 1.0);
     final targetSec = ratio * _totalSeconds;
 
-    // 在 _spots 里找最近的 x
-    int nearest = 0;
-    double minDiff = (_spots[0].x - targetSec).abs();
-    for (int i = 1; i < _spots.length; i++) {
-      final diff = (_spots[i].x - targetSec).abs();
-      if (diff < minDiff) {
-        minDiff = diff;
-        nearest = i;
+    // 二分查找最近的 spot（_spots 按 x 升序排列）
+    int lo = 0, hi = _spots.length - 1;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (_spots[mid].x < targetSec) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
       }
+    }
+    // 检查 lo-1 是否更近
+    int nearest = lo;
+    if (lo > 0) {
+      final d1 = (_spots[lo].x - targetSec).abs();
+      final d0 = (_spots[lo - 1].x - targetSec).abs();
+      if (d0 < d1) nearest = lo - 1;
     }
     return _sampledIndices[nearest];
   }
@@ -309,7 +318,7 @@ class _SpeedChartState extends State<SpeedChart> {
                         dashArray: [4, 3],
                       ),
                     // 事件时间竖线（半透明黄色细线）
-                    ..._buildEventLines(),
+                    ..._getEventLines(),
                   ],
                 ),
               ),
@@ -329,10 +338,14 @@ class _SpeedChartState extends State<SpeedChart> {
     });
   }
 
-  List<VerticalLine> _buildEventLines() {
-    if (widget.waypoints.isEmpty) return [];
+  List<VerticalLine> _getEventLines() {
+    if (_cachedEventLines != null) return _cachedEventLines!;
+    if (widget.waypoints.isEmpty) {
+      _cachedEventLines = [];
+      return _cachedEventLines!;
+    }
     final t0 = widget.waypoints.first.timestamp;
-    return widget.events.map((e) {
+    _cachedEventLines = widget.events.map((e) {
       final sec = (e.timestamp - t0) / 1000.0;
       return VerticalLine(
         x: sec.clamp(0, _totalSeconds),
@@ -341,6 +354,7 @@ class _SpeedChartState extends State<SpeedChart> {
         dashArray: [2, 4],
       );
     }).toList();
+    return _cachedEventLines!;
   }
 
   Widget _buildCursorDot(double ratio, double chartWidth, double chartHeight) {

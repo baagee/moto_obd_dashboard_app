@@ -4,12 +4,10 @@ class OBDData {
   final int speed;
   final int throttle; // 油门开度
   final int load; // 发动机负载
-  final String leanDirection; // 压弯方向，左右
   final int pressure; // 进气歧管压力MAP
   final double voltage; // 电压
   final int coolantTemp; // 冷却液水温
   final int intakeTemp; // 进气温度
-  final int leanAngle; // 压弯倾角
   final int gear; // 档位 (0=空档, 1-6=实际档位)
 
   OBDData({
@@ -18,8 +16,6 @@ class OBDData {
     required this.gear,
     required this.throttle,
     required this.load,
-    required this.leanAngle,
-    required this.leanDirection,
     required this.pressure,
     required this.voltage,
     required this.coolantTemp,
@@ -32,8 +28,6 @@ class OBDData {
     int? gear,
     int? throttle,
     int? load,
-    int? leanAngle,
-    String? leanDirection,
     int? pressure,
     double? voltage,
     int? coolantTemp,
@@ -45,8 +39,6 @@ class OBDData {
       gear: gear ?? this.gear,
       throttle: throttle ?? this.throttle,
       load: load ?? this.load,
-      leanAngle: leanAngle ?? this.leanAngle,
-      leanDirection: leanDirection ?? this.leanDirection,
       pressure: pressure ?? this.pressure,
       voltage: voltage ?? this.voltage,
       coolantTemp: coolantTemp ?? this.coolantTemp,

@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'providers/obd_data_provider.dart';
 import 'providers/bluetooth_provider.dart';
 import 'providers/log_provider.dart';
-import 'providers/sensor_provider.dart';
 import 'providers/riding_stats_provider.dart';
 import 'providers/riding_record_provider.dart';
 import 'providers/navigation_provider.dart';
@@ -70,25 +69,6 @@ void main() async {
           ),
           update: (context, logProvider, previous) =>
               previous ?? AudioService(logProvider: logProvider),
-        ),
-
-        // 传感器 Provider - 管理倾角传感器（依赖 OBDDataProvider + LogProvider + SettingsProvider）
-        ChangeNotifierProxyProvider3<OBDDataProvider, LogProvider,
-            SettingsProvider, SensorProvider>(
-          create: (context) => SensorProvider(
-            obdDataProvider: context.read<OBDDataProvider>(),
-            logProvider: context.read<LogProvider>(),
-            settings: context.read<SettingsProvider>(),
-          ),
-          update: (context, obdDataProvider, logProvider, settings, previous) {
-            previous?.updateSettings(settings);
-            return previous ??
-                SensorProvider(
-                  obdDataProvider: obdDataProvider,
-                  logProvider: logProvider,
-                  settings: settings,
-                );
-          },
         ),
 
         // BluetoothProvider（依赖 OBDDataProvider + LogProvider + AudioService + SettingsProvider）

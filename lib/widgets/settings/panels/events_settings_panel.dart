@@ -55,10 +55,6 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
       'coldRisk_temp': s.coldRiskTemp.toDouble(),
       'coldRisk_speedMin': s.coldRiskSpeedMin.toDouble(),
       'coldRisk_cooldown': s.coldRiskCooldown.toDouble(),
-      'extremeLean_enabled': s.extremeLeanEnabled,
-      'extremeLean_speedMin': s.extremeLeanSpeedMin.toDouble(),
-      'extremeLean_angleMin': s.extremeLeanAngleMin.toDouble(),
-      'extremeLean_cooldown': s.extremeLeanCooldown.toDouble(),
       'gearShiftUp_enabled': s.gearShiftUpEnabled,
       'gearShiftUp_rpm': s.gearShiftUpRpm.toDouble(),
       'gearShiftDown_enabled': s.gearShiftDownEnabled,
@@ -117,14 +113,6 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
           (_draft['coldRisk_speedMin'] as double).toInt(),
       'settings_events_coldRisk_cooldown':
           (_draft['coldRisk_cooldown'] as double).toInt(),
-      'settings_events_extremeLean_enabled':
-          _draft['extremeLean_enabled'] as bool,
-      'settings_events_extremeLean_speedMin':
-          (_draft['extremeLean_speedMin'] as double).toInt(),
-      'settings_events_extremeLean_angleMin':
-          (_draft['extremeLean_angleMin'] as double).toInt(),
-      'settings_events_extremeLean_cooldown':
-          (_draft['extremeLean_cooldown'] as double).toInt(),
       'settings_events_gearShiftUp_enabled':
           _draft['gearShiftUp_enabled'] as bool,
       'settings_events_gearShiftUp_rpm':
@@ -486,50 +474,6 @@ class _EventsSettingsPanelState extends State<EventsSettingsPanel> {
                 valueFormatter: (v) => '${v.toInt()} s',
                 onChanged: (v) =>
                     setState(() => _draft['coldRisk_cooldown'] = v),
-              ),
-            ],
-          ),
-
-          const SettingsDivider(),
-
-          // ── 极限压弯 ──
-          _buildEventSection(
-            icon: Icons.rotate_right,
-            title: '极限压弯',
-            enabledKey: 'extremeLean_enabled',
-            children: [
-              SettingsSliderField(
-                label: '最低车速要求',
-                value: _draft['extremeLean_speedMin'],
-                defaultValue: 60,
-                min: 20,
-                max: 100,
-                divisions: 16,
-                valueFormatter: (v) => '${v.toInt()} km/h',
-                onChanged: (v) =>
-                    setState(() => _draft['extremeLean_speedMin'] = v),
-              ),
-              SettingsSliderField(
-                label: '倾角触发阈值',
-                value: _draft['extremeLean_angleMin'],
-                defaultValue: 20,
-                min: 5,
-                max: 60,
-                divisions: 55,
-                valueFormatter: (v) => '${v.toInt()} °',
-                onChanged: (v) =>
-                    setState(() => _draft['extremeLean_angleMin'] = v),
-              ),
-              SettingsSliderField(
-                label: '事件冷却',
-                value: _draft['extremeLean_cooldown'],
-                defaultValue: 60,
-                min: 10,
-                max: 300,
-                divisions: 29,
-                valueFormatter: (v) => '${v.toInt()} s',
-                onChanged: (v) =>
-                    setState(() => _draft['extremeLean_cooldown'] = v),
               ),
             ],
           ),

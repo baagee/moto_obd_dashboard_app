@@ -238,23 +238,6 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setColdRiskCooldown(int v) =>
       _setInt('settings_events_coldRisk_cooldown', v);
 
-  bool get extremeLeanEnabled =>
-      _getBool('settings_events_extremeLean_enabled', true);
-  int get extremeLeanSpeedMin =>
-      _getInt('settings_events_extremeLean_speedMin', 60);
-  int get extremeLeanAngleMin =>
-      _getInt('settings_events_extremeLean_angleMin', 20);
-  int get extremeLeanCooldown =>
-      _getInt('settings_events_extremeLean_cooldown', 60);
-  Future<void> setExtremeLeanEnabled(bool v) =>
-      _setBool('settings_events_extremeLean_enabled', v);
-  Future<void> setExtremeLeanSpeedMin(int v) =>
-      _setInt('settings_events_extremeLean_speedMin', v);
-  Future<void> setExtremeLeanAngleMin(int v) =>
-      _setInt('settings_events_extremeLean_angleMin', v);
-  Future<void> setExtremeLeanCooldown(int v) =>
-      _setInt('settings_events_extremeLean_cooldown', v);
-
   // ===== 换挡提醒 =====
 
   bool get gearShiftUpEnabled =>
@@ -305,11 +288,6 @@ class SettingsProvider extends ChangeNotifier {
 
   // ===== 高级设置 =====
 
-  double get sensorAlpha => _getDouble('settings_advanced_sensorAlpha', 0.98);
-  int get movingAverageWindow =>
-      _getInt('settings_advanced_movingAverageWindow', 5);
-  double get deadzoneThreshold =>
-      _getDouble('settings_advanced_deadzoneThreshold', 1.0);
   double get minMoveDistance =>
       _getDouble('settings_advanced_minMoveDistance', 3.0);
   int get maxGpsGapSeconds => _getInt('settings_advanced_maxGpsGapSeconds', 30);
@@ -317,12 +295,6 @@ class SettingsProvider extends ChangeNotifier {
       _getInt('settings_advanced_minRidingDistance', 20);
   int get maxEventHistory => _getInt('settings_advanced_maxEventHistory', 100);
 
-  Future<void> setSensorAlpha(double v) =>
-      _setDouble('settings_advanced_sensorAlpha', v);
-  Future<void> setMovingAverageWindow(int v) =>
-      _setInt('settings_advanced_movingAverageWindow', v);
-  Future<void> setDeadzoneThreshold(double v) =>
-      _setDouble('settings_advanced_deadzoneThreshold', v);
   Future<void> setMinMoveDistance(double v) =>
       _setDouble('settings_advanced_minMoveDistance', v);
   Future<void> setMaxGpsGapSeconds(int v) =>
@@ -387,10 +359,6 @@ class SettingsProvider extends ChangeNotifier {
       'settings_events_coldRisk_temp',
       'settings_events_coldRisk_speedMin',
       'settings_events_coldRisk_cooldown',
-      'settings_events_extremeLean_enabled',
-      'settings_events_extremeLean_speedMin',
-      'settings_events_extremeLean_angleMin',
-      'settings_events_extremeLean_cooldown',
       'settings_events_gearShiftUp_enabled',
       'settings_events_gearShiftUp_rpm',
       'settings_events_gearShiftDown_enabled',
@@ -409,9 +377,6 @@ class SettingsProvider extends ChangeNotifier {
       'settings_api_amapKey',
     ],
     'advanced': [
-      'settings_advanced_sensorAlpha',
-      'settings_advanced_movingAverageWindow',
-      'settings_advanced_deadzoneThreshold',
       'settings_advanced_minMoveDistance',
       'settings_advanced_maxGpsGapSeconds',
       'settings_advanced_minRidingDistance',
