@@ -86,8 +86,6 @@ class RidingStatsProvider extends ChangeNotifier {
 
   // 全程统计数据（用于保存记录）
   double _maxSpeed = 0;
-  double _maxLeftLean = 0;
-  double _maxRightLean = 0;
   double _totalSpeedSum = 0;
   int _totalSampleCount = 0;
 
@@ -128,8 +126,6 @@ class RidingStatsProvider extends ChangeNotifier {
 
     // 重置全程统计数据
     _maxSpeed = 0;
-    _maxLeftLean = 0;
-    _maxRightLean = 0;
     _totalSpeedSum = 0;
     _totalSampleCount = 0;
 
@@ -315,8 +311,6 @@ class RidingStatsProvider extends ChangeNotifier {
         'max_speed': _maxSpeed,
         'distance': distance,
         'duration': duration,
-        'max_left_lean': _maxLeftLean,
-        'max_right_lean': _maxRightLean,
       });
     } catch (e) {
       _logCallback('Stats', LogType.warning, '统计快照写入失败: $e');
@@ -501,26 +495,10 @@ class RidingStatsProvider extends ChangeNotifier {
     _sampler.addSample('load', data.load.toDouble());
     _sampler.addSample('intakeTemp', data.intakeTemp.toDouble());
     _sampler.addSample('throttle', data.throttle.toDouble());
-    const int maxSpeed = 3;
-    // 倾角只在车速 >= maxSpeed km/h 时统计，过滤低速/静止时的传感器噪声
-    if (data.speed >= maxSpeed) {
-      _sampler.addSample('lean', data.leanAngle.toDouble());
-    }
 
     // 实时更新全程统计数据
     final speed = data.speed.toDouble();
     if (speed > _maxSpeed) _maxSpeed = speed;
-
-    // 最大倾角只在车速 >= maxSpeed km/h 时统计，过滤低速/静止时的传感器噪声
-    if (data.speed >= maxSpeed) {
-      final leanAngle = data.leanAngle.toDouble();
-      final leanDirection = data.leanDirection.toLowerCase();
-      if (leanDirection == 'left' && leanAngle > _maxLeftLean) {
-        _maxLeftLean = leanAngle;
-      } else if (leanDirection == 'right' && leanAngle > _maxRightLean) {
-        _maxRightLean = leanAngle;
-      }
-    }
 
     // 累积速度和计数（用于计算全程平均速度）
     _totalSpeedSum += speed;
@@ -532,13 +510,11 @@ class RidingStatsProvider extends ChangeNotifier {
     final avgTemp = _sampler.getAverage('temp');
     final avgVoltage = _sampler.getAverage('voltage');
     final avgLoad = _sampler.getAverage('load');
-    final avgLean = _sampler.getAverage('lean');
     final avgIntakeTemp = _sampler.getAverage('intakeTemp');
     final avgThrottle = _sampler.getAverage('throttle');
 
     // 检测事件
     _checkPerformanceBurst();
-    _checkExtremeLean(avgSpeed, avgLean);
     _checkEngineOverheating(avgTemp);
     _checkVoltageAnomaly(avgVoltage);
     _checkHighEngineLoad(avgLoad);
@@ -558,7 +534,6 @@ class RidingStatsProvider extends ChangeNotifier {
     if (data.coolantTemp <= -40 || data.coolantTemp > 150) return false;
     if (data.voltage <= 0 || data.voltage > 20) return false;
     if (data.load <= 0 || data.load > 100) return false;
-    if (data.leanAngle <= -90 || data.leanAngle > 90) return false;
     if (data.intakeTemp <= -40 || data.intakeTemp > 60) return false;
     if (data.throttle <= 0 || data.throttle > 100) return false;
     return true;
@@ -601,31 +576,6 @@ class RidingStatsProvider extends ChangeNotifier {
       );
       _addEvent(event);
     }
-  }
-
-  /// 极限压弯检测
-  void _checkExtremeLean(double? avgSpeed, double? avgLean) {
-    if (avgSpeed == null || avgLean == null) return;
-    if (_settingsProvider?.extremeLeanEnabled == false) return;
-    final minSpeed = (_settingsProvider?.extremeLeanSpeedMin ?? 60).toDouble();
-    final minAngle = (_settingsProvider?.extremeLeanAngleMin ?? 20).toDouble();
-    final cooldownSec = _settingsProvider?.extremeLeanCooldown ?? 60;
-    if (avgSpeed < minSpeed) return;
-    if (avgLean < minAngle) return;
-    if (!_canTriggerEvent(
-      stats.RidingEventType.extremeLean,
-      customCooldown: Duration(seconds: cooldownSec),
-    )) {
-      return;
-    } // codeflicker-fix: OPT-Issue-8/omvh7ni7j93qpiynr7sw
-
-    final direction = _obdDataProvider.data.leanDirection;
-    final event = stats.RidingEvent.extremeLean(
-      vehicleSpeed: avgSpeed,
-      leanAngle: avgLean,
-      direction: direction.toLowerCase(),
-    );
-    _addEvent(event);
   }
 
   /// 引擎过热检测
@@ -915,8 +865,6 @@ class RidingStatsProvider extends ChangeNotifier {
     final avgSpeed =
         _totalSampleCount > 0 ? _totalSpeedSum / _totalSampleCount : 0.0;
     final maxSpeed = _maxSpeed;
-    final maxLeftLean = _maxLeftLean;
-    final maxRightLean = _maxRightLean;
 
     // 起点 = 骑行开始时第一个 GPS 点，终点 = 骑行结束时最后更新的位置
     final startPoint = _trackStartPoint;
@@ -944,8 +892,8 @@ class RidingStatsProvider extends ChangeNotifier {
           distance: distance,
           avgSpeed: avgSpeed,
           maxSpeed: maxSpeed,
-          maxLeftLean: maxLeftLean,
-          maxRightLean: maxRightLean,
+          maxLeftLean: 0,
+          maxRightLean: 0,
           events: events,
           startLatitude: startPoint?.latitude,
           startLongitude: startPoint?.longitude,
@@ -971,8 +919,8 @@ class RidingStatsProvider extends ChangeNotifier {
         distance: distance,
         avgSpeed: avgSpeed,
         maxSpeed: maxSpeed,
-        maxLeftLean: maxLeftLean,
-        maxRightLean: maxRightLean,
+        maxLeftLean: 0,
+        maxRightLean: 0,
         events: events,
         startLatitude: startPoint?.latitude,
         startLongitude: startPoint?.longitude,

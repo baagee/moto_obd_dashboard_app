@@ -29,7 +29,7 @@ class SensorService {
   }
 
   // 采样间隔 15ms ≈ 66Hz
-  static const int sampleIntervalMs = 15;
+  static const int sampleIntervalMs = 1000;
 
   // 滤波参数 getter：有 SettingsProvider 时从中读取，否则使用硬编码默认值
   double get _alpha => _settings?.sensorAlpha ?? 0.98;

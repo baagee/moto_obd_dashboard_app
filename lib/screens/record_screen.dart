@@ -541,14 +541,6 @@ class _StatsPanel extends StatelessWidget {
 
   const _StatsPanel({required this.stats});
 
-  String _getMaxLean() {
-    final left = stats.maxLeftLean;
-    final right = stats.maxRightLean;
-    final maxLean = left > right ? left : right;
-    final direction = left > right ? 'L' : 'R';
-    return '${maxLean.toStringAsFixed(0)}°$direction';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -591,14 +583,6 @@ class _StatsPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Expanded(
-            child: _StatsCard(
-              label: '倾角',
-              value: _getMaxLean(),
-              color: AppTheme.accentPink,
-              icon: Icons.rotate_right,
-            ),
-          ),
         ],
       ),
     );

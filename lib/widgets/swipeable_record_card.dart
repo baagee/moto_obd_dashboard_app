@@ -291,7 +291,6 @@ class SwipeableRecordCard extends StatelessWidget {
                         '${record.maxSpeed.toStringAsFixed(0)}',
                         'km/h',
                         accent),
-                    _buildLeanStat(),
                   ],
                 ),
               ),
@@ -342,21 +341,6 @@ class SwipeableRecordCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildLeanStat() {
-    final left = record.maxLeftLean;
-    final right = record.maxRightLean;
-    final maxLean = left > right ? left : right;
-    final direction = left > right ? 'L' : 'R';
-
-    return _buildStat(
-      Icons.rotate_right,
-      '倾角',
-      '${maxLean.toStringAsFixed(0)}°$direction',
-      '',
-      AppTheme.accentPink,
     );
   }
 

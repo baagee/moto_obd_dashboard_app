@@ -21,10 +21,9 @@ class RidingScoreCalculator {
   /// 计算骑行评分（满分 100）
   ///
   /// 评分维度：
-  ///   - 速度管理（30分）：最高速度相对合理水平
-  ///   - 均速效率（25分）：均速是否在高效巡航区间
-  ///   - 骑行风格（25分）：最大倾角反映激烈程度（激烈骑行得分低）
-  ///   - 完整性（20分）：距离和时长基础分
+  ///   - 速度管理（40分）：最高速度相对合理水平
+  ///   - 均速效率（33分）：均速是否在高效巡航区间
+  ///   - 完整性（27分）：距离和时长基础分
   static RidingScoreResult calculate(RidingRecord record) {
     // ── 1. 速度管理（30分）──
     // 最高速度越低越安全，但也要有合理的骑行速度
@@ -62,28 +61,7 @@ class RidingScoreCalculator {
       avgSpeedScore = 10; // 持续高速
     }
 
-    // ── 3. 骑行风格（25分）──
-    // 最大倾角反映骑行激烈程度：越大说明越激进（适度压弯是技术，过度则扣分）
-    final maxLean =
-        record.maxLeftLean > record.maxRightLean
-            ? record.maxLeftLean
-            : record.maxRightLean;
-    int leanScore;
-    if (maxLean <= 0) {
-      leanScore = 20; // 无倾角数据，给中等分
-    } else if (maxLean < 10) {
-      leanScore = 25; // 几乎不压弯，直道骑行
-    } else if (maxLean < 20) {
-      leanScore = 22; // 轻度压弯
-    } else if (maxLean < 35) {
-      leanScore = 16; // 中度压弯
-    } else if (maxLean < 50) {
-      leanScore = 10; // 激烈压弯
-    } else {
-      leanScore = 5; // 极限压弯
-    }
-
-    // ── 4. 完整性（20分）──
+    // ── 3. 完整性（20分）──
     // 有足够的骑行距离和时长才是有效骑行
     int completionScore = 0;
     if (record.distance >= 1.0) completionScore += 6;
@@ -92,7 +70,8 @@ class RidingScoreCalculator {
     if (record.duration >= 1800) completionScore += 3; // 30 分钟以上
     if (record.endTime != null) completionScore += 2; // 正常结束骑行（非崩溃）
 
-    final total = (speedScore + avgSpeedScore + leanScore + completionScore)
+    final total = ((speedScore + avgSpeedScore + completionScore) / 75 * 100)
+        .round()
         .clamp(0, 100);
 
     return RidingScoreResult(

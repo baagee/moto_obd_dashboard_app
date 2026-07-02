@@ -72,11 +72,6 @@ class EventVoiceConfigManager {
         getDurationMs: null,
       ),
       const EventVoiceConfig(
-        eventType: RidingEventType.extremeLean,
-        audioAssetPath: 'assets/audio/extreme_lean.mp3',
-        getDurationMs: null,
-      ),
-      const EventVoiceConfig(
         eventType: RidingEventType.gearShiftUp,
         audioAssetPath: 'assets/audio/gear_shift_up.mp3',
         getDurationMs: null,

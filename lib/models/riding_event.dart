@@ -10,7 +10,6 @@ enum RidingEventType {
   highEngineLoad, // 发动机高负荷
   engineWarmup, // 引擎预热
   coldEnvironmentRisk, // 低温环境风险
-  extremeLean, // 高速大倾角压弯
   gearShiftUp, // 建议升档
   gearShiftDown, // 建议降档
 }
@@ -33,8 +32,6 @@ String getEventTypeDisplayName(RidingEventType type) {
       return '引擎预热';
     case RidingEventType.coldEnvironmentRisk:
       return '低温风险';
-    case RidingEventType.extremeLean:
-      return '极限压弯';
     case RidingEventType.gearShiftUp:
       return '建议升档';
     case RidingEventType.gearShiftDown:
@@ -214,35 +211,6 @@ class RidingEvent {
         'intakeAirTemp': intakeAirTemp,
         'vehicleSpeed': vehicleSpeed,
         // 'condition': 'intake air temperature < 5°C and vehicle speed > 40 km/h',
-      },
-    );
-  }
-
-  factory RidingEvent.extremeLean({
-    required double vehicleSpeed,
-    required double leanAngle,
-    required String direction, // 'left' or 'right'
-    DateTime? timestamp,
-  }) {
-    final angleThreshold = 20.0;
-    final speedThreshold = 60.0;
-
-    return RidingEvent(
-      type: RidingEventType.extremeLean,
-      title: getEventTypeDisplayName(RidingEventType.extremeLean),
-      description: direction == 'left'
-          ? '高速左倾压弯：车速${vehicleSpeed.toStringAsFixed(0)}km/h，倾角${leanAngle.toStringAsFixed(1)}°'
-          : '高速右倾压弯：车速${vehicleSpeed.toStringAsFixed(0)}km/h，倾角${leanAngle.abs().toStringAsFixed(1)}°',
-      triggerValue: leanAngle,
-      threshold: angleThreshold,
-      timestamp: timestamp ?? DateTime.now(),
-      additionalData: {
-        'vehicleSpeed': vehicleSpeed,
-        'leanAngle': leanAngle,
-        'direction': direction,
-        'speedThreshold': speedThreshold,
-        'angleThreshold': angleThreshold,
-        // 'condition': 'speed >= 60 km/h && |leanAngle| >= 20°',
       },
     );
   }

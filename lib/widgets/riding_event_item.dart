@@ -45,8 +45,6 @@ class RidingEventItem extends StatelessWidget {
         return Colors.amber;
       case 'RidingEventType.coldEnvironmentRisk':
         return AppTheme.accentCyan;
-      case 'RidingEventType.extremeLean':
-        return Colors.purple;
       case 'RidingEventType.gearShiftUp':
         return AppTheme.accentGreen;
       case 'RidingEventType.gearShiftDown':
@@ -74,8 +72,6 @@ class RidingEventItem extends StatelessWidget {
         return Icons.ac_unit;
       case 'RidingEventType.coldEnvironmentRisk':
         return Icons.severe_cold;
-      case 'RidingEventType.extremeLean':
-        return Icons.rotate_right;
       case 'RidingEventType.gearShiftUp':
         return Icons.arrow_circle_up;
       case 'RidingEventType.gearShiftDown':
