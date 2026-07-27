@@ -7,7 +7,9 @@ import 'package:provider/provider.dart';
 
 import '../../providers/obd_data_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../theme/app_fonts.dart';
 import '../../theme/app_theme.dart';
+import '../danger_pulse_overlay.dart';
 
 // ───────────────────────────────────────────────
 // 经典风格档位指示器（两表中间上方）
@@ -19,7 +21,7 @@ class ClassicGearIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     final gear = context.select<OBDDataProvider, int>((p) => p.data.gear);
     final isNeutral = gear == 0;
-    final glowColor = isNeutral ? AppTheme.accentOrange : AppTheme.accentCyan;
+    final glowColor = isNeutral ? AppTheme.gaugeWarn : AppTheme.gaugeNormal;
     final displayText = isNeutral ? 'N' : '$gear';
 
     return Container(
@@ -66,11 +68,10 @@ class ClassicGearIndicator extends StatelessWidget {
             child: Text(
               displayText,
               key: ValueKey(gear),
-              style: TextStyle(
+              style: AppFonts.displayStyle(
                 fontSize: 32,
-                fontWeight: FontWeight.bold,
-                height: 1.0,
                 color: glowColor,
+              ).copyWith(
                 shadows: [
                   Shadow(color: glowColor, blurRadius: 10),
                 ],
@@ -92,15 +93,24 @@ const double _sweepAngleDeg = 270.0;
 const double _startAngleRad = _startAngleDeg * pi / 180;
 const double _sweepAngleRad = _sweepAngleDeg * pi / 180;
 
-// 图片路径（写死）
-const _bgPaths = {
-  'rpm': 'assets/gauges/classic/rpm_bg.png',
-  'speed': 'assets/gauges/classic/speed_bg.png',
-};
-const _pointerPaths = {
-  'rpm': 'assets/gauges/classic/rpm_pointer.png',
-  'speed': 'assets/gauges/classic/speed_pointer.png',
-};
+// 图片路径（两表共用同一份素材）
+const _bgPath = 'assets/gauges/classic/bg.png';
+const _pointerPath = 'assets/gauges/classic/pointer.png';
+
+// ───────────────────────────────────────────────
+// 图片解码共享缓存：两个表共用同一份解码结果，避免重复解码
+// ───────────────────────────────────────────────
+final Map<String, Future<ui.Image>> _imageCache = {};
+
+Future<ui.Image> _loadSharedImage(String assetPath) {
+  return _imageCache.putIfAbsent(assetPath, () async {
+    final data = await rootBundle.load(assetPath);
+    final bytes = data.buffer.asUint8List();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    return frame.image;
+  });
+}
 
 // ───────────────────────────────────────────────
 // 经典仪表盘布局（屏幕平分两半）
@@ -110,6 +120,16 @@ class ClassicDashboardLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 危险状态：RPM 或速度超过 danger 阈值时触发呼吸闪烁
+    // select 监听 bool 翻转，数据每帧变化不会导致布局重建
+    final dangerRpm = context.select<SettingsProvider, int>((s) => s.dangerRpm);
+    final dangerSpeed =
+        context.select<SettingsProvider, int>((s) => s.dangerSpeed);
+    final rpmDanger = context
+        .select<OBDDataProvider, bool>((p) => p.data.rpm > dangerRpm);
+    final speedDanger = context
+        .select<OBDDataProvider, bool>((p) => p.data.speed > dangerSpeed);
+
     return Stack(
       children: [
         // 底层：两个仪表盘（保持原样）
@@ -118,6 +138,10 @@ class ClassicDashboardLayout extends StatelessWidget {
             Expanded(child: ClassicGaugeWidget(type: GaugeType.rpm)),
             Expanded(child: ClassicGaugeWidget(type: GaugeType.speed)),
           ],
+        ),
+        // 危险状态呼吸闪烁（红框包围整个双表区域）
+        Positioned.fill(
+          child: DangerPulseOverlay(danger: rpmDanger || speedDanger),
         ),
         // 顶层：档位指示器，水平居中，距底部 12dp
         const Align(
@@ -181,11 +205,10 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
   }
 
   Future<void> _loadImages() async {
-    final key = widget.type == GaugeType.rpm ? 'rpm' : 'speed';
     try {
       final results = await Future.wait([
-        _loadImage(_bgPaths[key]!),
-        _loadImage(_pointerPaths[key]!),
+        _loadSharedImage(_bgPath),
+        _loadSharedImage(_pointerPath),
       ]);
       if (!mounted) return;
 
@@ -231,14 +254,6 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
     }
   }
 
-  Future<ui.Image> _loadImage(String assetPath) async {
-    final data = await rootBundle.load(assetPath);
-    final bytes = data.buffer.asUint8List();
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    return frame.image;
-  }
-
   // 自检阶段的模拟值
   int get _selfCheckValue {
     if (_checkCtrl.value <= 0.6) return _riseAnim.value.round();
@@ -260,34 +275,22 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
       return Center(
         child: Text(
           _error ?? '图片加载失败',
-          style: const TextStyle(color: AppTheme.accentRed, fontSize: 12),
+          style: const TextStyle(color: AppTheme.gaugeDanger, fontSize: 12),
         ),
       );
     }
 
-    // 从 Provider 读取数据
-    final settings = context.watch<SettingsProvider>();
-    final obd = context.watch<OBDDataProvider>();
-
-    final int obdValue;
-    final int maxValue;
-    final int warnValue;
-    final int dangerValue;
-    final String unit;
-
-    if (widget.type == GaugeType.rpm) {
-      obdValue = obd.data.rpm;
-      maxValue = settings.maxRpm;
-      warnValue = settings.warnRpm;
-      dangerValue = settings.dangerRpm;
-      unit = 'rpm';
-    } else {
-      obdValue = obd.data.speed;
-      maxValue = settings.maxSpeed;
-      warnValue = settings.warnSpeed;
-      dangerValue = settings.dangerSpeed;
-      unit = 'km/h';
-    }
+    // 精确订阅：仅本表关心的字段变化才触发重建
+    final isRpm = widget.type == GaugeType.rpm;
+    final obdValue = context.select<OBDDataProvider, int>(
+        (p) => isRpm ? p.data.rpm : p.data.speed);
+    final maxValue = context.select<SettingsProvider, int>(
+        (s) => isRpm ? s.maxRpm : s.maxSpeed);
+    final warnValue = context.select<SettingsProvider, int>(
+        (s) => isRpm ? s.warnRpm : s.warnSpeed);
+    final dangerValue = context.select<SettingsProvider, int>(
+        (s) => isRpm ? s.dangerRpm : s.dangerSpeed);
+    final unit = isRpm ? 'rpm' : 'km/h';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -299,45 +302,74 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
         final cx = constraints.maxWidth / 2;
         final cy = constraints.maxHeight * 0.58; // 下移中心
         final center = Offset(cx, cy);
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
 
-        // 自检阶段用动画值，完成后用真实 OBD 值
-        if (!_selfCheckDone) {
-          return AnimatedBuilder(
-            animation: _checkCtrl,
-            builder: (context, _) {
-              return CustomPaint(
-                size: Size(constraints.maxWidth, constraints.maxHeight),
-                painter: _ClassicGaugePainter(
-                  bgImage: _bgImage!,
-                  pointerImage: _pointerImage!,
-                  value: _selfCheckValue,
-                  maxValue: _maxValueCache > 0 ? _maxValueCache : maxValue,
-                  warnValue: warnValue,
-                  dangerValue: dangerValue,
-                  center: center,
-                  radius: radius,
-                  unit: unit,
-                  isRpm: widget.type == GaugeType.rpm,
-                ),
-              );
-            },
-          );
-        }
-
-        return CustomPaint(
-          size: Size(constraints.maxWidth, constraints.maxHeight),
-          painter: _ClassicGaugePainter(
+        // 静态层：背景图 + 弧道 + 刻度，仅量程设置/尺寸变化时重绘
+        final staticLayer = CustomPaint(
+          size: size,
+          painter: _ClassicGaugeStaticPainter(
             bgImage: _bgImage!,
-            pointerImage: _pointerImage!,
-            value: obdValue,
             maxValue: maxValue,
             warnValue: warnValue,
             dangerValue: dangerValue,
             center: center,
             radius: radius,
-            unit: unit,
-            isRpm: widget.type == GaugeType.rpm,
+            isRpm: isRpm,
           ),
+        );
+
+        // 自检阶段用动画值，完成后用真实 OBD 值
+        if (!_selfCheckDone) {
+          return Stack(
+            children: [
+              staticLayer,
+              RepaintBoundary(
+                child: AnimatedBuilder(
+                  animation: _checkCtrl,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      size: size,
+                      painter: _ClassicGaugeDynamicPainter(
+                        pointerImage: _pointerImage!,
+                        value: _selfCheckValue,
+                        maxValue:
+                            _maxValueCache > 0 ? _maxValueCache : maxValue,
+                        warnValue: warnValue,
+                        dangerValue: dangerValue,
+                        center: center,
+                        radius: radius,
+                        unit: unit,
+                        isRpm: isRpm,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Stack(
+          children: [
+            staticLayer,
+            // 动态层：指针（手）+ 数值，独立图层不波及静态层
+            RepaintBoundary(
+              child: CustomPaint(
+                size: size,
+                painter: _ClassicGaugeDynamicPainter(
+                  pointerImage: _pointerImage!,
+                  value: obdValue,
+                  maxValue: maxValue,
+                  warnValue: warnValue,
+                  dangerValue: dangerValue,
+                  center: center,
+                  radius: radius,
+                  unit: unit,
+                  isRpm: isRpm,
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -345,18 +377,80 @@ class _ClassicGaugeWidgetState extends State<ClassicGaugeWidget>
 }
 
 // ───────────────────────────────────────────────
-// 经典仪表盘 CustomPainter
+// 共享绘制辅助函数
 // ───────────────────────────────────────────────
-class _ClassicGaugePainter extends CustomPainter {
+
+/// 值到角度的线性映射（270° 弧）
+double _valueToAngle(double v, int maxValue) {
+  final ratio = (v / maxValue).clamp(0.0, 1.0);
+  return _startAngleRad + ratio * _sweepAngleRad;
+}
+
+/// 计算最优主刻度步长，使刻度值为整洁数（如 1000、2000 或 24、48）
+int _calcTickStep(int max) {
+  const int targetCount = 10;
+  final rawStep = max / targetCount;
+  final magnitude =
+      pow(10, (log(rawStep) / log(10)).floor()).toInt().clamp(1, max);
+  final candidates = [
+    magnitude,
+    magnitude * 2,
+    magnitude * 5,
+    magnitude * 10,
+  ];
+  for (final step in candidates) {
+    if (step > 0 && max % step == 0) {
+      final count = max ~/ step;
+      if (count >= 6 && count <= 14) return step;
+    }
+  }
+  // 兜底：取第二候选（2×magnitude）
+  return (magnitude * 2).clamp(1, max);
+}
+
+/// 区间语义色：正常-青 / 警告-琥珀 / 危险-红
+Color _zoneColor(double tickValue, int warnValue, int dangerValue) {
+  if (tickValue >= dangerValue) return AppTheme.gaugeDanger;
+  if (tickValue >= warnValue) return AppTheme.gaugeWarn;
+  return AppTheme.gaugeNormal;
+}
+
+/// 文本绘制（居中于指定点）
+void _drawGaugeText(
+  Canvas canvas,
+  String text,
+  Offset center, {
+  required Color color,
+  required double fontSize,
+  FontWeight fontWeight = FontWeight.normal,
+  String? fontFamily,
+}) {
+  final span = TextSpan(
+    text: text,
+    style: TextStyle(
+      color: color,
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      fontFamily: fontFamily,
+    ),
+  );
+  final painter = TextPainter(text: span, textDirection: TextDirection.ltr)
+    ..layout();
+  painter.paint(
+      canvas, center - Offset(painter.width / 2, painter.height / 2));
+}
+
+// ───────────────────────────────────────────────
+// 静态层 Painter：背景图（乌鸦哥）+ 弧道 + 刻度线/标签
+// 仅量程设置/尺寸变化时重绘，正常骑行吃图层缓存
+// ───────────────────────────────────────────────
+class _ClassicGaugeStaticPainter extends CustomPainter {
   final ui.Image bgImage;
-  final ui.Image pointerImage;
-  final int value;
   final int maxValue;
   final int warnValue;
   final int dangerValue;
   final Offset center;
   final double radius;
-  final String unit;
   final bool isRpm;
 
   // 刻度参数
@@ -366,55 +460,15 @@ class _ClassicGaugePainter extends CustomPainter {
   static const double _tickInnerRatio = 0.82;
   static const double _labelRadiusRatio = 0.68;
 
-  /// 计算最优主刻度步长，使刻度值为整洁数（如 1000、2000 或 24、48）
-  int _calcTickStep(int max) {
-    const int targetCount = 10;
-    final rawStep = max / targetCount;
-    final magnitude =
-        pow(10, (log(rawStep) / log(10)).floor()).toInt().clamp(1, max);
-    final candidates = [
-      magnitude,
-      magnitude * 2,
-      magnitude * 5,
-      magnitude * 10,
-    ];
-    for (final step in candidates) {
-      if (step > 0 && max % step == 0) {
-        final count = max ~/ step;
-        if (count >= 6 && count <= 14) return step;
-      }
-    }
-    // 兜底：取第二候选（2×magnitude）
-    return (magnitude * 2).clamp(1, max);
-  }
-
-  // 指针参数
-  static const double _pointerLenRatio = 0.82;
-  static const double _pointerMaxWidthRatio = 0.33;
-
-  _ClassicGaugePainter({
+  _ClassicGaugeStaticPainter({
     required this.bgImage,
-    required this.pointerImage,
-    required this.value,
     required this.maxValue,
     required this.warnValue,
     required this.dangerValue,
     required this.center,
     required this.radius,
-    required this.unit,
     this.isRpm = false,
   });
-
-  double _valueToAngle(double v) {
-    final ratio = (v / maxValue).clamp(0.0, 1.0);
-    return _startAngleRad + ratio * _sweepAngleRad;
-  }
-
-  Color _tickColor(double tickValue) {
-    if (tickValue >= dangerValue) return AppTheme.accentRed;
-    if (tickValue >= warnValue) return AppTheme.accentOrange;
-    return AppTheme.primary;
-  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -431,12 +485,6 @@ class _ClassicGaugePainter extends CustomPainter {
 
     // ── 3. 刻度线 + 数值标签 ──
     _drawTicks(canvas);
-
-    // ── 3. 指针 ──
-    _drawPointer(canvas);
-
-    // ── 4. 当前数值（圆心正下方）──
-    _drawValueText(canvas);
   }
 
   void _drawArcTrack(Canvas canvas) {
@@ -450,14 +498,14 @@ class _ClassicGaugePainter extends CustomPainter {
       height: trackRadius * 2,
     );
 
-    final normalEnd = _valueToAngle(warnValue.toDouble());
-    final warnEnd = _valueToAngle(dangerValue.toDouble());
-    final dangerEnd = _valueToAngle(maxValue.toDouble());
+    final normalEnd = _valueToAngle(warnValue.toDouble(), maxValue);
+    final warnEnd = _valueToAngle(dangerValue.toDouble(), maxValue);
+    final dangerEnd = _valueToAngle(maxValue.toDouble(), maxValue);
 
     final segments = [
-      (_startAngleRad, normalEnd, AppTheme.primary, 0.55),
-      (normalEnd, warnEnd, AppTheme.accentOrange, 0.55),
-      (warnEnd, dangerEnd, AppTheme.accentRed, 0.55),
+      (_startAngleRad, normalEnd, AppTheme.gaugeNormal, 0.55),
+      (normalEnd, warnEnd, AppTheme.gaugeWarn, 0.55),
+      (warnEnd, dangerEnd, AppTheme.gaugeDanger, 0.55),
     ];
 
     for (final seg in segments) {
@@ -507,8 +555,8 @@ class _ClassicGaugePainter extends CustomPainter {
 
     for (int i = 0; i <= tickCount; i++) {
       final tickValue = (step * i).toDouble();
-      final angle = _valueToAngle(tickValue);
-      final color = _tickColor(tickValue);
+      final angle = _valueToAngle(tickValue, maxValue);
+      final color = _zoneColor(tickValue, warnValue, dangerValue);
 
       canvas.drawLine(
         Offset(center.dx + mainInner * cos(angle),
@@ -526,7 +574,7 @@ class _ClassicGaugePainter extends CustomPainter {
       // rpm 刻度标签除以 1000 显示（1、2、3...12），speed 直接显示原值
       final labelText =
           isRpm ? (tickValue ~/ 1000).toString() : tickValue.toInt().toString();
-      _drawText(
+      _drawGaugeText(
         canvas,
         labelText,
         Offset(
@@ -534,6 +582,7 @@ class _ClassicGaugePainter extends CustomPainter {
         color: color.withValues(alpha: 0.9),
         fontSize: labelFontSize,
         fontWeight: FontWeight.bold,
+        fontFamily: AppFonts.mono,
       );
 
       // 副刻度：步长可被 _subTickPerMain 整除时才绘制
@@ -541,8 +590,8 @@ class _ClassicGaugePainter extends CustomPainter {
         final subStep = step / _subTickPerMain;
         for (int j = 1; j < _subTickPerMain; j++) {
           final subValue = tickValue + subStep * j;
-          final subAngle = _valueToAngle(subValue);
-          final subColor = _tickColor(subValue);
+          final subAngle = _valueToAngle(subValue, maxValue);
+          final subColor = _zoneColor(subValue, warnValue, dangerValue);
           canvas.drawLine(
             Offset(center.dx + subInner * cos(subAngle),
                 center.dy + subInner * sin(subAngle)),
@@ -558,8 +607,60 @@ class _ClassicGaugePainter extends CustomPainter {
     }
   }
 
+  @override
+  bool shouldRepaint(covariant _ClassicGaugeStaticPainter old) {
+    return old.bgImage != bgImage ||
+        old.maxValue != maxValue ||
+        old.warnValue != warnValue ||
+        old.dangerValue != dangerValue ||
+        old.radius != radius ||
+        old.center != center ||
+        old.isRpm != isRpm;
+  }
+}
+
+// ───────────────────────────────────────────────
+// 动态层 Painter：指针（招手手臂）+ 当前数值
+// 每帧仅重绘本层，背景/刻度由静态层缓存
+// ───────────────────────────────────────────────
+class _ClassicGaugeDynamicPainter extends CustomPainter {
+  final ui.Image pointerImage;
+  final int value;
+  final int maxValue;
+  final int warnValue;
+  final int dangerValue;
+  final Offset center;
+  final double radius;
+  final String unit;
+  final bool isRpm;
+
+  // 指针参数
+  static const double _pointerLenRatio = 0.82;
+  static const double _pointerMaxWidthRatio = 0.33;
+
+  _ClassicGaugeDynamicPainter({
+    required this.pointerImage,
+    required this.value,
+    required this.maxValue,
+    required this.warnValue,
+    required this.dangerValue,
+    required this.center,
+    required this.radius,
+    required this.unit,
+    this.isRpm = false,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // ── 1. 指针 ──
+    _drawPointer(canvas);
+
+    // ── 2. 当前数值（圆心正下方）──
+    _drawValueText(canvas);
+  }
+
   void _drawPointer(Canvas canvas) {
-    final angle = _valueToAngle(value.toDouble());
+    final angle = _valueToAngle(value.toDouble(), maxValue);
     final pointerLen = radius * _pointerLenRatio;
 
     final imgW = pointerImage.width.toDouble();
@@ -585,9 +686,9 @@ class _ClassicGaugePainter extends CustomPainter {
 
     final Color valueColor;
     if (value >= dangerValue) {
-      valueColor = AppTheme.accentRed;
+      valueColor = AppTheme.gaugeDanger;
     } else if (value >= warnValue) {
-      valueColor = AppTheme.accentOrange;
+      valueColor = AppTheme.gaugeWarn;
     } else {
       valueColor = AppTheme.textPrimary;
     }
@@ -598,38 +699,29 @@ class _ClassicGaugePainter extends CustomPainter {
     // rpm 显示实际值；单位行加 ×1000 标识
     final displayUnit = isRpm ? '×1000  $unit' : unit;
 
-    _drawText(canvas, value.toString(), Offset(center.dx, valueY),
-        color: valueColor,
-        fontSize: valueFontSize,
-        fontWeight: FontWeight.bold);
-    _drawText(canvas, displayUnit, Offset(center.dx, unitY),
-        color: AppTheme.textSecondary,
-        fontSize: unitFontSize,
-        fontWeight: FontWeight.w500);
-  }
-
-  void _drawText(
-    Canvas canvas,
-    String text,
-    Offset center, {
-    required Color color,
-    required double fontSize,
-    FontWeight fontWeight = FontWeight.normal,
-  }) {
-    final span = TextSpan(
-      text: text,
-      style:
-          TextStyle(color: color, fontSize: fontSize, fontWeight: fontWeight),
+    _drawGaugeText(
+      canvas,
+      value.toString(),
+      Offset(center.dx, valueY),
+      color: valueColor,
+      fontSize: valueFontSize,
+      fontWeight: FontWeight.bold,
+      fontFamily: AppFonts.display,
     );
-    final painter = TextPainter(text: span, textDirection: TextDirection.ltr)
-      ..layout();
-    painter.paint(
-        canvas, center - Offset(painter.width / 2, painter.height / 2));
+    _drawGaugeText(
+      canvas,
+      displayUnit,
+      Offset(center.dx, unitY),
+      color: AppTheme.textSecondary,
+      fontSize: unitFontSize,
+      fontWeight: FontWeight.w500,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _ClassicGaugePainter old) {
-    return old.value != value ||
+  bool shouldRepaint(covariant _ClassicGaugeDynamicPainter old) {
+    return old.pointerImage != pointerImage ||
+        old.value != value ||
         old.maxValue != maxValue ||
         old.warnValue != warnValue ||
         old.dangerValue != dangerValue ||

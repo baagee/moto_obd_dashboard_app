@@ -35,20 +35,20 @@ class SideStatsPanel extends StatelessWidget {
               children: [
                 _ProgressBar(
                   icon: Icons.speed,
-                  iconColor: AppTheme.accentCyan,
+                  iconColor: AppTheme.gaugeNormal,
                   label: '油门开度',
                   value: throttle,
-                  color: AppTheme.accentCyan,
+                  color: AppTheme.gaugeNormal,
                 ),
 
                 const SizedBox(height: 12),
 
                 _ProgressBar(
                   icon: Icons.settings,
-                  iconColor: AppTheme.accentOrange,
+                  iconColor: AppTheme.gaugeWarn,
                   label: '发动机负载',
                   value: load,
-                  color: AppTheme.accentOrange,
+                  color: AppTheme.gaugeWarn,
                 ),
 
                 const SizedBox(height: 12),

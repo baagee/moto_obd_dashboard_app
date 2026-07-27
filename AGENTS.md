@@ -130,13 +130,17 @@ lib/
 │   ├── logs_screen.dart         # 诊断日志视图
 │   └── bluetooth_scan_screen.dart # 蓝牙设备扫描页面
 ├── theme/
-│   └── app_theme.dart           # 颜色常量、TextStyles、BoxDecorations
+│   ├── app_theme.dart           # 颜色常量、TextStyles、BoxDecorations
+│   └── app_fonts.dart           # 科技感字体管理（Orbitron 大数字 / Roboto Mono 等宽数据）
 ├── constants/
 │   └── bluetooth_constants.dart # 蓝牙相关常量
 └── widgets/
     ├── speed_gauge_card.dart          # 圆形速度表
     ├── rpm_gauge_card.dart            # 带渐变的转速表
-    ├── combined_gauge_card.dart       # 多仪表组合显示
+    ├── combined_gauge_card.dart       # 多仪表组合显示（静态/动态双 Painter 分层）
+    ├── danger_pulse_overlay.dart      # 危险状态呼吸闪烁覆盖层（Shift-Light，两主题共用）
+    ├── gauges/
+    │   └── classic_gauge_widget.dart  # 乌鸦哥招手主题（静态/动态分层、共享图片解码缓存）
     ├── speed_gear_card.dart           # 速度+档位显示
     ├── telemetry_chart_card.dart     # fl_chart 折线图
     ├── side_stats_panel.dart          # 侧边统计面板
@@ -387,6 +391,20 @@ static const Color primary60 = Color(0x990DA6F2); // 0.6 opacity
 static const Color primary30 = Color(0x4D0DA6F2); // 0.3 opacity
 static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
 ```
+
+#### 仪表盘语义色
+- 仪表数据相关颜色（进度/指针/刻度/中心值）**必须**使用语义色，不直接使用 accent 色：
+    - `gaugeNormal` 霓虹青 - 正常区（RPM/速度共用）
+    - `gaugeWarn` 琥珀 - 警告区
+    - `gaugeDanger` 红 - 危险区
+- `primary` 蓝仅用于 UI 框架层（导航、边框、按钮、背景纹理）
+
+#### 字体规范
+- 拉丁字母/数字使用 `AppFonts`（`lib/theme/app_fonts.dart`）：
+    - `AppFonts.displayStyle()` Orbitron - 仪表大数字/标题
+    - `AppFonts.monoStyle()` Roboto Mono - 刻度数字/数据值（等宽防跳字）
+- 中文标签不指定 fontFamily，走 Space Grotesk/系统回退链
+- 字体文件打包在 `assets/fonts/`（pubspec 已注册），不使用 google_fonts 运行时下载
 
 #### TextStyle 规范
 - 使用 `static const TextStyle` 预定义样式

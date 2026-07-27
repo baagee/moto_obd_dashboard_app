@@ -42,3 +42,14 @@ flutter:
     - assets/audio/
     - assets/gauges/classic/
     - assets/icon.png
+
+  # 科技感字体（打包进 assets，车机离线场景可用）
+  fonts:
+    - family: Orbitron
+      fonts:
+        - asset: assets/fonts/Orbitron-Bold.ttf
+          weight: 700
+    - family: RobotoMono
+      fonts:
+        - asset: assets/fonts/RobotoMono-Bold.ttf
+          weight: 700

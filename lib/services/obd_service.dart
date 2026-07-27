@@ -79,26 +79,26 @@ class OBDService {
     logCallback?.call('ELM327', LogType.info, '开始初始化 ELM327...');
 
     // ATZ 复位
-    sendCommand("ATZ");
+    _writeRaw("ATZ");
     // codeflicker-fix: LOGIC-Issue-006/odko2evgylfq2rjqqr53
     await Future.delayed(Duration(
         milliseconds: _settings?.elm327InitWaitMs ??
             BluetoothConstants.elm327InitWait.inMilliseconds));
 
     // ATE0 关闭回显
-    sendCommand("ATE0");
+    _writeRaw("ATE0");
     await Future.delayed(BluetoothConstants.obdCommandInterval);
 
     // ATL0 关闭行尾
-    sendCommand("ATL0");
+    _writeRaw("ATL0");
     await Future.delayed(BluetoothConstants.obdCommandInterval);
 
     // ATH0 关闭头信息
-    sendCommand("ATH0");
+    _writeRaw("ATH0");
     await Future.delayed(BluetoothConstants.obdCommandInterval);
 
     // ATSP0 自动协议
-    sendCommand("ATSP0");
+    _writeRaw("ATSP0");
     await Future.delayed(BluetoothConstants.obdCommandInterval);
 
     logCallback?.call('ELM327', LogType.success, 'ELM327 初始化完成');
@@ -222,26 +222,34 @@ class OBDService {
     }
   }
 
-  /// 发送 OBD 命令
+  /// 发送 OBD 命令（仅轮询期间有效；断开/轮询停止后直接跳过）
   void sendCommand(String command) {
-    // 如果轮询未启动或写入特征为空，跳过发送
+    if (!_isPollingActive) return;
+    _writeRaw(command);
+  }
+
+  /// 实际执行 BLE 写入（ELM327 初始化 AT 指令在轮询启动前也走这里）
+  void _writeRaw(String command) {
     if (_writeCharacteristic == null) {
-      logCallback?.call('OBD', LogType.warning,
-          'sendCommand 跳过: _writeCharacteristic=${_writeCharacteristic != null}');
+      logCallback?.call('OBD', LogType.warning, '写入跳过: 写入特征为空');
       return;
     }
-    try {
-      final bytes = utf8.encode("$command\r");
-      _writeCharacteristic!.write(bytes, withoutResponse: false);
-    } catch (e) {
+    final bytes = utf8.encode("$command\r");
+    // write 的错误必须走 catchError：try/catch 捕获不到 Future 的异步错误，
+    // 否则断开窗口期每个失败的 write 都会变成一个 unhandled async error
+    _writeCharacteristic!.write(bytes, withoutResponse: false).catchError((e) {
       final errorMsg = e.toString();
+      // 断开导致的失败会批量爆发：只处理第一次（停轮询），避免日志风暴
+      if (errorMsg.contains('disconnected')) {
+        if (_isPollingActive) {
+          logCallback?.call('OBD', LogType.error, '发送命令失败(设备已断开): $command');
+          stopPolling();
+        }
+        return;
+      }
       logCallback?.call(
           'OBD', LogType.error, '发送命令失败: $command, 错误: $errorMsg');
-      if (errorMsg.contains('device is disconnected') ||
-          errorMsg.contains('disconnected')) {
-        stopPolling();
-      } else {}
-    }
+    });
   }
 
   /// 启动分级轮询

@@ -159,12 +159,28 @@ class _SelfCheckOverlayState extends State<SelfCheckOverlay>
                     padding: const EdgeInsets.all(8),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        return CustomPaint(
-                          size: Size(
-                            constraints.maxWidth,
-                            constraints.maxHeight,
-                          ),
-                          painter: CombinedGaugePainter(
+                        final size = Size(
+                          constraints.maxWidth,
+                          constraints.maxHeight,
+                        );
+                        return Stack(
+                          children: [
+                            // 静态层：背景/刻度（与正式仪表盘一致）
+                            CustomPaint(
+                              size: size,
+                              painter: GaugeStaticPainter(
+                                maxRpm: widget.maxRpm,
+                                warnRpm: widget.warnRpm,
+                                dangerRpm: widget.dangerRpm,
+                                maxSpeed: widget.maxSpeed,
+                                warnSpeed: widget.warnSpeed,
+                                dangerSpeed: widget.dangerSpeed,
+                              ),
+                            ),
+                            // 动态层：扫表动画
+                            CustomPaint(
+                              size: size,
+                              painter: CombinedGaugePainter(
                             rpm: _currentRpm,
                             speed: _currentSpeed,
                             gear: 0,
@@ -176,7 +192,9 @@ class _SelfCheckOverlayState extends State<SelfCheckOverlay>
                             maxSpeed: widget.maxSpeed,
                             warnSpeed: widget.warnSpeed,
                             dangerSpeed: widget.dangerSpeed,
-                          ),
+                              ),
+                            ),
+                          ],
                         );
                       },
                     ),

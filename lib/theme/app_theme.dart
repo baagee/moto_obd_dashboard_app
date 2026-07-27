@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'app_fonts.dart';
+
 /// 应用主题配置
 class AppTheme {
   // ========== 基础颜色 ==========
@@ -13,6 +15,16 @@ class AppTheme {
   static const Color accentPurple = Color(0xFF9C27B0);
   static const Color accentPink = Color(0xFFE91E63);
   static const Color slateGray = Color(0xFF1E293B);
+
+  // ========== 仪表盘语义色 ==========
+  /// 仪表正常区 - 霓虹青（RPM/速度共用，消除蓝青双主色）
+  static const Color gaugeNormal = Color(0xFF00F0FF);
+
+  /// 仪表警告区 - 琥珀
+  static const Color gaugeWarn = Color(0xFFFFB84D);
+
+  /// 仪表危险区 - 红
+  static const Color gaugeDanger = Color(0xFFFF3B3B);
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFF9CA3AF);
   static const Color textMuted = Color(0xFF6B7280);
@@ -122,13 +134,11 @@ class AppTheme {
     color: textPrimary,
   );
 
-  /// 大标题样式
-  static const TextStyle headingLarge = TextStyle(
+  /// 大标题样式（Orbitron 科技感数字字体，非 const 因引用 AppFonts）
+  static final TextStyle headingLarge = AppFonts.displayStyle(
     fontSize: 120,
-    fontWeight: FontWeight.bold,
     color: textPrimary,
     letterSpacing: -2,
-    height: 1,
   );
 
   /// 标题样式 - 中号

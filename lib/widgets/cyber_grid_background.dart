@@ -1,10 +1,36 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
-/// 全局赛博风格背景：深蓝黑渐变 + 不规则电路走线纹理
-class CyberGridBackground extends StatelessWidget {
+import '../theme/app_theme.dart';
+
+/// 全局赛博风格背景：深蓝黑渐变 + 不规则电路走线纹理 + 流动光点
+class CyberGridBackground extends StatefulWidget {
   final Widget child;
   const CyberGridBackground({super.key, required this.child});
+
+  @override
+  State<CyberGridBackground> createState() => _CyberGridBackgroundState();
+}
+
+class _CyberGridBackgroundState extends State<CyberGridBackground>
+    with SingleTickerProviderStateMixin {
+  /// 光点流动动画：5s 线性循环
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,12 +54,18 @@ class CyberGridBackground extends StatelessWidget {
             ),
           ),
         ),
-        // ② 电路走线纹理
+        // ② 电路走线纹理（静态层）
         Positioned.fill(
           child: CustomPaint(painter: _CircuitPainter()),
         ),
-        // ③ 内容层
-        child,
+        // ③ 流动光点（动态层，独立图层不波及静态层）
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: CustomPaint(painter: _PulsePainter(_pulseController)),
+          ),
+        ),
+        // ④ 内容层
+        widget.child,
       ],
     );
   }
@@ -50,29 +82,108 @@ class _CircuitTrace {
 }
 
 // ─────────────────────────────────────────────
-// CustomPainter 实现
+// 走线数据共享缓存（静态层与光点层复用同一份数据）
 // ─────────────────────────────────────────────
-class _CircuitPainter extends CustomPainter {
+class _CircuitCache {
   // App 启动时生成一次种子，保证同一次运行内图案稳定，但每次启动不同
   static final int _seed = DateTime.now().millisecondsSinceEpoch;
 
-  // 预生成走线数据（静态缓存，只算一次）
-  static List<_CircuitTrace>? _cachedTraces;
-  static List<Offset>? _cachedVias;
-  static Size? _cachedSize;
+  static List<_CircuitTrace>? traces;
+  static List<Offset>? vias;
+  static Size? size;
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    // 首次或尺寸变化时重新生成
-    if (_cachedTraces == null || _cachedSize != size) {
+  /// 首次或尺寸变化时重新生成
+  static void ensure(Size s) {
+    if (traces == null || size != s) {
       final rng = math.Random(_seed);
-      _cachedTraces = _generateTraces(size, rng);
-      _cachedVias = _generateVias(size, rng);
-      _cachedSize = size;
+      traces = _generateTraces(s, rng);
+      vias = _generateVias(s, rng);
+      size = s;
+    }
+  }
+
+  /// 生成所有走线
+  static List<_CircuitTrace> _generateTraces(Size size, math.Random rng) {
+    const int dimCount = 100; // 暗走线数量
+    const int glowCount = 14; // 发光走线数量
+
+    final traces = <_CircuitTrace>[];
+
+    for (int i = 0; i < dimCount; i++) {
+      final pts = _generateTracePath(size, rng);
+      if (pts.length >= 2) traces.add(_CircuitTrace(pts));
     }
 
-    final traces = _cachedTraces!;
-    final vias = _cachedVias!;
+    for (int i = 0; i < glowCount; i++) {
+      final pts = _generateTracePath(size, rng, minSegments: 2, maxSegments: 5);
+      if (pts.length >= 2) traces.add(_CircuitTrace(pts, isGlow: true));
+    }
+
+    return traces;
+  }
+
+  /// 生成一条 PCB 风格折线路径（只走 0°/90°）
+  static List<Offset> _generateTracePath(
+    Size size,
+    math.Random rng, {
+    int minSegments = 2,
+    int maxSegments = 6,
+  }) {
+    final points = <Offset>[];
+
+    // 随机起点（允许稍微超出边缘，增加自然感）
+    double x = rng.nextDouble() * size.width;
+    double y = rng.nextDouble() * size.height;
+    points.add(Offset(x, y));
+
+    // 随机初始方向：true = 水平，false = 垂直
+    bool horizontal = rng.nextBool();
+
+    final segCount = minSegments + rng.nextInt(maxSegments - minSegments + 1);
+
+    for (int i = 0; i < segCount; i++) {
+      // 线段长度：20~160px，主要集中在 40~100px
+      final len = 20.0 + rng.nextDouble() * 140.0;
+      // 正负方向
+      final sign = rng.nextBool() ? 1.0 : -1.0;
+
+      if (horizontal) {
+        x = (x + sign * len).clamp(-20, size.width + 20);
+      } else {
+        y = (y + sign * len).clamp(-20, size.height + 20);
+      }
+
+      points.add(Offset(x, y));
+
+      // 下一段切换水平/垂直，偶尔（20%概率）连续同方向
+      if (rng.nextDouble() > 0.2) {
+        horizontal = !horizontal;
+      }
+    }
+
+    return points;
+  }
+
+  /// 生成随机 Via 焊盘位置
+  static List<Offset> _generateVias(Size size, math.Random rng) {
+    const int count = 25;
+    return List.generate(count, (_) {
+      return Offset(
+        rng.nextDouble() * size.width,
+        rng.nextDouble() * size.height,
+      );
+    });
+  }
+}
+// ─────────────────────────────────────────────
+// CustomPainter 实现（静态层）
+// ─────────────────────────────────────────────
+class _CircuitPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    _CircuitCache.ensure(size);
+    final traces = _CircuitCache.traces!;
+    final vias = _CircuitCache.vias!;
 
     // --- 暗走线 ---
     final dimPaint = Paint()
@@ -161,79 +272,105 @@ class _CircuitPainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
 
-  /// 生成所有走线
-  static List<_CircuitTrace> _generateTraces(Size size, math.Random rng) {
-    const int dimCount = 100; // 暗走线数量
-    const int glowCount = 14; // 发光走线数量
-
-    final traces = <_CircuitTrace>[];
-
-    for (int i = 0; i < dimCount; i++) {
-      final pts = _generateTracePath(size, rng);
-      if (pts.length >= 2) traces.add(_CircuitTrace(pts));
-    }
-
-    for (int i = 0; i < glowCount; i++) {
-      final pts = _generateTracePath(size, rng, minSegments: 2, maxSegments: 5);
-      if (pts.length >= 2) traces.add(_CircuitTrace(pts, isGlow: true));
-    }
-
-    return traces;
-  }
-
-  /// 生成一条 PCB 风格折线路径（只走 0°/90°）
-  static List<Offset> _generateTracePath(
-    Size size,
-    math.Random rng, {
-    int minSegments = 2,
-    int maxSegments = 6,
-  }) {
-    final points = <Offset>[];
-
-    // 随机起点（允许稍微超出边缘，增加自然感）
-    double x = rng.nextDouble() * size.width;
-    double y = rng.nextDouble() * size.height;
-    points.add(Offset(x, y));
-
-    // 随机初始方向：true = 水平，false = 垂直
-    bool horizontal = rng.nextBool();
-
-    final segCount = minSegments + rng.nextInt(maxSegments - minSegments + 1);
-
-    for (int i = 0; i < segCount; i++) {
-      // 线段长度：20~160px，主要集中在 40~100px
-      final len = 20.0 + rng.nextDouble() * 140.0;
-      // 正负方向
-      final sign = rng.nextBool() ? 1.0 : -1.0;
-
-      if (horizontal) {
-        x = (x + sign * len).clamp(-20, size.width + 20);
-      } else {
-        y = (y + sign * len).clamp(-20, size.height + 20);
-      }
-
-      points.add(Offset(x, y));
-
-      // 下一段切换水平/垂直，偶尔（20%概率）连续同方向
-      if (rng.nextDouble() > 0.2) {
-        horizontal = !horizontal;
-      }
-    }
-
-    return points;
-  }
-
-  /// 生成随机 Via 焊盘位置
-  static List<Offset> _generateVias(Size size, math.Random rng) {
-    const int count = 25;
-    return List.generate(count, (_) {
-      return Offset(
-        rng.nextDouble() * size.width,
-        rng.nextDouble() * size.height,
-      );
-    });
-  }
-
   @override
   bool shouldRepaint(_CircuitPainter oldDelegate) => false;
+}
+
+// ─────────────────────────────────────────────
+// 流动光点 Painter（动态层）
+// ─────────────────────────────────────────────
+/// 沿发光走线流动的光点：3 个光点错峰循环，带 60px 渐隐拖尾
+class _PulsePainter extends CustomPainter {
+  /// 光点数量
+  static const int _pulseCount = 3;
+
+  /// 拖尾长度（px）
+  static const double _trailLength = 60;
+
+  /// 拖尾分段数
+  static const int _trailSegments = 8;
+
+  final Animation<double> progress;
+
+  _PulsePainter(this.progress) : super(repaint: progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _CircuitCache.ensure(size);
+    final glowTraces = _CircuitCache.traces!
+        .where((t) => t.isGlow)
+        .take(_pulseCount)
+        .toList();
+
+    for (int k = 0; k < glowTraces.length; k++) {
+      final pts = glowTraces[k].points;
+      final totalLen = _polylineLength(pts);
+      if (totalLen <= 0) continue;
+
+      // 错峰相位：3 个光点均匀分布在循环周期上
+      final t = (progress.value + k / _pulseCount) % 1.0;
+      final headDist = t * totalLen;
+      final head = _pointAt(pts, headDist);
+
+      // 拖尾：从头部反向采样，透明度渐隐
+      for (int i = 0; i < _trailSegments; i++) {
+        final d1 = headDist - _trailLength * i / _trailSegments;
+        final d2 = headDist - _trailLength * (i + 1) / _trailSegments;
+        if (d2 < 0 && d1 <= 0) break;
+        final p1 = _pointAt(pts, d1.clamp(0.0, totalLen));
+        final p2 = _pointAt(pts, d2.clamp(0.0, totalLen));
+        final alpha = 0.35 * (1 - i / _trailSegments);
+        canvas.drawLine(
+          p1,
+          p2,
+          Paint()
+            ..color = AppTheme.gaugeNormal.withValues(alpha: alpha)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+
+      // 头部光点：外发光 + 白芯
+      canvas.drawCircle(
+        head,
+        3,
+        Paint()
+          ..color = AppTheme.gaugeNormal.withValues(alpha: 0.8)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+      canvas.drawCircle(
+        head,
+        1.2,
+        Paint()..color = Colors.white.withValues(alpha: 0.9),
+      );
+    }
+  }
+
+  /// 折线总长度
+  double _polylineLength(List<Offset> pts) {
+    double len = 0;
+    for (int i = 1; i < pts.length; i++) {
+      len += (pts[i] - pts[i - 1]).distance;
+    }
+    return len;
+  }
+
+  /// 折线上距起点 dist 处的点
+  Offset _pointAt(List<Offset> pts, double dist) {
+    double remaining = dist;
+    for (int i = 1; i < pts.length; i++) {
+      final segLen = (pts[i] - pts[i - 1]).distance;
+      if (remaining <= segLen) {
+        final t = segLen == 0 ? 0.0 : remaining / segLen;
+        return Offset.lerp(pts[i - 1], pts[i], t)!;
+      }
+      remaining -= segLen;
+    }
+    return pts.last;
+  }
+
+  // 逐帧重绘由构造函数 super(repaint: progress) 驱动，字段不可变故返回 false
+  @override
+  bool shouldRepaint(_PulsePainter oldDelegate) => false;
 }

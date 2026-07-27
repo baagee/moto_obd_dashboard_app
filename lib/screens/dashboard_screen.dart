@@ -7,6 +7,7 @@ import '../widgets/side_stats_panel.dart';
 import '../widgets/telemetry_chart_card.dart';
 import '../widgets/riding_events_panel.dart';
 import '../widgets/self_check_overlay.dart';
+import '../widgets/danger_pulse_overlay.dart';
 import '../widgets/gauges/classic_gauge_widget.dart';
 
 /// 主仪表盘屏幕
@@ -93,29 +94,47 @@ class _CyberpunkLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 确保 OBDDataProvider 被监听（原布局中子组件各自 select，此处保持原样）
-    return const Padding(
-      padding: EdgeInsets.all(8),
+    // 危险状态：RPM 或速度超过 danger 阈值时触发呼吸闪烁
+    // select 监听 bool 翻转，数据每帧变化不会导致布局重建
+    final dangerRpm = context.select<SettingsProvider, int>((s) => s.dangerRpm);
+    final dangerSpeed =
+        context.select<SettingsProvider, int>((s) => s.dangerSpeed);
+    final rpmDanger = context
+        .select<OBDDataProvider, bool>((p) => p.data.rpm > dangerRpm);
+    final speedDanger = context
+        .select<OBDDataProvider, bool>((p) => p.data.speed > dangerSpeed);
+
+    return Padding(
+      padding: const EdgeInsets.all(8),
       child: Row(
         children: [
           // 第一列：车辆状态参数 (2/9)
-          Expanded(
+          const Expanded(
             flex: 2,
             child: SideStatsPanel(),
           ),
 
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
 
           // 第二列：组合仪表盘（转速+时速合并为一个完整圆）(4/9)
           Expanded(
             flex: 4,
-            child: CombinedGaugeCard(),
+            child: Stack(
+              children: [
+                const CombinedGaugeCard(),
+                Positioned.fill(
+                  child: DangerPulseOverlay(
+                    danger: rpmDanger || speedDanger,
+                  ),
+                ),
+              ],
+            ),
           ),
 
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
 
           // 第三列：遥测图表和骑行事件（上下排列，1:2比例）(3/9)
-          Expanded(
+          const Expanded(
             flex: 3,
             child: Column(
               children: [
@@ -140,7 +159,3 @@ class _CyberpunkLayout extends StatelessWidget {
     );
   }
 }
-
-// 确保 OBDDataProvider 引用不被 tree-shaking（classic 布局用到它）
-// ignore: unused_element
-void _ensureOBDImport(OBDDataProvider _) {}
