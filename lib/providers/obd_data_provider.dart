@@ -41,12 +41,19 @@ class OBDDataProvider extends ChangeNotifier {
   // 连接状态
   bool _isDeviceConnected = false;
 
+  // 峰值保持（Peak-Hold）：本次骑行的最高 RPM / 最高速度
+  // 骑行开始（startRide）或设备断开（resetData）时清零
+  int _peakRpm = 0;
+  int _peakSpeed = 0;
+
   // Getter
   OBDData get data => _data; // cur data
   List<int> get rpmHistory => _rpmHistory;
   List<int> get velocityHistory => _velocityHistory;
   List<int> get pressureHistory => _pressureHistory;
   bool get isDeviceConnected => _isDeviceConnected;
+  int get peakRpm => _peakRpm;
+  int get peakSpeed => _peakSpeed;
 
   SettingsProvider? _settingsProvider;
 
@@ -86,6 +93,10 @@ class OBDDataProvider extends ChangeNotifier {
       if (_pressureHistory.length > maxDataPoints) _pressureHistory.removeAt(0);
     }
 
+    // 更新峰值（Peak-Hold）
+    if (rpm != null && rpm > _peakRpm) _peakRpm = rpm;
+    if (speed != null && speed > _peakSpeed) _peakSpeed = speed;
+
     // 计算档位
     final currentSpeed = speed ?? _data.speed;
     final currentThrottle = throttle ?? _data.throttle;
@@ -117,12 +128,19 @@ class OBDDataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 清零峰值（骑行开始时调用）
+  void resetPeaks() {
+    _peakRpm = 0;
+    _peakSpeed = 0;
+  }
+
   /// 重置数据为默认值（设备断开时调用）
   void resetData() {
     _isDeviceConnected = false;
     _rpmHistory = List.generate(maxDataPoints, (_) => 0);
     _velocityHistory = List.generate(maxDataPoints, (_) => 0);
     _pressureHistory = List.generate(maxDataPoints, (_) => 0);
+    resetPeaks();
 
     _data = OBDData(
       rpm: defaultRpm,

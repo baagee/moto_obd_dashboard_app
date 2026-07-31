@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
 import '../constants/bluetooth_constants.dart';
 import '../models/bluetooth_device.dart';
-import '../models/obd_data.dart';
+import '../models/log.dart';
 import '../services/audio_service.dart';
 import '../services/bluetooth_service.dart' as app_bluetooth;
 import '../services/device_storage_service.dart';
@@ -707,7 +707,7 @@ class BluetoothProvider extends ChangeNotifier {
 
     // 取消通知订阅（静默失败）
     if (_notifyCharacteristic != null) {
-      _notifyCharacteristic!.setNotifyValue(false).catchError((_) {});
+      _notifyCharacteristic!.setNotifyValue(false).catchError((_) => false);
       _notifyCharacteristic = null;
     }
     // 兜底处理：确保所有设备都重置为 disconnected

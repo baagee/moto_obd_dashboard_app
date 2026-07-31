@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import '../models/obd_data.dart';
+import '../models/log.dart';
 import '../models/riding_record.dart';
 import '../services/database_service.dart';
 import '../services/geocoding_service.dart';
@@ -219,6 +219,7 @@ class RidingRecordProvider extends ChangeNotifier {
       GeocodingService.getPlaceName(
         endLatitude,
         endLongitude,
+        amapKey: _settingsProvider?.amapKey ?? '',
         logCallback: _logCallback,
       ).then((endPlaceName) async {
         if (endPlaceName != null) {
@@ -337,17 +338,20 @@ class RidingRecordProvider extends ChangeNotifier {
         ? DailyStats.fromMap(existing)
         : DailyStats(date: dateStr);
 
+    // 时长加权计算均速：与 DatabaseService._recalcDailyStats 逻辑保持一致
+    // weightedSpeedSum = 旧均速 * 旧总时长 + 新均速 * 新时长
+    final newTotalDuration = stats.totalDuration + duration;
+    final newAvgSpeed = newTotalDuration > 0
+        ? (stats.avgSpeed * stats.totalDuration + avgSpeed * duration) /
+            newTotalDuration
+        : 0.0;
+
     // 更新统计
     final updatedStats = DailyStats(
       date: dateStr,
       totalDistance: stats.totalDistance + distance,
-      totalDuration: stats.totalDuration + duration,
-      avgSpeed: _calculateWeightedAvg(
-        stats.avgSpeed,
-        stats.rideCount,
-        avgSpeed,
-        1,
-      ),
+      totalDuration: newTotalDuration,
+      avgSpeed: newAvgSpeed,
       maxSpeed: maxSpeed > stats.maxSpeed ? maxSpeed : stats.maxSpeed,
       maxLeftLean:
           maxLeftLean > stats.maxLeftLean ? maxLeftLean : stats.maxLeftLean,
@@ -357,17 +361,6 @@ class RidingRecordProvider extends ChangeNotifier {
     );
 
     await DatabaseService.upsertDailyStats(dateStr, updatedStats.toMap());
-  }
-
-  /// 计算加权平均
-  double _calculateWeightedAvg(
-    double avg1,
-    int count1,
-    double avg2,
-    int count2,
-  ) {
-    if (count1 + count2 == 0) return 0;
-    return (avg1 * count1 + avg2 * count2) / (count1 + count2);
   }
 
   /// 刷新统计数据

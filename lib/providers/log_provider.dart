@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../models/obd_data.dart';
+import '../models/log.dart';
 import '../services/log_service.dart';
 
 /// 日志 Provider - 集中管理所有业务日志

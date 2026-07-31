@@ -3,12 +3,14 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:obd_dashboard/utils/gear_util.dart';
+import '../models/log.dart';
 import '../models/obd_data.dart';
 import '../models/riding_event.dart' as stats;
 import '../services/audio_service.dart';
 import '../services/database_service.dart';
 import '../services/geocoding_service.dart';
 import '../services/location_service.dart';
+import '../models/position_data.dart';
 import 'log_provider.dart';
 import 'loggable.dart';
 import 'obd_data_provider.dart';
@@ -72,6 +74,15 @@ class RidingStatsProvider extends ChangeNotifier {
   double _totalGpsDistance = 0; // 米
   PositionData? _lastPosition;
 
+  // 实时轨迹缓存（内存，仅保留最近 15 分钟，供轨迹雷达图使用）
+  // 注意：列表只做原地增删，不重新赋值，保证外部持有的引用始终有效
+  static const Duration trackWindow = Duration(minutes: 15);
+  final List<LiveTrackPoint> _recentTrack = [];
+  bool _trackGapPending = false; // GPS 失联后的下一段轨迹需要断线重开
+
+  // 事件位置标记（内存，仅保留最近 15 分钟，叠加在轨迹雷达图上）
+  final List<TrackEventMarker> _eventMarkers = [];
+
   // 轨迹点分批落库
   static const Duration _waypointInterval = Duration(seconds: 1);
   static const int _waypointBatchSize = 15;
@@ -91,6 +102,12 @@ class RidingStatsProvider extends ChangeNotifier {
 
   List<stats.RidingEvent> get eventHistory => _eventHistory;
   bool get isRiding => _isRiding;
+
+  /// 最近 15 分钟实时轨迹点（轨迹雷达图数据源）
+  List<LiveTrackPoint> get recentTrack => _recentTrack;
+
+  /// 最近 15 分钟事件位置标记（轨迹雷达图叠加层数据源）
+  List<TrackEventMarker> get eventMarkers => _eventMarkers;
 
   RidingStatsProvider({
     required OBDDataProvider obdDataProvider,
@@ -120,9 +137,15 @@ class RidingStatsProvider extends ChangeNotifier {
     _trackStartPoint = null;
     _totalGpsDistance = 0;
     _lastPosition = null;
+    _recentTrack.clear();
+    _trackGapPending = false;
+    _eventMarkers.clear();
     _pendingWaypoints.clear();
     _lastWaypointPosition = null;
     _currentRecordId = null;
+
+    // 重置峰值（Peak-Hold），新骑行从零开始记峰
+    _obdDataProvider.resetPeaks();
 
     // 重置全程统计数据
     _maxSpeed = 0;
@@ -426,6 +449,14 @@ class RidingStatsProvider extends ChangeNotifier {
     // 记录起点（只保留第一次）
     _trackStartPoint ??= position;
 
+    // 首个有效位置直接入轨迹缓存
+    if (_lastPosition == null) {
+      _appendTrackPoint(
+        position,
+        speedKmh: _obdDataProvider.data.speed.toDouble(),
+      );
+    }
+
     if (_lastPosition != null) {
       final distance = _calculateDistance(_lastPosition!, position);
       final timeDiffMs = position.timestamp
@@ -445,6 +476,8 @@ class RidingStatsProvider extends ChangeNotifier {
           LogType.warning,
           'GPS 信号中断 ${timeDiffSec.toStringAsFixed(0)}s 后重连，跳过此段 ${distance.toStringAsFixed(0)}m',
         );
+        // 轨迹雷达图在此断开重开，避免画出穿越建筑的直线
+        _trackGapPending = true;
       } else if (speed > _maxReasonableSpeedMs) {
         // 速度超出摩托车极限：GPS 漂移，过滤
         _logCallback(
@@ -455,9 +488,38 @@ class RidingStatsProvider extends ChangeNotifier {
       } else {
         // 正常采样：累加里程
         _totalGpsDistance += distance;
+        _appendTrackPoint(
+          position,
+          speedKmh: speed * 3.6,
+          gapBefore: _trackGapPending,
+        );
+        _trackGapPending = false;
       }
     }
     _lastPosition = position;
+  }
+
+  /// 追加实时轨迹点并裁剪 15 分钟时间窗口（仅内存，不落库）
+  void _appendTrackPoint(
+    PositionData position, {
+    required double speedKmh,
+    bool gapBefore = false,
+  }) {
+    _recentTrack.add(
+      LiveTrackPoint(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        speedKmh: speedKmh,
+        timestamp: position.timestamp,
+        gapBefore: gapBefore,
+      ),
+    );
+    // 轨迹点按时间顺序追加，从头部移除过期点即可
+    final cutoff = DateTime.now().subtract(trackWindow);
+    while (_recentTrack.isNotEmpty &&
+        _recentTrack.first.timestamp.isBefore(cutoff)) {
+      _recentTrack.removeAt(0);
+    }
   }
 
   /// 使用 Haversine 公式计算两个 GPS 点之间的距离（米）
@@ -797,6 +859,23 @@ class RidingStatsProvider extends ChangeNotifier {
 
     // 设置最新事件（供外部监听显示弹窗）
     _latestEvent = event;
+
+    // 记录事件位置标记（轨迹雷达图叠加层），仅保留 15 分钟窗口
+    final pos = _lastPosition;
+    if (pos != null) {
+      _eventMarkers.add(
+        TrackEventMarker(
+          type: event.type,
+          title: event.title,
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          timestamp: event.timestamp,
+        ),
+      );
+      final cutoff = DateTime.now().subtract(trackWindow);
+      _eventMarkers.removeWhere((m) => m.timestamp.isBefore(cutoff));
+    }
+
     _logCallback('Stats', LogType.warning, '事件触发: ${event.title}');
     notifyListeners();
   }
@@ -1025,4 +1104,38 @@ class _SamplePoint {
   final DateTime timestamp;
 
   _SamplePoint({required this.value, required this.timestamp});
+}
+
+/// 实时轨迹点（内存缓存，供轨迹雷达图使用，不落库）
+class LiveTrackPoint {
+  final double latitude;
+  final double longitude;
+  final double speedKmh; // 该点瞬时速度（km/h），用于轨迹着色
+  final DateTime timestamp;
+  final bool gapBefore; // GPS 失联后重连的首点，绘制时断线重开
+
+  const LiveTrackPoint({
+    required this.latitude,
+    required this.longitude,
+    required this.speedKmh,
+    required this.timestamp,
+    this.gapBefore = false,
+  });
+}
+
+/// 事件位置标记（叠加在轨迹雷达图上的浮动徽章）
+class TrackEventMarker {
+  final stats.RidingEventType type; // 事件类型（决定徽章颜色）
+  final String title; // 事件标题
+  final double latitude;
+  final double longitude;
+  final DateTime timestamp;
+
+  const TrackEventMarker({
+    required this.type,
+    required this.title,
+    required this.latitude,
+    required this.longitude,
+    required this.timestamp,
+  });
 }

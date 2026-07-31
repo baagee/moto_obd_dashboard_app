@@ -5,7 +5,7 @@ import '../providers/obd_data_provider.dart';
 import '../widgets/combined_gauge_card.dart';
 import '../widgets/side_stats_panel.dart';
 import '../widgets/telemetry_chart_card.dart';
-import '../widgets/riding_events_panel.dart';
+import '../widgets/track_radar_panel.dart';
 import '../widgets/self_check_overlay.dart';
 import '../widgets/danger_pulse_overlay.dart';
 import '../widgets/gauges/classic_gauge_widget.dart';
@@ -133,7 +133,7 @@ class _CyberpunkLayout extends StatelessWidget {
 
           const SizedBox(width: 8),
 
-          // 第三列：遥测图表和骑行事件（上下排列，1:2比例）(3/9)
+          // 第三列：遥测图表和轨迹雷达（上下排列，1:2比例）(3/9)
           const Expanded(
             flex: 3,
             child: Column(
@@ -146,10 +146,10 @@ class _CyberpunkLayout extends StatelessWidget {
 
                 SizedBox(height: 8),
 
-                // 下半部分：骑行事件（2/3）
+                // 下半部分：轨迹雷达（2/3）
                 Expanded(
                   flex: 2,
-                  child: RidingEventsPanel(),
+                  child: TrackRadarPanel(),
                 ),
               ],
             ),

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
-import '../models/obd_data.dart';
+import '../models/log.dart';
 
 /// 逆地理编码服务 - 将坐标转换为地名（高德地图 HTTP API，国内可用）
 ///
@@ -227,11 +227,7 @@ class GeocodingService {
     final radLat = lat / 180.0 * math.pi;
     final sinRad = math.sin(radLat);
     final sin2Rad = sinRad * sinRad;
-    double magic = 1 -
-        ee *
-            (1 - ee) *
-            (1 - ee) *
-            (radLat.abs() < 0.00001 ? 1 : (1 - ee * sin2Rad));
+    double magic = 1 - ee * sin2Rad;
     if (magic < 0.0000001) magic = 0.0000001;
     final sqrtMagic = math.sqrt(magic);
     dLat = dLat * 180.0 / ((a * (1 - ee)) / (magic * sqrtMagic) * math.pi);

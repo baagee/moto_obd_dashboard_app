@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/log_provider.dart';
 import '../theme/app_theme.dart';
-import '../models/obd_data.dart';
+import '../models/log.dart';
 import '../widgets/cyber_button.dart';
 import '../widgets/cyber_dialog.dart';
 

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fb;
 import '../constants/bluetooth_constants.dart';
-import '../models/obd_data.dart';
+import '../models/log.dart';
 import '../providers/obd_data_provider.dart';
 import '../providers/settings_provider.dart';
 

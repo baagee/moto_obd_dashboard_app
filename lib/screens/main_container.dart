@@ -94,6 +94,7 @@ class _MainContainerState extends State<MainContainer> {
     // 骑行统计在蓝牙连接成功后自动开始
     await bluetoothProvider.initialize();
     _hasCheckedBluetooth = true;
+    if (!mounted) return;
     await _checkAndShowBluetoothDialog();
 
     // 蓝牙检查完成后，检查定位权限
@@ -103,7 +104,7 @@ class _MainContainerState extends State<MainContainer> {
   }
 
   Future<void> _checkAndShowBluetoothDialog() async {
-    if (!_hasCheckedBluetooth) return;
+    if (!_hasCheckedBluetooth || !mounted) return;
 
     final bluetoothProvider = context.read<BluetoothProvider>();
 

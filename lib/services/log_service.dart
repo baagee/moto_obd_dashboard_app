@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../models/obd_data.dart';
+import '../models/log.dart';
 
 /// 日志服务 - 负责日志的实时写入和分享
 class LogService {

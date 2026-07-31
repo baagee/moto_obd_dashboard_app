@@ -1,6 +1,6 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
-import '../models/obd_data.dart';
+import '../models/log.dart';
 import '../providers/log_provider.dart';
 import '../providers/loggable.dart';
 

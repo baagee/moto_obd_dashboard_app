@@ -1,4 +1,4 @@
-import '../models/obd_data.dart';
+import '../models/log.dart';
 import 'log_provider.dart';
 
 /// 创建日志回调的工厂函数

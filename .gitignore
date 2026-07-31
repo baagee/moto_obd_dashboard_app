@@ -48,3 +48,4 @@ app.*.map.json
 .planning
 .playwright-cli
 .superpowers
+html

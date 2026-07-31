@@ -20,6 +20,8 @@ class CombinedGaugeCard extends StatelessWidget {
         context.select<OBDDataProvider, int>((p) => p.data.coolantTemp);
     final intakeTemp =
         context.select<OBDDataProvider, int>((p) => p.data.intakeTemp);
+    final peakRpm = context.select<OBDDataProvider, int>((p) => p.peakRpm);
+    final peakSpeed = context.select<OBDDataProvider, int>((p) => p.peakSpeed);
     // gear 字段由 GearDisplayPanel 单独订阅，此处传 0 保持画布不含档位
     // codeflicker-fix: OPT-Issue-6/omvh7ni7j93qpiynr7sw
     final maxRpm = context.select<SettingsProvider, int>((s) => s.maxRpm);
@@ -58,6 +60,8 @@ class CombinedGaugeCard extends StatelessWidget {
                     gear: 0,
                     coolantTemp: coolantTemp,
                     intakeTemp: intakeTemp,
+                    peakRpm: peakRpm,
+                    peakSpeed: peakSpeed,
                     maxRpm: maxRpm,
                     warnRpm: warnRpm,
                     dangerRpm: dangerRpm,
@@ -83,6 +87,10 @@ class CombinedGaugePainter extends CustomPainter {
   final int gear;
   final int coolantTemp;
   final int intakeTemp;
+
+  // 峰值保持（Peak-Hold）
+  final int peakRpm;
+  final int peakSpeed;
 
   // 量程参数（从 SettingsProvider 注入）
   final int maxRpm;
@@ -140,6 +148,8 @@ class CombinedGaugePainter extends CustomPainter {
     required this.gear,
     required this.coolantTemp,
     required this.intakeTemp,
+    this.peakRpm = 0,
+    this.peakSpeed = 0,
     this.maxRpm = 12000,
     this.warnRpm = 7000,
     this.dangerRpm = 9000,
@@ -165,6 +175,9 @@ class CombinedGaugePainter extends CustomPainter {
     _drawRPMPointer(canvas, center, radius);
     _drawSpeedPointer(canvas, center, radius);
     _drawCenterHub(canvas, center, radius);
+
+    // 绘制峰值保持标记（在指针之上，中心值之下）
+    _drawPeakMarkers(canvas, center, radius);
 
     // 绘制中心数值
     _drawCenterValues(canvas, center, radius);
@@ -512,17 +525,96 @@ class CombinedGaugePainter extends CustomPainter {
     );
   }
 
+  /// 峰值保持标记（Peak-Hold）：弧上覆盖一条短亮线 + 微发光
+  /// 无数字标签；峰值 > 0 才绘制
+  void _drawPeakMarkers(Canvas canvas, Offset center, double radius) {
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    // ── RPM 峰值标记（上半圆） ──
+    if (peakRpm > 0) {
+      final peakAngle = pi + rpmToAngle(peakRpm.toDouble(), maxRpm);
+      final peakColor = zoneColor(peakRpm, warnRpm, dangerRpm);
+      const markerArc = 0.03; // 约 5° 短弧段
+
+      // 发光层
+      canvas.drawArc(
+        rect,
+        peakAngle - markerArc / 2,
+        markerArc,
+        false,
+        Paint()
+          ..color = peakColor.withValues(alpha: 0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 34
+          ..strokeCap = StrokeCap.butt
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+      );
+      // 实体层：弧正上方覆盖
+      canvas.drawArc(
+        rect,
+        peakAngle - markerArc / 2,
+        markerArc,
+        false,
+        Paint()
+          ..color = peakColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..strokeCap = StrokeCap.butt,
+      );
+    }
+
+    // ── 速度峰值标记（下半圆） ──
+    if (peakSpeed > 0) {
+      final peakAngle = pi - speedToAngle(peakSpeed.toDouble(), maxSpeed);
+      final peakColor = zoneColor(peakSpeed, warnSpeed, dangerSpeed);
+      const markerArc = 0.03;
+
+      // 发光层
+      canvas.drawArc(
+        rect,
+        peakAngle - markerArc / 2,
+        markerArc,
+        false,
+        Paint()
+          ..color = peakColor.withValues(alpha: 0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 34
+          ..strokeCap = StrokeCap.butt
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+      );
+      // 实体层
+      canvas.drawArc(
+        rect,
+        peakAngle - markerArc / 2,
+        markerArc,
+        false,
+        Paint()
+          ..color = peakColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..strokeCap = StrokeCap.butt,
+      );
+    }
+  }
+
+  /// 根据数值/阈值确定仪表分区色（青/琥珀/红）
+  static Color zoneColor(int value, int warn, int danger) {
+    if (value <= warn) return AppTheme.gaugeNormal;
+    if (value <= danger) return AppTheme.gaugeWarn;
+    return AppTheme.gaugeDanger;
+  }
+
   void _drawCenterValues(Canvas canvas, Offset center, double radius) {
     final fontSize = radius * 0.24;
 
     // RPM 在上半圆视觉中心：数值在 center 上方， 单位在数值更上方
-    // RPM 值
+    // RPM 值 — 跟随区间变色
+    final rpmColor = zoneColor(rpm, warnRpm, dangerRpm);
     final rpmTextSpan = TextSpan(
-      // text: rpm >= 1000 ? '${(rpm / 1000).toStringAsFixed(1)}k' : rpm.toString(),
       text: rpm.toString(),
       style: AppFonts.displayStyle(
         fontSize: fontSize,
-        color: AppTheme.gaugeNormal,
+        color: rpmColor,
         letterSpacing: -1,
       ),
     );
@@ -530,17 +622,16 @@ class CombinedGaugePainter extends CustomPainter {
       text: rpmTextSpan,
       textDirection: TextDirection.ltr,
     )..layout();
-    // RPM 在上半圆内
     rpmTextPainter.paint(
       canvas,
       Offset(center.dx - rpmTextPainter.width / 2, center.dy - radius * 0.45),
     );
 
-    // RPM 单位 (在RPM值更上方)
+    // RPM 单位 (在RPM值更上方) — 同色 70% 透明度
     final rpmUnitSpan = TextSpan(
       text: 'RPM',
       style: TextStyle(
-        color: AppTheme.gaugeNormal.withValues(alpha: 0.7),
+        color: rpmColor.withValues(alpha: 0.7),
         fontSize: fontSize * 0.33,
         fontWeight: FontWeight.w500,
       ),
@@ -555,12 +646,13 @@ class CombinedGaugePainter extends CustomPainter {
     );
 
     // Speed 在下半圆视觉中心：数值在 center 下方， 单位在数值更下方
-    // Speed 值
+    // Speed 值 — 跟随区间变色
+    final speedColor = zoneColor(speed, warnSpeed, dangerSpeed);
     final speedTextSpan = TextSpan(
       text: '$speed',
       style: AppFonts.displayStyle(
         fontSize: fontSize,
-        color: AppTheme.gaugeNormal,
+        color: speedColor,
         letterSpacing: -1,
       ),
     );
@@ -568,17 +660,16 @@ class CombinedGaugePainter extends CustomPainter {
       text: speedTextSpan,
       textDirection: TextDirection.ltr,
     )..layout();
-    // 下半圆中心，靠近中心点
     speedTextPainter.paint(
       canvas,
       Offset(center.dx - speedTextPainter.width / 2, center.dy + radius * 0.15),
     );
 
-    // Speed 单位 (在Speed值下方)
+    // Speed 单位 (在Speed值下方) — 同色 70% 透明度
     final speedUnitSpan = TextSpan(
       text: 'km/h',
       style: TextStyle(
-        color: AppTheme.gaugeNormal.withValues(alpha: 0.7),
+        color: speedColor.withValues(alpha: 0.7),
         fontSize: fontSize * 0.33,
         fontWeight: FontWeight.w500,
       ),
@@ -600,6 +691,8 @@ class CombinedGaugePainter extends CustomPainter {
         oldDelegate.gear != gear ||
         oldDelegate.coolantTemp != coolantTemp ||
         oldDelegate.intakeTemp != intakeTemp ||
+        oldDelegate.peakRpm != peakRpm ||
+        oldDelegate.peakSpeed != peakSpeed ||
         oldDelegate.maxRpm != maxRpm ||
         oldDelegate.warnRpm != warnRpm ||
         oldDelegate.dangerRpm != dangerRpm ||
