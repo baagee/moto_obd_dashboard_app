@@ -132,9 +132,6 @@ class _GearRowState extends State<_GearRow>
     // 文字透明度：按距激活档的距离衰减，营造景深感
     final distance = (widget.gear - widget.currentGear).abs();
     final isActive = distance == 0;
-    // 未激活统一用相同透明度的主题蓝色，保持颜色一致
-    final textOpacity =
-        isActive ? 1.0 : (1.0 - distance * 0.15).clamp(0.35, 0.75);
 
     return AnimatedBuilder(
       animation: _glowAnim,

@@ -32,6 +32,7 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
     _original = {
       'minMoveDistance': s.minMoveDistance,
       'maxGpsGapSeconds': s.maxGpsGapSeconds.toDouble(),
+      'maxGpsAccuracyMeters': s.maxGpsAccuracyMeters,
       'minRidingDistance': s.minRidingDistance.toDouble(),
       'maxEventHistory': s.maxEventHistory.toDouble(),
     };
@@ -43,6 +44,8 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
       'settings_advanced_minMoveDistance': _draft['minMoveDistance'] as double,
       'settings_advanced_maxGpsGapSeconds':
           (_draft['maxGpsGapSeconds'] as double).toInt(),
+      'settings_advanced_maxGpsAccuracyMeters':
+          _draft['maxGpsAccuracyMeters'] as double,
       'settings_advanced_minRidingDistance':
           (_draft['minRidingDistance'] as double).toInt(),
       'settings_advanced_maxEventHistory':
@@ -155,6 +158,18 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
             divisions: 23,
             valueFormatter: (v) => '${v.toInt()} s',
             onChanged: (v) => setState(() => _draft['maxGpsGapSeconds'] = v),
+          ),
+          SettingsSliderField(
+            label: 'GPS 精度阈值',
+            hint: '定位精度差于此值的点视为信号差，直接丢弃（防轨迹漂移）',
+            value: _draft['maxGpsAccuracyMeters'],
+            defaultValue: 30,
+            min: 10,
+            max: 60,
+            divisions: 50,
+            valueFormatter: (v) => '${v.toInt()} m',
+            onChanged: (v) =>
+                setState(() => _draft['maxGpsAccuracyMeters'] = v),
           ),
           SettingsSliderField(
             label: '骑行记录最小有效距离',

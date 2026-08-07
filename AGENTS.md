@@ -368,7 +368,6 @@ static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
 
 - 项目中使用中文和用户交流
 - 每次做完大的功能改动/重构，**必须**更新此文档
-- 应用强制横屏方向并隐藏系统 UI 以获得沉浸式体验
 - 新增 Provider、Service、Model 必须遵循上述代码规范
 - 代码提交前必须运行 `flutter analyze` 确保无 error
 - 本文档由代码探索生成，如发现文档与实际实现不一致，请更新本文档

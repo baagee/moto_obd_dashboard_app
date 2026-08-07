@@ -25,6 +25,18 @@ class _TrackRadarCardState extends State<TrackRadarCard>
   /// 雷达扫描/脉冲动画（4s 一圈，匀速循环）
   late final AnimationController _controller;
 
+  /// 当前平滑后的朝向角（弧度，0 = 北，顺时针为正）
+  double _smoothedHeading = 0.0;
+
+  /// 平滑系数：约 0.3s 收敛（60fps × k ≈ 1）
+  static const double _smoothK = 0.10;
+
+  /// 低速冻结阈值（km/h）：低于此速度时不更新朝向
+  static const double _minSpeedKmh = 5.0;
+
+  /// 有效方位角累计距离下限（米）：段长不足时不更新朝向
+  static const double _minBearingDistM = 15.0;
+
   @override
   void initState() {
     super.initState();
@@ -32,12 +44,58 @@ class _TrackRadarCardState extends State<TrackRadarCard>
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat();
+    // 用 addListener 每帧更新朝向，不调用 setState（AnimatedBuilder 已覆盖重建）
+    _controller.addListener(_updateHeading);
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_updateHeading);
     _controller.dispose();
     super.dispose();
+  }
+
+  /// 每帧计算目标方位角并做最短弧平滑 lerp
+  void _updateHeading() {
+    final statsProvider = context.read<RidingStatsProvider>();
+    final track = statsProvider.recentTrack;
+    if (track.isEmpty) return;
+
+    // 低速冻结：末点速度 < 阈值则保持
+    if (track.last.speedKmh < _minSpeedKmh) return;
+
+    // 从末端往回找累计距离 >= _minBearingDistM 的"头部"点
+    // 跳过 gapBefore 段（GPS 失联段不参与）
+    final metersPerLng =
+        111320.0 * cos(track.last.latitude * pi / 180);
+    const metersPerLat = 110540.0;
+
+    double accDist = 0.0;
+    int headIdx = track.length - 1;
+    for (int i = track.length - 1; i > 0; i--) {
+      if (track[i].gapBefore) break; // 遇到失联断点停止往前追溯
+      final dx =
+          (track[i].longitude - track[i - 1].longitude) * metersPerLng;
+      final dy =
+          (track[i].latitude - track[i - 1].latitude) * metersPerLat;
+      accDist += sqrt(dx * dx + dy * dy);
+      headIdx = i - 1;
+      if (accDist >= _minBearingDistM) break;
+    }
+
+    // 段长不足（静止 / 刚起步）则保持
+    if (accDist < _minBearingDistM) return;
+
+    // 平面近似：atan2(dx, dy) → 0=北，顺时针正，与地理方位角一致
+    final tailPoint = track.last;
+    final headPoint = track[headIdx];
+    final dx = (tailPoint.longitude - headPoint.longitude) * metersPerLng;
+    final dy = (tailPoint.latitude - headPoint.latitude) * metersPerLat;
+    final targetHeading = atan2(dx, dy);
+
+    // 最短弧 lerp
+    var delta = ((targetHeading - _smoothedHeading + pi) % (2 * pi)) - pi;
+    _smoothedHeading += delta * _smoothK;
   }
 
   @override
@@ -117,6 +175,7 @@ class _TrackRadarCardState extends State<TrackRadarCard>
                         now: now,
                         warnSpeed: warnSpeed.toDouble(),
                         dangerSpeed: dangerSpeed.toDouble(),
+                        smoothedHeading: _smoothedHeading,
                       ),
                       child: hasTrack
                           ? null
@@ -171,8 +230,9 @@ class _StandbyHint extends StatelessWidget {
   }
 }
 
-/// 雷达静态网格层：同心圆 + 十字线 + 刻度 + 角标 + 北向标识
+/// 雷达静态网格层：同心圆 + 十字线 + 刻度 + 角标
 /// 内容不随时间变化，配合外层 RepaintBoundary 只绘制一次
+/// 注意：罗盘方向标识（N/E/S/W）在动态层绘制（随 heading-up 旋转实现指北针效果）
 class _RadarGridPainter extends CustomPainter {
   const _RadarGridPainter();
 
@@ -237,16 +297,6 @@ class _RadarGridPainter extends CustomPainter {
         ..lineTo(origin.dx, origin.dy + dir.dy * len);
       canvas.drawPath(path, bracketPaint);
     }
-
-    // 北向标识（顶部居中）
-    final nPainter = TextPainter(
-      text: TextSpan(
-        text: 'N',
-        style: AppFonts.monoStyle(fontSize: 9, color: AppTheme.primary60),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    nPainter.paint(canvas, Offset(center.dx - nPainter.width / 2, 4));
   }
 
   @override
@@ -269,12 +319,15 @@ class _TrackRadarDynamicPainter extends CustomPainter {
   final double warnSpeed;
   final double dangerSpeed;
 
+  /// Heading-up：当前平滑后的行驶方向（弧度，0=北，顺时针为正）
+  /// 轨迹 canvas 绕中心旋转 -smoothedHeading，使行驶方向恒朝正上方
+  final double smoothedHeading;
+
   /// 最多绘制的轨迹段数（超出则抽稀）
   /// 双层绘制（辉光+实芯）每段画 2 次，段数取 320 控制 60fps 开销
   static const int _maxSegments = 320;
 
   /// 轨迹四周留白
-  static const double _padding = 16.0;
 
   _TrackRadarDynamicPainter({
     required this.track,
@@ -283,6 +336,7 @@ class _TrackRadarDynamicPainter extends CustomPainter {
     required this.now,
     required this.warnSpeed,
     required this.dangerSpeed,
+    required this.smoothedHeading,
   });
 
   @override
@@ -290,6 +344,7 @@ class _TrackRadarDynamicPainter extends CustomPainter {
     final center = size.center(Offset.zero);
     final maxR = min(size.width, size.height) / 2 - 2;
 
+    // 雷达扫描装饰：不随轨迹旋转（纯装饰）
     _drawSweep(canvas, center, maxR);
 
     final cutoff = now.subtract(RidingStatsProvider.trackWindow);
@@ -318,13 +373,18 @@ class _TrackRadarDynamicPainter extends CustomPainter {
     final lngC = (minLng + maxLng) / 2;
     final metersPerLng = 111320.0 * cos(latC * pi / 180);
     const metersPerLat = 110540.0;
-    // 最小跨度 100m，防止短轨迹被过度放大
-    final spanX = max((maxLng - minLng) * metersPerLng, 100.0);
-    final spanY = max((maxLat - minLat) * metersPerLat, 100.0);
-    final scale = min(
-      (size.width - _padding * 2) / spanX,
-      (size.height - _padding * 2) / spanY,
-    );
+    // 径向适配：遍历保留点，求各点到包围盒中心的最大距离（米）
+    // 用半径而非包围盒边长做适配，保证任意轨迹形状在任意旋转角度下均不超出圆环
+    double maxDist = 0;
+    for (final p in pts) {
+      final dx = (p.longitude - lngC) * metersPerLng;
+      final dy = (p.latitude - latC) * metersPerLat;
+      maxDist = max(maxDist, sqrt(dx * dx + dy * dy));
+    }
+    // 下限 50m（近似等价原 100m 最小跨度，实际视野略大）
+    maxDist = max(maxDist, 50.0);
+    // 12px 余量：覆盖末点装饰物延伸（脉冲环 10px / 箭头尖端 8px），保证不出圆环
+    final scale = (maxR - 12) / maxDist;
 
     Offset toScreen(double lat, double lng) {
       return Offset(
@@ -333,10 +393,23 @@ class _TrackRadarDynamicPainter extends CustomPainter {
       );
     }
 
+    // ── 旋转变换：轨迹/徽章/当前位置随行驶方向旋转 ──────────────────
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(-smoothedHeading);
+    canvas.translate(-center.dx, -center.dy);
+
     _drawTrack(canvas, pts, toScreen);
     _drawMarkers(canvas, size, toScreen);
     _drawCurrentPosition(canvas, pts, toScreen);
-    _drawScaleLabel(canvas, size, max(spanX, spanY));
+
+    canvas.restore();
+    // ────────────────────────────────────────────────────────────────
+
+    // 罗盘方向标识（N/E/S/W）：圆环上对应角位置，不随轨迹旋转（天然指北针）
+    _drawCompassIndicators(canvas, center, maxR);
+    // 比例尺：始终水平显示（视野实际直径 = maxDist × 2）
+    _drawScaleLabel(canvas, size, maxDist * 2);
   }
 
   /// 雷达扫描拖尾：从相位角出发的扇形渐变尾迹 + 前沿亮线
@@ -472,10 +545,10 @@ class _TrackRadarDynamicPainter extends CustomPainter {
   ) {
     final last = toScreen(pts.last.latitude, pts.last.longitude);
 
-    // 脉冲光环（随相位扩散淡出）
+    // 脉冲光环（随相位扩散淡出），max 半径 10px，与 scale 的 12px 余量匹配
     canvas.drawCircle(
       last,
-      4 + phase * 12,
+      3 + phase * 7,
       Paint()
         ..color = AppTheme.gaugeNormal.withValues(alpha: (1 - phase) * 0.5)
         ..style = PaintingStyle.stroke
@@ -493,15 +566,16 @@ class _TrackRadarDynamicPainter extends CustomPainter {
       if (dist > 2) {
         final unit = dir / dist;
         final perp = Offset(-unit.dy, unit.dx);
+        // 箭头整体约 8×6px（原 11×8 缩小 ~30%），尖端延伸不超过 scale 余量
         final arrow = Path()
-          ..moveTo(last.dx + unit.dx * 11, last.dy + unit.dy * 11)
+          ..moveTo(last.dx + unit.dx * 8, last.dy + unit.dy * 8)
           ..lineTo(
-            last.dx + unit.dx * 3 + perp.dx * 4,
-            last.dy + unit.dy * 3 + perp.dy * 4,
+            last.dx + unit.dx * 2 + perp.dx * 3,
+            last.dy + unit.dy * 2 + perp.dy * 3,
           )
           ..lineTo(
-            last.dx + unit.dx * 3 - perp.dx * 4,
-            last.dy + unit.dy * 3 - perp.dy * 4,
+            last.dx + unit.dx * 2 - perp.dx * 3,
+            last.dy + unit.dy * 2 - perp.dy * 3,
           )
           ..close();
         canvas.drawPath(
@@ -514,6 +588,47 @@ class _TrackRadarDynamicPainter extends CustomPainter {
     // 核心亮点
     canvas.drawCircle(last, 3.5, Paint()..color = AppTheme.gaugeNormal);
     canvas.drawCircle(last, 1.5, Paint()..color = AppTheme.textPrimary);
+  }
+
+  /// 罗盘四方向标识（N/E/S/W）：绘制在圆环上，随 heading-up 反向旋转。
+  /// 世界方位角 b 在旋转后出现在 center + r·(sin(b−h), −cos(b−h))：
+  /// heading=0（朝北）→ N 顶中、E 右、S 底、W 左；heading=π/2（朝东）→ N 左 ✓
+  /// N 高亮（primary60）作为锚点，E/S/W 弱化（primary30），符合真实罗盘层级惯例。
+  /// TextPainter 静态缓存，每帧仅改 paint offset，避免 60fps 重复 layout。
+  void _drawCompassIndicators(Canvas canvas, Offset center, double maxR) {
+    for (final dir in _compassDirections) {
+      final a = dir.bearing - smoothedHeading;
+      final tp = dir.painter;
+      tp.paint(
+        canvas,
+        Offset(
+          center.dx + maxR * sin(a) - tp.width / 2,
+          center.dy - maxR * cos(a) - tp.height / 2,
+        ),
+      );
+    }
+  }
+
+  /// 罗盘四方向定义（世界方位角 + 缓存的 TextPainter）
+  static final List<({double bearing, TextPainter painter})>
+      _compassDirections = [
+    (bearing: 0.0, painter: _buildCompassPainter('N', AppTheme.primary60)),
+    (bearing: pi / 2, painter: _buildCompassPainter('E', AppTheme.primary30)),
+    (bearing: pi, painter: _buildCompassPainter('S', AppTheme.primary30)),
+    (
+      bearing: 3 * pi / 2,
+      painter: _buildCompassPainter('W', AppTheme.primary30),
+    ),
+  ];
+
+  static TextPainter _buildCompassPainter(String label, Color color) {
+    return TextPainter(
+      text: TextSpan(
+        text: label,
+        style: AppFonts.monoStyle(fontSize: 9, color: color),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
   }
 
   /// 左下角比例尺标签（当前视野的实际跨度）

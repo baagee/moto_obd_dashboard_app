@@ -435,10 +435,26 @@ class RidingStatsProvider extends ChangeNotifier {
   // GPS 过滤参数改为从 SettingsProvider 动态读取
   double get _minMoveDistance => _settingsProvider?.minMoveDistance ?? 3.0;
   int get _maxGpsGapSeconds => _settingsProvider?.maxGpsGapSeconds ?? 30;
+  // GPS 精度阈值：accuracy 超过此值的点直接丢弃（默认 30m）
+  double get _maxGpsAccuracyMeters =>
+      _settingsProvider?.maxGpsAccuracyMeters ?? 30.0;
 
   /// GPS 位置更新处理
   void _onPositionUpdate(PositionData position) {
     if (!_isRiding) return;
+
+    // Layer 1 — 精度阈值过滤：GPS 热身期 / 信号差时 accuracy 大，直接丢弃
+    // 注意：不更新 _lastPosition，避免差点成为下次计算速度的基准
+    final accuracy = position.accuracy;
+    if (accuracy != null && accuracy > _maxGpsAccuracyMeters) {
+      _logCallback(
+        'GPS',
+        LogType.warning,
+        'GPS 精度不足，丢弃: accuracy=${accuracy.toStringAsFixed(1)}m '
+            '(阈值=${_maxGpsAccuracyMeters.toStringAsFixed(0)}m)',
+      );
+      return;
+    }
 
     // 时间过滤：距离上次更新至少 0.5 秒（避免静止时频繁回调）
     if (_lastPosition != null) {

@@ -295,6 +295,11 @@ class SettingsProvider extends ChangeNotifier {
       _getInt('settings_advanced_minRidingDistance', 20);
   int get maxEventHistory => _getInt('settings_advanced_maxEventHistory', 100);
 
+  /// GPS 精度阈值（米）：accuracy 超过此值的点视为信号差，直接丢弃
+  /// 默认 30m，可在高级设置中调整（15m 严格 ~ 50m 宽松）
+  double get maxGpsAccuracyMeters =>
+      _getDouble('settings_advanced_maxGpsAccuracyMeters', 30.0);
+
   Future<void> setMinMoveDistance(double v) =>
       _setDouble('settings_advanced_minMoveDistance', v);
   Future<void> setMaxGpsGapSeconds(int v) =>
@@ -303,6 +308,8 @@ class SettingsProvider extends ChangeNotifier {
       _setInt('settings_advanced_minRidingDistance', v);
   Future<void> setMaxEventHistory(int v) =>
       _setInt('settings_advanced_maxEventHistory', v);
+  Future<void> setMaxGpsAccuracyMeters(double v) =>
+      _setDouble('settings_advanced_maxGpsAccuracyMeters', v);
 
   // ===== 批量重置 =====
 
@@ -381,6 +388,7 @@ class SettingsProvider extends ChangeNotifier {
       'settings_advanced_maxGpsGapSeconds',
       'settings_advanced_minRidingDistance',
       'settings_advanced_maxEventHistory',
+      'settings_advanced_maxGpsAccuracyMeters',
     ],
   };
 

@@ -72,45 +72,6 @@ class SideStatsPanel extends StatelessWidget {
   }
 }
 
-/// 温度卡片
-class _TempCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-
-  const _TempCard({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: iconColor, size: 14),
-              const SizedBox(width: 4),
-              Text(label, style: AppTheme.labelMediumPrimary),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Text(value, style: AppTheme.valueMedium),
-        ],
-      ),
-    );
-  }
-}
-
 /// 进度条
 class _ProgressBar extends StatelessWidget {
   final IconData icon;

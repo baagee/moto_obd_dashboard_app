@@ -237,7 +237,14 @@ class OBDService {
     final bytes = utf8.encode("$command\r");
     // write 的错误必须走 catchError：try/catch 捕获不到 Future 的异步错误，
     // 否则断开窗口期每个失败的 write 都会变成一个 unhandled async error
-    _writeCharacteristic!.write(bytes, withoutResponse: false).catchError((e) {
+    // 优先使用 Write Without Response 模式：发出去即返回，不等 BLE ACK，
+    // 省下 15~30ms 等待；OBD 数据通过 Notify 通道异步回传，与 ACK 无关。
+    // 设备若不支持 writeWithoutResponse 属性则回退到带确认写入。
+    final useWithoutResponse =
+        _writeCharacteristic!.properties.writeWithoutResponse;
+    _writeCharacteristic!
+        .write(bytes, withoutResponse: useWithoutResponse)
+        .catchError((e) {
       final errorMsg = e.toString();
       // 断开导致的失败会批量爆发：只处理第一次（停轮询），避免日志风暴
       if (errorMsg.contains('disconnected')) {

@@ -346,25 +346,8 @@ class CombinedGaugePainter extends CustomPainter {
       ..lineTo(rightX, rightY)
       ..close();
 
-    // 外层大光晕
-    canvas.drawPath(
-      bladePath,
-      Paint()
-        ..color = color.withValues(alpha: 0.20)
-        ..style = PaintingStyle.fill
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
-    );
-
-    // 中层光晕
-    canvas.drawPath(
-      bladePath,
-      Paint()
-        ..color = color.withValues(alpha: 0.45)
-        ..style = PaintingStyle.fill
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
-    );
-
     // 实体刀片（渐变：根部→尖端高亮）
+    // 已精简：删除双层光晕与尖端发光点（与进度弧末端发光位置重复，降低视觉噪音与 blur 开销）
     final bladeRect = Rect.fromPoints(Offset(rootX, rootY), Offset(tipX, tipY));
     canvas.drawPath(
       bladePath,
@@ -378,20 +361,6 @@ class CombinedGaugePainter extends CustomPainter {
           ],
         ).createShader(bladeRect)
         ..style = PaintingStyle.fill,
-    );
-
-    // 尖端高亮发光点
-    canvas.drawCircle(
-      Offset(tipX, tipY),
-      2.8,
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.85)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-    );
-    canvas.drawCircle(
-      Offset(tipX, tipY),
-      1.4,
-      Paint()..color = Colors.white,
     );
   }
 
@@ -440,25 +409,8 @@ class CombinedGaugePainter extends CustomPainter {
       ..lineTo(rightX, rightY)
       ..close();
 
-    // 外层大光晕
-    canvas.drawPath(
-      bladePath,
-      Paint()
-        ..color = color.withValues(alpha: 0.20)
-        ..style = PaintingStyle.fill
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
-    );
-
-    // 中层光晕
-    canvas.drawPath(
-      bladePath,
-      Paint()
-        ..color = color.withValues(alpha: 0.45)
-        ..style = PaintingStyle.fill
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
-    );
-
     // 实体刀片（渐变）
+    // 已精简：删除双层光晕与尖端发光点（与进度弧末端发光位置重复，降低视觉噪音与 blur 开销）
     final bladeRect = Rect.fromPoints(Offset(rootX, rootY), Offset(tipX, tipY));
     canvas.drawPath(
       bladePath,
@@ -472,20 +424,6 @@ class CombinedGaugePainter extends CustomPainter {
           ],
         ).createShader(bladeRect)
         ..style = PaintingStyle.fill,
-    );
-
-    // 尖端高亮发光点
-    canvas.drawCircle(
-      Offset(tipX, tipY),
-      2.8,
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.85)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-    );
-    canvas.drawCircle(
-      Offset(tipX, tipY),
-      1.4,
-      Paint()..color = Colors.white,
     );
   }
 
