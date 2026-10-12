@@ -286,6 +286,64 @@ class SettingsProvider extends ChangeNotifier {
   String get amapKey => _getString('settings_api_amapKey', '');
   Future<void> setAmapKey(String v) => _setString('settings_api_amapKey', v);
 
+  // ===== 导航 HUD（高德分享路线）=====
+
+  /// 回到前台时是否自动读取剪贴板中的高德分享短链并开始导航
+  bool get naviAutoSync => _getBool('settings_navi_autoSync', true);
+  Future<void> setNaviAutoSync(bool v) =>
+      _setBool('settings_navi_autoSync', v);
+
+  /// 导航路线刷新间隔（秒）。端点 A 单次响应约 228KB，30s 约 27MB/小时，
+  /// 因此下限钳到 10s，避免误配成高频轮询把流量打爆。
+  int get naviRouteRefreshSec =>
+      _getInt('settings_navi_routeRefreshSec', 30).clamp(10, 120);
+  Future<void> setNaviRouteRefreshSec(int v) =>
+      _setInt('settings_navi_routeRefreshSec', v);
+
+  /// 导航卡底图的**前方视窗里程**（米）。底图只截取最近一段真实路线，
+  /// 视窗越长越像"路线全貌"、越短越像"眼前这段路"。
+  int get naviMapAheadMeters =>
+      _getInt('settings_navi_mapAheadMeters', 300).clamp(100, 2000);
+  Future<void> setNaviMapAheadMeters(int v) =>
+      _setInt('settings_navi_mapAheadMeters', v);
+
+  /// 是否给底图路线叠加路况着色（默认关：红/琥珀在本项目已被
+  /// "危险 / 超速"语义占用，开着容易与告警混淆）
+  bool get naviRouteTrafficColor =>
+      _getBool('settings_navi_routeTrafficColor', false);
+  Future<void> setNaviRouteTrafficColor(bool v) =>
+      _setBool('settings_navi_routeTrafficColor', v);
+
+  /// 剩余时间显示方式：'clock' 预计到达时刻（12:34）/ 'duration' 剩余时长（38 分钟）
+  String get naviEtaMode => _getString('settings_navi_etaMode', 'clock');
+  Future<void> setNaviEtaMode(String v) =>
+      _setString('settings_navi_etaMode', v);
+
+  /// 是否开启**分享状态心跳**：定期问高德"这条分享还活着吗"
+  /// （行中 `shareStatus` / 行前 `status`），判到停止就收尾。
+  ///
+  /// 关掉后行为与旧版一致：只有链接失效或连续请求失败才会结束。
+  bool get naviShareStatusWatchOn =>
+      _getBool('settings_navi_shareStatusWatchOn', true);
+  Future<void> setNaviShareStatusWatchOn(bool v) =>
+      _setBool('settings_navi_shareStatusWatchOn', v);
+
+  /// 分享状态心跳周期（秒）。行中端点响应仅 ~2.5KB（路线轮询是 228KB/30s），
+  /// 所以下限可以比路线轮询更短；默认 15s（判到停止最多 2 个周期，即 ≤30s）。
+  int get naviShareStatusWatchSec =>
+      _getInt('settings_navi_shareStatusWatchSec', 15).clamp(5, 60);
+  Future<void> setNaviShareStatusWatchSec(int v) =>
+      _setInt('settings_navi_shareStatusWatchSec', v);
+
+  /// 判到"高德那边已停止导航"时是否直接收尾。
+  ///
+  /// 关掉则只在导航卡上标"已停止"并继续导航（骑手可能只是关了高德，但仍想
+  /// 按这条路线骑完）。
+  bool get naviStopOnShareEnd =>
+      _getBool('settings_navi_stopOnShareEnd', true);
+  Future<void> setNaviStopOnShareEnd(bool v) =>
+      _setBool('settings_navi_stopOnShareEnd', v);
+
   // ===== 高级设置 =====
 
   double get minMoveDistance =>
@@ -382,6 +440,14 @@ class SettingsProvider extends ChangeNotifier {
     ],
     'api': [
       'settings_api_amapKey',
+      'settings_navi_autoSync',
+      'settings_navi_routeRefreshSec',
+      'settings_navi_mapAheadMeters',
+      'settings_navi_routeTrafficColor',
+      'settings_navi_etaMode',
+      'settings_navi_shareStatusWatchOn',
+      'settings_navi_shareStatusWatchSec',
+      'settings_navi_stopOnShareEnd',
     ],
     'advanced': [
       'settings_advanced_minMoveDistance',

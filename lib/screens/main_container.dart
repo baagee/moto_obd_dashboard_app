@@ -6,7 +6,11 @@ import '../providers/bluetooth_provider.dart';
 import '../providers/log_provider.dart';
 import '../providers/riding_stats_provider.dart';
 import '../providers/navigation_provider.dart';
+import '../providers/navi_provider.dart';
+import '../providers/settings_provider.dart';
+import '../providers/loggable.dart';
 import '../services/audio_service.dart';
+import '../services/clipboard_share_watcher.dart';
 import '../services/log_service.dart';
 import '../models/riding_event.dart';
 import '../models/event_voice_config.dart';
@@ -38,6 +42,9 @@ class _MainContainerState extends State<MainContainer> {
 
   late final PageController _pageController;
 
+  /// 剪贴板分享短链监听（Phase 4 导航 HUD 入口）
+  ClipboardShareWatcher? _clipboardWatcher;
+
   final List<Widget> _pages = const [
     DashboardScreen(),
     RecordScreen(),
@@ -60,8 +67,21 @@ class _MainContainerState extends State<MainContainer> {
       context.read<BluetoothProvider>().onDeviceConnected = (name) {
         if (mounted) CyberToast.show(context, '$name 已连接，OBD 初始化完成');
       };
+      _startClipboardWatcher();
     });
     // _registerFrameMonitor();
+  }
+
+  /// 启动剪贴板监听：App 回前台时若剪贴板含高德分享短链，自动同步并开始导航
+  void _startClipboardWatcher() {
+    _clipboardWatcher = ClipboardShareWatcher(
+      naviProvider: context.read<NaviProvider>(),
+      settings: context.read<SettingsProvider>(),
+      logCallback: createLogger(context.read<LogProvider>()),
+      onAutoSync: (_) {
+        if (mounted) CyberToast.show(context, '已同步高德分享路线，导航指引上线');
+      },
+    )..start();
   }
 
   /// 注册帧率监控：慢帧只写文件，不进内存列表，不触发 notifyListeners
@@ -213,6 +233,7 @@ class _MainContainerState extends State<MainContainer> {
 
   @override
   void dispose() {
+    _clipboardWatcher?.stop();
     _pageController.dispose();
     super.dispose();
   }

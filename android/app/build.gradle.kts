@@ -22,6 +22,11 @@ android {
         checkReleaseBuilds = false
     }
 
+    buildFeatures {
+        // 生成 BuildConfig（MainActivity 依赖 BuildConfig.DEBUG 守卫 Phase 0 探针）
+        buildConfig = true
+    }
+
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }

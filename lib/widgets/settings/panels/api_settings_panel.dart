@@ -6,6 +6,7 @@ import '../../../theme/app_theme.dart';
 import '../../../widgets/cyber_button.dart';
 import '../../../widgets/cyber_dialog.dart';
 import '../../../widgets/cyber_toast.dart';
+import '../../../widgets/navi_card.dart';
 import '../settings_fields.dart';
 
 /// 第三方服务设置面板（高德 API Key 配置）
@@ -268,6 +269,109 @@ class _ApiSettingsPanelState extends State<ApiSettingsPanel> {
                 ),
               ],
             ],
+          ),
+
+          const SettingsDivider(),
+
+          // ── 导航 HUD（高德分享路线）──
+          // 本区块即时生效，不参与顶部「保存」的草稿流程
+          const SettingsSectionTitle('▸  导航 HUD（高德分享路线）'),
+          SettingsToggleField(
+            label: '回前台自动同步分享短链',
+            hint: '在高德分享行程后回到本 App，自动读剪贴板短链开始导航。'
+                '关闭后仍可在仪表盘导航卡上手动粘贴。',
+            value: context.watch<SettingsProvider>().naviAutoSync,
+            onChanged: (v) =>
+                context.read<SettingsProvider>().setNaviAutoSync(v),
+          ),
+          SettingsRadioField(
+            label: '路线刷新间隔',
+            options: const ['10', '30', '60'],
+            optionLabels: const ['10 秒', '30 秒', '60 秒'],
+            currentValue:
+                context.watch<SettingsProvider>().naviRouteRefreshSec.toString(),
+            onChanged: (v) =>
+                context.read<SettingsProvider>().setNaviRouteRefreshSec(int.parse(v)),
+          ),
+
+          const SettingsDivider(),
+
+          // ── 跟随高德停止（分享状态心跳）──
+          const SettingsSectionTitle('▸  跟随高德停止'),
+          SettingsToggleField(
+            label: '高德停止导航时同步收尾',
+            hint: '定期向高德确认这条分享是否还活着（行中 shareStatus / 行前 status）。'
+                '判到"已停止/已结束/已过期"就结束导航（需连续两次确认，防后端节点抖动）。',
+            value: context.watch<SettingsProvider>().naviShareStatusWatchOn,
+            onChanged: (v) =>
+                context.read<SettingsProvider>().setNaviShareStatusWatchOn(v),
+          ),
+          SettingsRadioField(
+            label: '状态探测间隔',
+            options: const ['5', '15', '30'],
+            optionLabels: const ['5 秒', '15 秒', '30 秒'],
+            currentValue: context
+                .watch<SettingsProvider>()
+                .naviShareStatusWatchSec
+                .toString(),
+            onChanged: (v) => context
+                .read<SettingsProvider>()
+                .setNaviShareStatusWatchSec(int.parse(v)),
+          ),
+          SettingsToggleField(
+            label: '判到停止后继续导航',
+            hint: '打开后不再自动收尾，只在导航卡上标"已停止"——适合只想按这条路线骑完、'
+                '不跟随高德状态的场景。',
+            value: !context.watch<SettingsProvider>().naviStopOnShareEnd,
+            onChanged: (v) =>
+                context.read<SettingsProvider>().setNaviStopOnShareEnd(!v),
+          ),
+
+          const SettingsDivider(),
+
+          // ── 导航卡底图 ──
+          const SettingsSectionTitle('▸  导航卡底图'),
+          SettingsRadioField(
+            label: '视窗里程',
+            options: const ['150', '300', '600'],
+            optionLabels: const ['150 m', '300 m', '600 m'],
+            currentValue:
+                context.watch<SettingsProvider>().naviMapAheadMeters.toString(),
+            onChanged: (v) =>
+                context.read<SettingsProvider>().setNaviMapAheadMeters(int.parse(v)),
+          ),
+          SettingsRadioField(
+            label: '剩余时间',
+            options: const ['clock', 'duration'],
+            optionLabels: const ['到达时刻', '剩余时长'],
+            currentValue: context.watch<SettingsProvider>().naviEtaMode,
+            onChanged: (v) => context.read<SettingsProvider>().setNaviEtaMode(v),
+          ),
+          SettingsToggleField(
+            label: '底图叠加路况着色',
+            hint: '缓行/拥堵段在路线上叠一层彩带。默认关闭：红/琥珀已被"危险/超速"语义占用。',
+            value: context.watch<SettingsProvider>().naviRouteTrafficColor,
+            onChanged: (v) =>
+                context.read<SettingsProvider>().setNaviRouteTrafficColor(v),
+          ),
+
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              CyberButton.secondary(
+                text: '粘贴分享短链开始导航',
+                height: 30,
+                fontSize: 11,
+                icon: Icons.alt_route,
+                onPressed: () => showNaviPasteDialog(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '单次路线响应约 228KB，30 秒刷新约 27MB/小时。\n'
+            '隧道/地库无 GPS 时用 OBD 车速做航位推算，出隧道自动校正。',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 9, height: 1.6),
           ),
 
           const SettingsDivider(),

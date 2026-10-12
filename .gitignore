@@ -49,3 +49,5 @@ app.*.map.json
 .playwright-cli
 .superpowers
 html
+.myflicker
+amap_test01

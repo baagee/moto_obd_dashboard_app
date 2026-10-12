@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -24,8 +26,70 @@ class RidingTrackScreen extends StatefulWidget {
 // 曲线图高度常量
 const double _kChartHeight = 90.0;
 
+// 速度颜色量化档数（越大颜色过渡越细腻，但同色段合并越少）
+const int _kSpeedColorSteps = 12;
+
+// 轨迹点超过该阈值时，GCJ 转换 + 抽稀放到后台 isolate（compute 有固定开销，小数据同步更划算）
+const int _kGcjComputeThreshold = 1500;
+
 // 地图样式
 enum _MapStyle { dark, satellite }
+
+/// 后台 isolate 返回值：全量 GCJ 坐标 + 折线渲染用的抽稀索引
+class _GcjDecimationResult {
+  final List<List<double>> gcj; // 与 waypoints 一一对应
+  final List<int> keptIndices; // 抽稀保留的 waypoint 索引（升序，含首尾）
+
+  _GcjDecimationResult(this.gcj, this.keptIndices);
+}
+
+/// 后台 isolate：WGS-84 → GCJ-02 全量转换（每点多次三角函数，CPU 密集）。
+/// 同时做一次轻量距离抽稀，去掉静止/密集采样产生的冗余点，并硬性限制折线渲染点数。
+_GcjDecimationResult _convertAndDecimateWaypoints(
+    List<RidingWaypoint> waypoints) {
+  const minDistM = 2.0; // 相邻点小于 2 米视为冗余
+  const maxKept = 5000; // 折线渲染点数上限
+
+  final n = waypoints.length;
+  final gcj = <List<double>>[];
+  for (final w in waypoints) {
+    gcj.add(GeocodingService.wgs84ToGcj02(w.latitude, w.longitude));
+  }
+  if (n == 0) return _GcjDecimationResult(gcj, const []);
+
+  final kept = <int>[];
+  for (int i = 0; i < n; i++) {
+    if (kept.isEmpty) {
+      kept.add(i);
+      continue;
+    }
+    final a = gcj[kept.last];
+    final b = gcj[i];
+    final dLat = (b[0] - a[0]) * 111000;
+    final dLng = (b[1] - a[1]) * 111000 * math.cos(a[0] * math.pi / 180);
+    if (dLat * dLat + dLng * dLng >= minDistM * minDistM) {
+      kept.add(i);
+    }
+  }
+
+  // 超上限时均匀 stride 二次抽稀
+  if (kept.length > maxKept) {
+    final stride = (kept.length / maxKept).ceil();
+    final capped = <int>[];
+    for (int k = 0; k < kept.length; k += stride) {
+      capped.add(kept[k]);
+    }
+    kept
+      ..clear()
+      ..addAll(capped);
+  }
+
+  // 保证首尾都在（fitBounds / 起终点依赖）
+  if (kept.first != 0) kept.insert(0, 0);
+  if (kept.last != n - 1) kept.add(n - 1);
+
+  return _GcjDecimationResult(gcj, kept);
+}
 
 class _RidingTrackScreenState extends State<RidingTrackScreen> {
   final MapController _mapController = MapController();
@@ -45,9 +109,8 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
   // 当前缩放级别（ValueNotifier 驱动局部重建，避免整页 setState）
   final ValueNotifier<double> _zoomNotifier = ValueNotifier(14.0);
 
-  // Polyline 缓存（zoom 等级不变时直接复用，避免每帧重建）
-  List<Polyline> _cachedPolylines = [];
-  double _cachedPolylineZoom = -1;
+  // 速度渐变折线（加载时一次性构建，配合 flutter_map 内置 simplificationTolerance 按 zoom 简化）
+  List<Polyline> _gradientPolylines = [];
 
   // 有效事件列表（过滤掉无对应轨迹点的事件），与三套 Circle 缓存下标一一对应
   List<_MappedEvent> _mappedEvents = [];
@@ -97,23 +160,26 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
       final waypoints = results[0] as List<RidingWaypoint>;
       final events = results[1] as List<RidingRecordEvent>;
 
-      // 一次性转换 WGS-84 → GCJ-02，结果缓存
-      final gcjPoints = waypoints.map((w) {
-        final coords = GeocodingService.wgs84ToGcj02(w.latitude, w.longitude);
-        return LatLng(coords[0], coords[1]);
-      }).toList();
+      // WGS-84 → GCJ-02：每点多次三角函数、CPU 密集，点量大时放后台 isolate；
+      // 同时做一次轻量距离抽稀，去冗余并限制折线渲染点数。
+      final dec = waypoints.length > _kGcjComputeThreshold
+          ? await compute(_convertAndDecimateWaypoints, waypoints)
+          : _convertAndDecimateWaypoints(waypoints);
+      final gcjPoints = <LatLng>[
+        for (final c in dec.gcj) LatLng(c[0], c[1]),
+      ];
 
-      // 数据加载完成后一次性构建事件圆点缓存（避免每次 build 重建）
+      // 数据加载完成后一次性构建事件圆点缓存 + 渐变折线（避免每次 build 重建）
       _buildMappedEvents(events, gcjPoints, waypoints);
+      final polylines =
+          _buildGradientPolylines(waypoints, gcjPoints, dec.keptIndices);
 
       setState(() {
         _allWaypoints = waypoints;
         _cachedGcjPoints = gcjPoints;
         _events = events;
+        _gradientPolylines = polylines;
         _isLoading = false;
-        // 数据更新后清空 polyline 缓存
-        _cachedPolylines = [];
-        _cachedPolylineZoom = -1;
       });
 
       // 自动 fitBounds
@@ -155,151 +221,69 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     );
   }
 
-  /// Douglas-Peucker 算法递归抽稀（epsilon 单位：度，约等于米/111000）
-  void _douglasPeucker(
-      List<int> indices, int start, int end, double epsilon, Set<int> result) {
-    if (end <= start + 1) return;
-
-    // 找距离基线（start→end）最远的点
-    final p1 = _cachedGcjPoints[indices[start]];
-    final p2 = _cachedGcjPoints[indices[end]];
-    double maxDist = 0;
-    int maxIdx = start;
-
-    for (int i = start + 1; i < end; i++) {
-      final p = _cachedGcjPoints[indices[i]];
-      final dist = _perpendicularDistance(p, p1, p2);
-      if (dist > maxDist) {
-        maxDist = dist;
-        maxIdx = i;
-      }
-    }
-
-    if (maxDist > epsilon) {
-      result.add(indices[maxIdx]);
-      _douglasPeucker(indices, start, maxIdx, epsilon, result);
-      _douglasPeucker(indices, maxIdx, end, epsilon, result);
-    }
-  }
-
-  /// 点到线段的垂线距离（经纬度近似）
-  double _perpendicularDistance(LatLng p, LatLng a, LatLng b) {
-    final dx = b.longitude - a.longitude;
-    final dy = b.latitude - a.latitude;
-    if (dx == 0 && dy == 0) {
-      return _latLngDist(p, a);
-    }
-    final t =
-        ((p.longitude - a.longitude) * dx + (p.latitude - a.latitude) * dy) /
-            (dx * dx + dy * dy);
-    final tc = t.clamp(0.0, 1.0);
-    final cx = a.longitude + tc * dx;
-    final cy = a.latitude + tc * dy;
-    final ddx = p.longitude - cx;
-    final ddy = p.latitude - cy;
-    return (ddx * ddx + ddy * ddy);
-  }
-
-  double _latLngDist(LatLng a, LatLng b) {
-    final dx = a.longitude - b.longitude;
-    final dy = a.latitude - b.latitude;
-    return dx * dx + dy * dy;
-  }
-
-  /// 根据缩放级别抽稀轨迹点（Douglas-Peucker，返回索引列表）
-  List<int> _sampleIndices(double zoom) {
-    final total = _allWaypoints.length;
-    if (total == 0) return [];
-    if (total <= 2) return [0, total - 1];
-
-    // epsilon 单位：度的平方（近似），zoom 越大精度越高
-    // zoom 15+ 约 0.5m 精度，zoom 10- 约 50m 精度
-    double epsilon;
-    if (zoom >= 15) {
-      epsilon = 2e-10; // 极高精度
-    } else if (zoom >= 13) {
-      epsilon = 1e-9;
-    } else if (zoom >= 10) {
-      epsilon = 1e-8;
-    } else {
-      epsilon = 1e-7; // 低缩放时大量省略
-    }
-
-    final allIndices = List<int>.generate(total, (i) => i);
-    final result = <int>{0, total - 1};
-    _douglasPeucker(allIndices, 0, total - 1, epsilon, result);
-
-    final sorted = result.toList()..sort();
-    return sorted;
-  }
-
   /// 速度映射颜色（霓虹青 → 品红 → 粉红 三段渐变）
+  /// 颜色做量化分档，让相邻速度点共享同一颜色 → 同色连续段合并成更少的折线段
   Color _speedToColor(double speed) {
     if (speed <= 40) {
       return const Color(0xFF00F5FF); // 霓虹青
-    } else if (speed <= 80) {
-      final t = (speed - 40) / 40;
-      return Color.lerp(
-          const Color(0xFF00F5FF), const Color(0xFFFF00FF), t)!; // 青→品红
-    } else {
-      final t = ((speed - 80) / 40).clamp(0.0, 1.0);
-      return Color.lerp(
-          const Color(0xFFFF00FF), const Color(0xFFFF2D87), t)!; // 品红→霓虹粉
     }
+    if (speed <= 80) {
+      final t = (speed - 40) / 40;
+      final q = (t * _kSpeedColorSteps).round() / _kSpeedColorSteps;
+      return Color.lerp(
+          const Color(0xFF00F5FF), const Color(0xFFFF00FF), q)!; // 青→品红
+    }
+    final t = ((speed - 80) / 40).clamp(0.0, 1.0);
+    final q = (t * _kSpeedColorSteps).round() / _kSpeedColorSteps;
+    return Color.lerp(
+        const Color(0xFFFF00FF), const Color(0xFFFF2D87), q)!; // 品红→霓虹粉
   }
 
-  /// 生成速度渐变 Polyline 列表（同色连续段合并为单条多点 Polyline，按 zoom 整数级缓存）
-  List<Polyline> _buildGradientPolylines(double zoom) {
-    // zoom 取整后未变化时直接复用缓存
-    final zoomKey = zoom.floorToDouble();
-    if (_cachedPolylineZoom == zoomKey && _cachedPolylines.isNotEmpty) {
-      return _cachedPolylines;
-    }
-    final sampledIdx = _sampleIndices(zoom);
-    if (sampledIdx.length < 2) return [];
+  /// 一次性构建速度渐变折线（颜色量化后同色连续段合并）。
+  /// 抽稀交给 flutter_map 内置 `simplificationTolerance` 按 zoom 完成，这里不再手工 Douglas-Peucker。
+  List<Polyline> _buildGradientPolylines(
+    List<RidingWaypoint> waypoints,
+    List<LatLng> gcjPoints,
+    List<int> keptIndices,
+  ) {
+    final m = keptIndices.length;
+    if (m < 2) return [];
 
     final polylines = <Polyline>[];
+    var segPoints = <LatLng>[
+      gcjPoints[keptIndices[0]],
+      gcjPoints[keptIndices[1]],
+    ];
+    var segColor = _speedToColor(
+        (waypoints[keptIndices[0]].speed + waypoints[keptIndices[1]].speed) /
+            2);
 
-    // 遍历采样段，颜色相同的连续段合并为一条多点 Polyline
-    int segStart = 0;
-    final firstAvgSpeed =
-        (_allWaypoints[sampledIdx[0]].speed + _allWaypoints[sampledIdx[1]].speed) / 2;
-    Color segColor = _speedToColor(firstAvgSpeed);
-
-    for (int i = 1; i < sampledIdx.length - 1; i++) {
-      final i1 = sampledIdx[i];
-      final i2 = sampledIdx[i + 1];
-      final avgSpeed = (_allWaypoints[i1].speed + _allWaypoints[i2].speed) / 2;
+    for (int i = 2; i < m; i++) {
+      final i0 = keptIndices[i - 1];
+      final i1 = keptIndices[i];
+      final avgSpeed = (waypoints[i0].speed + waypoints[i1].speed) / 2;
       final color = _speedToColor(avgSpeed);
 
-      if (color != segColor) {
-        // 颜色变化，flush 当前段（覆盖 sampledIdx[segStart] 到 sampledIdx[i]）
-        polylines.add(_buildMergedPolyline(sampledIdx, segStart, i + 1, segColor));
-        segStart = i;
+      if (color == segColor) {
+        segPoints.add(gcjPoints[i1]);
+      } else {
+        // 颜色变化：flush 当前段，新段从上一段末尾点延续，保证轨迹连续
+        polylines.add(Polyline(
+          points: segPoints,
+          color: segColor,
+          strokeWidth: 4.0,
+        ));
+        segPoints = <LatLng>[gcjPoints[i0], gcjPoints[i1]];
         segColor = color;
       }
     }
-    // flush 最后一段
-    polylines.add(
-        _buildMergedPolyline(sampledIdx, segStart, sampledIdx.length, segColor));
-
-    _cachedPolylines = polylines;
-    _cachedPolylineZoom = zoomKey;
-    return polylines;
-  }
-
-  /// 构建从 sampledIdx[start] 到 sampledIdx[end-1] 的多点 Polyline（同色合并段）
-  Polyline _buildMergedPolyline(
-      List<int> sampledIdx, int start, int end, Color color) {
-    final points = <LatLng>[];
-    for (int j = start; j < end; j++) {
-      points.add(_cachedGcjPoints[sampledIdx[j]]);
-    }
-    return Polyline(
-      points: points,
-      color: color,
+    polylines.add(Polyline(
+      points: segPoints,
+      color: segColor,
       strokeWidth: 4.0,
-    );
+    ));
+
+    return polylines;
   }
 
   /// 二分查找最近轨迹点索引（轨迹点按 timestamp 升序排列）
@@ -520,6 +504,34 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
     );
   }
 
+  // 暗色底图滤镜（反色 + 降饱和 + 色调偏蓝灰，模拟暗色地图）
+  static const ColorFilter _darkMapColorFilter = ColorFilter.matrix([
+    -0.6,
+    0,
+    0,
+    0,
+    180,
+    0,
+    -0.6,
+    0,
+    0,
+    180,
+    0,
+    0,
+    -0.6,
+    0,
+    200,
+    0,
+    0,
+    0,
+    1,
+    0,
+  ]);
+
+  // 共享瓦片 provider：复用同一个 HTTP 客户端 + 内置磁盘缓存（BuiltInMapCachingProvider）。
+  // 避免每次 build 重建 NetworkTileProvider 导致 HTTP 客户端泄漏（游标拖动会高频触发 build）。
+  final NetworkTileProvider _tileProvider = NetworkTileProvider();
+
   Widget _buildTileLayer() {
     if (_mapStyle == _MapStyle.satellite) {
       // 卫星实景底图（高德卫星瓦片）
@@ -527,25 +539,19 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         urlTemplate:
             'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
         userAgentPackageName: 'com.example.obd_dashboard',
-        tileProvider: NetworkTileProvider(),
+        tileProvider: _tileProvider,
       );
     }
 
-    // 赛博朋克暗色路网底图
+    // 赛博朋克暗色路网底图：整层 ColorFiltered（官方推荐方式，比逐瓦片 tileBuilder 更省）
     return ColorFiltered(
-      colorFilter: const ColorFilter.matrix([
-        // 反色 + 降饱和 + 色调偏蓝灰，模拟暗色地图
-        -0.6, 0, 0, 0, 180,
-        0, -0.6, 0, 0, 180,
-        0, 0, -0.6, 0, 200,
-        0, 0, 0, 1, 0,
-      ]),
+      colorFilter: _darkMapColorFilter,
       child: TileLayer(
         urlTemplate:
             'https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
         userAgentPackageName: 'com.example.obd_dashboard',
         subdomains: const ['webrd01', 'webrd02', 'webrd03', 'webrd04'],
-        tileProvider: NetworkTileProvider(),
+        tileProvider: _tileProvider,
       ),
     );
   }
@@ -587,22 +593,23 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
         // 1. 底图（根据样式切换）
         _buildTileLayer(),
 
-        // 2~4. zoom 相关图层（PolylineLayer/CircleLayer/选中Marker），用 ValueListenableBuilder 局部重建
+        // 2. 速度渐变轨迹折线：一次性构建 + flutter_map 内置 simplificationTolerance 按 zoom 简化。
+        //    保持 PolylineLayer widget 稳定（不放 ValueListenableBuilder），
+        //    避免每次 zoom 变化触发 didUpdateWidget 清空投影/简化缓存。
+        if (_gradientPolylines.isNotEmpty)
+          PolylineLayer(
+            polylines: _gradientPolylines,
+            simplificationTolerance: 0.5,
+          ),
+
+        // 3~4. zoom 分级图层（事件圆点三档 / 选中高亮 Marker），用 ValueListenableBuilder 局部重建
         ValueListenableBuilder<double>(
           valueListenable: _zoomNotifier,
           builder: (context, zoom, _) {
             return Stack(
               children: [
-                // 2. 速度渐变轨迹折线
-                PolylineLayer(
-                  polylines: _buildGradientPolylines(zoom),
-                ),
-
-                // 3. 事件圆点（纯 Canvas 绘制，零 Widget 树，三档 zoom 分级）
                 if (_mappedEvents.isNotEmpty)
                   CircleLayer(circles: _getCircleCache(zoom)),
-
-                // 4. 选中事件高亮圆环 + icon（最多 1 个 Marker，仅 zoom >= 12 且有选中时）
                 if (_selectedEvent != null && zoom >= 12)
                   MarkerLayer(
                       markers: [_buildSelectedEventMarker(_selectedEvent!)]),
@@ -731,9 +738,6 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
                 _mapStyle = _mapStyle == _MapStyle.dark
                     ? _MapStyle.satellite
                     : _MapStyle.dark;
-                // 切换样式时清空 polyline 缓存
-                _cachedPolylines = [];
-                _cachedPolylineZoom = -1;
               }),
               child: Container(
                 height: 28,

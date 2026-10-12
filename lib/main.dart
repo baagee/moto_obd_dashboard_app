@@ -8,6 +8,7 @@ import 'providers/log_provider.dart';
 import 'providers/riding_stats_provider.dart';
 import 'providers/riding_record_provider.dart';
 import 'providers/navigation_provider.dart';
+import 'providers/navi_provider.dart';
 import 'providers/settings_provider.dart';
 import 'utils/gear_util.dart';
 import 'services/audio_service.dart';
@@ -132,6 +133,25 @@ void main() async {
                   ridingRecordProvider: context.read<RidingRecordProvider>(),
                   settingsProvider: settings,
                 );
+          },
+        ),
+
+        // 导航 HUD Provider - 高德分享路线的转向指引（依赖 OBDDataProvider + LogProvider + SettingsProvider）
+        // 车速优先取 OBD（隧道内也有），GPS 速度兜底；刷新间隔来自 SettingsProvider
+        ChangeNotifierProxyProvider3<OBDDataProvider, LogProvider,
+            SettingsProvider, NaviProvider>(
+          create: (context) => NaviProvider(
+            obdDataProvider: context.read<OBDDataProvider>(),
+            logProvider: context.read<LogProvider>(),
+          ),
+          update: (context, obdDataProvider, logProvider, settings, previous) {
+            final navi = previous ??
+                NaviProvider(
+                  obdDataProvider: obdDataProvider,
+                  logProvider: logProvider,
+                );
+            navi.updateSettings(settings);
+            return navi;
           },
         ),
       ],

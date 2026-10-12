@@ -4,4 +4,20 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Plan B 探针：通知监听服务。
+         仅声明在 debug 源集，release 构建完全不受影响。
+         用途：验证能否从高德导航通知中取到转向/路名/距离等数据。
+         需用户在系统「通知使用权」中手动授权后才会生效。 -->
+    <application>
+        <service
+            android:name=".debug.NotificationProbeService"
+            android:exported="true"
+            android:label="高德通知抓包(调试)"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
 </manifest>

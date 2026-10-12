@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/settings_provider.dart';
@@ -5,6 +6,9 @@ import '../../../theme/app_theme.dart';
 import '../../../widgets/cyber_button.dart';
 import '../../../widgets/cyber_dialog.dart';
 import '../../../widgets/cyber_toast.dart';
+import '../../../debug/amap_probe_screen.dart';
+import '../../../debug/amap_share_probe_screen.dart';
+import '../../../debug/notification_probe_screen.dart';
 import '../settings_fields.dart';
 
 /// 高级设置面板（传感器 / GPS 参数）
@@ -198,6 +202,48 @@ class _AdvancedSettingsPanelState extends State<AdvancedSettingsPanel> {
             valueFormatter: (v) => '${v.toInt()} 条',
             onChanged: (v) => setState(() => _draft['maxEventHistory'] = v),
           ),
+
+          // ── 调试工具（仅 debug 构建可见）──
+          if (kDebugMode) ...[
+            const SettingsDivider(),
+            const SettingsSectionTitle('▸  调试工具'),
+            const SizedBox(height: 8),
+            CyberButton.secondary(
+              text: '高德导航广播抓包 (Phase 0)',
+              height: 36,
+              fontSize: 12,
+              icon: Icons.wifi_tethering,
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const AmapProbeScreen(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            CyberButton.secondary(
+              text: '高德导航通知抓包 (Plan B)',
+              height: 36,
+              fontSize: 12,
+              icon: Icons.notifications_active_outlined,
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const NotificationProbeScreen(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            CyberButton.secondary(
+              text: '高德分享路线解析验证 (方案 D)',
+              height: 36,
+              fontSize: 12,
+              icon: Icons.alt_route,
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const AmapShareProbeScreen(),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

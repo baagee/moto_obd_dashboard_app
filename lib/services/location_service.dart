@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/log.dart';
@@ -12,6 +14,26 @@ enum LocationPermissionStatus {
 
 /// GPS定位服务
 class LocationService {
+  LocationService._();
+
+  /// Android 定位更新间隔（**必须显式下传**，否则是 5 秒一帧）
+  ///
+  /// geolocator 11.x 的 [LocationSettings] 没有 `intervalDuration` 字段
+  /// （它的 `toJson()` 只带 `accuracy` / `distanceFilter`），Android 端
+  /// `LocationOptions.parseArguments` 取不到 `timeInterval` 就回退到 **5000ms**
+  /// 默认值，插件再把它写成
+  /// `setIntervalMillis(5000)` + `setMinUpdateIntervalMillis(5000)`。
+  ///
+  /// 关键误解：`distanceFilter` 落到 Android 只是
+  /// `setSmallestDisplacement` / `setMinUpdateDistanceMeters`（**最小位移**），
+  /// 它只会让回调**变少**，不会让回调**变快**。所以只调小 distanceFilter 无法
+  /// 提高采样频率：60km/h 下 5 秒就是 83 米，导航卡与通栏会明显滞后
+  /// （实测表现：**拐过弯了还在提示"前方右转"**）。
+  ///
+  /// geolocator 已 re-export [AndroidSettings]（含 `intervalDuration`），
+  /// 因此无需新增依赖。iOS 走系统 ~1Hz，本参数不生效。
+  static const Duration androidFixInterval = Duration(milliseconds: 1000);
+
   /// 检查定位权限
   static Future<bool> checkPermission() async {
     final permission = await Geolocator.checkPermission();
@@ -157,10 +179,24 @@ class LocationService {
   }
 
   /// 获取位置更新流（用于持续追踪）
+  ///
+  /// Android 必须走 [AndroidSettings] 才能下传 `intervalDuration`
+  /// （见 [androidFixInterval]，不传就是系统默认 5s 一帧）；
+  /// iOS/桌面走 [LocationSettings]，采集频率由 `distanceFilter` 决定。
   static Stream<Position> getPositionStream({
     int distanceFilter = 10, // 米
     Duration? timeLimit,
   }) {
+    if (Platform.isAndroid) {
+      return Geolocator.getPositionStream(
+        locationSettings: AndroidSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: distanceFilter,
+          intervalDuration: androidFixInterval,
+          timeLimit: timeLimit,
+        ),
+      );
+    }
     return Geolocator.getPositionStream(
       locationSettings: LocationSettings(
         accuracy: LocationAccuracy.high,

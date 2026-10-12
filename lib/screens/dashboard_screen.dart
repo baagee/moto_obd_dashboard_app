@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/obd_data_provider.dart';
 import '../widgets/combined_gauge_card.dart';
+import '../widgets/navi_hud_banner.dart';
 import '../widgets/side_stats_panel.dart';
 import '../widgets/telemetry_chart_card.dart';
 import '../widgets/track_radar_panel.dart';
@@ -56,21 +57,22 @@ class _DashboardScreenState extends State<DashboardScreen>
       onLongPress: _toggleGaugeStyle,
       // translucent：长按手势不拦截子 Widget 的点击事件
       behavior: HitTestBehavior.translucent,
-      child: Container(
-        color: Colors.transparent,
-        child: Stack(
-          children: [
-            // ── 底层：根据风格切换布局 ──
-            AnimatedSwitcher(
+      child: Stack(
+        children: [
+          // ── 仪表盘主体：始终占满全部空间，不被导航通栏压缩 ──
+          Positioned.fill(
+            child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               child: gaugeStyle == 'classic'
                   ? const ClassicDashboardLayout(key: ValueKey('classic'))
                   : const _CyberpunkLayout(key: ValueKey('cyberpunk')),
             ),
+          ),
 
-            // ── 顶层：自检动画覆盖层（仅首次，仅赛博朋克风格） ──
-            if (_showSelfCheck && gaugeStyle != 'classic')
-              SelfCheckOverlay(
+          // ── 自检动画覆盖层（仅首次，仅赛博朋克风格） ──
+          if (_showSelfCheck && gaugeStyle != 'classic')
+            Positioned.fill(
+              child: SelfCheckOverlay(
                 onComplete: () {
                   if (mounted) setState(() => _showSelfCheck = false);
                 },
@@ -81,8 +83,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                 warnSpeed: warnSpeed,
                 dangerSpeed: dangerSpeed,
               ),
-          ],
-        ),
+            ),
+
+          // ── 悬浮导航通知条：叠加在顶部，不影响主体布局 ──
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: NaviHudBanner(),
+          ),
+        ],
       ),
     );
   }
