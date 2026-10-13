@@ -36,11 +36,20 @@ const int _kGcjComputeThreshold = 1500;
 enum _MapStyle { dark, satellite }
 
 /// 后台 isolate 返回值：全量 GCJ 坐标 + 折线渲染用的抽稀索引
+///
+/// 坐标用**扁平 Float64List**（`[lat0, lon0, lat1, lon1, …]`）而不是
+/// `List<List<double>>`：后者会让每个轨迹点都产生一个小 List 对象（5 万点即
+/// 5 万个对象），isolate 深拷贝与 GC 压力都大；扁平连续内存既能省分配，
+/// 也能让拷贝一次完成。
 class _GcjDecimationResult {
-  final List<List<double>> gcj; // 与 waypoints 一一对应
+  final Float64List lonLat; // 扁平经纬度，长度 = 点数 × 2
   final List<int> keptIndices; // 抽稀保留的 waypoint 索引（升序，含首尾）
 
-  _GcjDecimationResult(this.gcj, this.keptIndices);
+  _GcjDecimationResult(this.lonLat, this.keptIndices);
+
+  /// 第 [i] 个点的纬度 / 经度
+  double latAt(int i) => lonLat[i * 2];
+  double lonAt(int i) => lonLat[i * 2 + 1];
 }
 
 /// 后台 isolate：WGS-84 → GCJ-02 全量转换（每点多次三角函数，CPU 密集）。
@@ -51,11 +60,15 @@ _GcjDecimationResult _convertAndDecimateWaypoints(
   const maxKept = 5000; // 折线渲染点数上限
 
   final n = waypoints.length;
-  final gcj = <List<double>>[];
-  for (final w in waypoints) {
-    gcj.add(GeocodingService.wgs84ToGcj02(w.latitude, w.longitude));
+  final flat = Float64List(n * 2);
+  for (int i = 0; i < n; i++) {
+    final w = waypoints[i];
+    // wgs84ToGcj02 返回 [lat, lon]
+    final c = GeocodingService.wgs84ToGcj02(w.latitude, w.longitude);
+    flat[i * 2] = c[0];
+    flat[i * 2 + 1] = c[1];
   }
-  if (n == 0) return _GcjDecimationResult(gcj, const []);
+  if (n == 0) return _GcjDecimationResult(flat, const []);
 
   final kept = <int>[];
   for (int i = 0; i < n; i++) {
@@ -63,10 +76,12 @@ _GcjDecimationResult _convertAndDecimateWaypoints(
       kept.add(i);
       continue;
     }
-    final a = gcj[kept.last];
-    final b = gcj[i];
-    final dLat = (b[0] - a[0]) * 111000;
-    final dLng = (b[1] - a[1]) * 111000 * math.cos(a[0] * math.pi / 180);
+    final last = kept.last * 2;
+    final cur = i * 2;
+    final dLat = (flat[cur] - flat[last]) * 111000;
+    final dLng = (flat[cur + 1] - flat[last + 1]) *
+        111000 *
+        math.cos(flat[last] * math.pi / 180);
     if (dLat * dLat + dLng * dLng >= minDistM * minDistM) {
       kept.add(i);
     }
@@ -88,7 +103,7 @@ _GcjDecimationResult _convertAndDecimateWaypoints(
   if (kept.first != 0) kept.insert(0, 0);
   if (kept.last != n - 1) kept.add(n - 1);
 
-  return _GcjDecimationResult(gcj, kept);
+  return _GcjDecimationResult(flat, kept);
 }
 
 class _RidingTrackScreenState extends State<RidingTrackScreen> {
@@ -166,7 +181,8 @@ class _RidingTrackScreenState extends State<RidingTrackScreen> {
           ? await compute(_convertAndDecimateWaypoints, waypoints)
           : _convertAndDecimateWaypoints(waypoints);
       final gcjPoints = <LatLng>[
-        for (final c in dec.gcj) LatLng(c[0], c[1]),
+        for (int i = 0; i < waypoints.length; i++)
+          LatLng(dec.latAt(i), dec.lonAt(i)),
       ];
 
       // 数据加载完成后一次性构建事件圆点缓存 + 渐变折线（避免每次 build 重建）

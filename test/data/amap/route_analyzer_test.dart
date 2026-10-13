@@ -8,8 +8,8 @@ import 'package:obd_dashboard/data/amap/route_analyzer.dart';
 /// `RouteAnalyzer` 单元测试（方案 §5.1）
 ///
 /// 覆盖两类样本：
-/// - **真实离线样本** `amap_test01/amap-live/sample-restoration.json`（含外层
-///   envelope），用于复现方案 §5.2 的对拍基线；样本缺失时自动跳过
+/// - **真实离线样本** `test/fixtures/amap/sample-restoration.json`（含外层
+///   envelope，随仓库分发），用于复现方案 §5.2 的对拍基线；样本缺失时自动跳过
 /// - **合成最小路线**，用于确定性地验证队列与跳点行为
 void main() {
   final sample = _loadSample();
@@ -410,7 +410,8 @@ void main() {
 // 辅助
 // ---------------------------------------------------------------------------
 
-const String _samplePath = 'amap_test01/amap-live/sample-restoration.json';
+/// 离线样本随仓库分发（`test/fixtures/`），**不依赖** `amap_test01/`
+const String _samplePath = 'test/fixtures/amap/sample-restoration.json';
 
 RouteAnalyzer? _loadSample() {
   final f = File(_samplePath);

@@ -331,7 +331,7 @@ void main() {
   });
 
   group('真实离线样本（存在时）', () {
-    final sample = File('amap_test01/amap-live/sample-restoration.json');
+    final sample = File('test/fixtures/amap/sample-restoration.json');
 
     test('sample-restoration.json 能完整解析并复现里程指纹', () async {
       if (!sample.existsSync()) {

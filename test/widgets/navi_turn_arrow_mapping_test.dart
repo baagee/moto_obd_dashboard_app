@@ -5,7 +5,7 @@ import 'package:obd_dashboard/widgets/navi_turn_arrow.dart';
 
 /// `main_action` 官方枚举 → 转向形状 / 文案 的映射回归
 ///
-/// 依据 `amap_test01/docs/amap-share-api-reference.md` §2.11（高德官方
+/// 依据 `docs/amap-share-api-reference.md` §2.11（高德官方
 /// 「驾车动作列表」，区间闭合 / 几何转角 / 语义三重佐证）。
 ///
 /// **本文件的存在意义是挡住"退回几何猜测"**：工程早期版本按几何反推，

@@ -61,6 +61,9 @@ void main() {
       // 因此把平滑心跳冻到 1 小时，避免 200ms 心跳在 real-time 用例里悄悄推进里程。
       // 平滑本身由下面的「里程平滑」组用 20ms 心跳覆盖。
       smoothTickPeriod: const Duration(hours: 1),
+      // 分享状态"复核"间隔（B）：注入 100ms（远小于 15s 心跳），让"自动复核"
+      // 在真实时钟下几十毫秒就能跑完，又留足余量避免它在无关断言里提前触发。
+      confirmProbePeriod: const Duration(milliseconds: 100),
     );
     addTearDown(() async {
       navi.dispose();
@@ -770,41 +773,266 @@ void main() {
   });
 
   group('分享状态心跳（高德那边停了就收尾）', () {
-    /// 触发一次与定时器等价的状态探测（避免测试真等 15 秒心跳）
-    Future<void> probe() async {
+    /// 触发**一次**与定时器等价的状态探测（避免测试真等 15 秒心跳）。
+    ///
+    /// 末尾 `pumpEventQueue` 顺带让 `_endSession`（内部是 `unawaited`）跑完，
+    /// 好让"收尾后 hasListener == false"这类断言成立；注入的复核间隔是 100ms，
+    /// 这点耗时远不足以把它提前引爆。
+    Future<void> probeOnce() async {
       await navi.debugStatusProbeNow();
       await pumpEventQueue();
     }
 
-    test('单次 stopped 不收尾，连续两次才收尾（防后端节点抖动误停）', () async {
+    /// 手动探测一次 + 等**自动复核**跑完（B：注入的 100ms 复核间隔）。
+    Future<void> probeConfirmed() async {
+      await probeOnce();
+      await Future.delayed(const Duration(milliseconds: 300));
+      await pumpEventQueue();
+    }
+
+    test('复核间隔远短于心跳周期（B 的核心）', () async {
+      await navi.start('https://surl.amap.com/abc');
+      await feedDistance(300);
+      client.naviShareStatus = 5;
+
+      await navi.debugStatusProbeNow();
+      final first = client.naviStatusTimes.last;
+
+      // 不再手动探测：复核定时器应自己发起第二次探测
+      await Future.delayed(const Duration(milliseconds: 300));
+      await pumpEventQueue();
+
+      expect(client.naviStatusTimes.length, greaterThanOrEqualTo(2),
+          reason: '首次判据后应自动复核一次');
+      final gapMs = client.naviStatusTimes.last.difference(first).inMilliseconds;
+      expect(gapMs, greaterThanOrEqualTo(10));
+      expect(gapMs, lessThan(1000),
+          reason: '复核必须远短于心跳（${navi.statusWatchSec}s），否则收尾又被拖到 15~30s');
+      expect(navi.state, NaviState.off);
+    });
+
+    test('并发探测互斥：同一时刻的信息只算一次（B 的必要护栏）', () async {
+      await navi.start('https://surl.amap.com/abc');
+      await feedDistance(300);
+      client.naviShareStatus = 5;
+
+      unawaited(navi.debugStatusProbeNow());
+      expect(navi.statusProbeCount, 1, reason: '首个调用同步计数');
+      unawaited(navi.debugStatusProbeNow());
+      unawaited(navi.debugStatusProbeNow());
+      expect(navi.statusProbeCount, 1, reason: '被互斥拦下的调用不计数');
+
+      await pumpEventQueue();
+      expect(navi.state, NaviState.navigating,
+          reason: '只算 1 次确认不能收尾（否则绕过 statusConfirmCount 的防护）');
+    });
+
+    test('回前台立即探一次（A），且进后台撤销待执行的复核', () async {
+      await navi.start('https://surl.amap.com/abc');
+      await feedDistance(300);
+
+      client.naviShareStatus = 5;
+      await navi.debugStatusProbeNow(); // strikes=1，挂上 100ms 复核
+      expect(navi.debugConfirmProbePending, isTrue);
+
+      navi.didChangeAppLifecycleState(AppLifecycleState.paused);
+      expect(navi.debugConfirmProbePending, isFalse,
+          reason: '进后台必须撤销待执行的复核，否则会在后台发请求');
+
+      client.naviShareStatus = 1; // 回前台前分享又活了
+      final before = navi.statusProbeCount;
+      navi.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      expect(navi.statusProbeCount, before + 1,
+          reason: 'A：回前台立即补探一次，不再等满 15s');
+
+      await pumpEventQueue();
+      expect(navi.state, NaviState.navigating);
+    });
+
+    test('复核期间 stop()：撤销复核，不再有残留探测', () async {
+      await navi.start('https://surl.amap.com/abc');
+      await feedDistance(300);
+      client.naviShareStatus = 5;
+      await probeOnce(); // strikes=1，挂复核
+      expect(navi.debugConfirmProbePending, isTrue);
+
+      await navi.stop();
+      expect(navi.debugConfirmProbePending, isFalse, reason: 'stop() 必须撤销复核');
+
+      final calls = client.naviStatusCalls;
+      await Future.delayed(const Duration(milliseconds: 300));
+      await pumpEventQueue();
+      expect(client.naviStatusCalls, calls, reason: '复核不得再发探测');
+    });
+
+    test('复核给 unknown：计数清零、撤销复核、仍 navigating', () async {
+      await navi.start('https://surl.amap.com/abc');
+      await feedDistance(300);
+      client.naviShareStatus = 5;
+      await probeOnce();
+      expect(navi.debugConfirmProbePending, isTrue);
+
+      // 复核时快照变得不可判定（行中字段缺失 + 行前 code 非 1）→ unknown
+      client.naviShareStatus = null;
+      client.beforeCode = '2';
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      await pumpEventQueue();
+      expect(navi.state, NaviState.navigating, reason: 'unknown ≠ 已停止，不得收尾');
+      expect(navi.debugConfirmProbePending, isFalse, reason: 'unknown 要打断确认链');
+    });
+
+    test('复核探测失败：不改状态；strike 保留，下次成功探测即可确认', () async {
+      await navi.start('https://surl.amap.com/abc');
+      await feedDistance(300);
+      client.naviShareStatus = 5;
+      await probeOnce();
+      final failuresBefore = navi.statusProbeFailureCount;
+
+      client.statusError = Exception('boom'); // 复核时网络断了
+      await Future.delayed(const Duration(milliseconds: 300));
+      await pumpEventQueue();
+      expect(navi.state, NaviState.navigating, reason: '探测不到 ≠ 已停止');
+      expect(navi.statusProbeFailureCount, failuresBefore + 1);
+
+      // 失败的复核不清零计数（探测失败没有信息量）→ 下一次成功探测即可收尾
+      client.statusError = null;
+      await probeOnce();
+      expect(navi.state, NaviState.off);
+    });
+
+    test('suspend 期间迟到的 verdict 不排复核（P0-2）', () async {
+      await navi.start('https://surl.amap.com/abc');
+      await feedDistance(300);
+      client.naviShareStatus = 5;
+
+      // 让这次探测挂在网络上（模拟"探测 in-flight 时进后台"）
+      final gate = Completer<void>();
+      client.statusGate = gate;
+      final pending = navi.debugStatusProbeNow();
+      await pumpEventQueue();
+
+      navi.didChangeAppLifecycleState(AppLifecycleState.paused);
+
+      // 放行：verdict 在 suspend **之后**才落地
+      client.statusGate = null;
+      gate.complete();
+      await pending;
+      await pumpEventQueue();
+
+      expect(navi.debugConfirmProbePending, isFalse,
+          reason: '后台不得挂出复核定时器（否则违反"后台一次都不探"）');
+
+      final countAfterProbe = navi.statusProbeCount;
+      await Future.delayed(const Duration(milliseconds: 300));
+      await pumpEventQueue();
+      expect(navi.statusProbeCount, countAfterProbe, reason: '后台期间一次都不探');
+      expect(navi.state, NaviState.navigating, reason: '会话仍在（未收尾）');
+
+      // 回前台 → 立即补探 → 完成确认 → 收尾（strikes 一直保留）
+      navi.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await pumpEventQueue();
+      await pumpEventQueue();
+      expect(navi.state, NaviState.off);
+    });
+
+    test('跨会话隔离：旧会话迟到的探测不打在新会话上（P0-3）', () async {
+      await navi.start('https://surl.amap.com/abc');
+      await feedDistance(300);
+
+      client.naviShareStatus = 5; // 旧会话：已停止
+      final gate = Completer<void>();
+      client.statusGate = gate;
+      final stale = navi.debugStatusProbeNow(); // 旧探测挂在网络上
+      await pumpEventQueue();
+
+      await navi.stop(); // 收掉旧会话
+      client.statusGate = null; // 后续探测不再卡住
+      client.naviShareStatus = 1; // 新分享还活着（行前自检放行）
+      await navi.start('https://surl.amap.com/abc'); // 重贴短链 → 新会话
+      await feedDistance(300);
+      expect(navi.state, NaviState.navigating);
+
+      final countBefore = navi.statusProbeCount;
+      final callsBefore = client.naviStatusCalls;
+      client.naviShareStatus = 5; // 旧探测此刻才返回 stopped
+      gate.complete();
+      await stale;
+      await pumpEventQueue();
+
+      expect(navi.state, NaviState.navigating,
+          reason: '旧 param 的返回不许打在新会话上');
+      expect(navi.debugConfirmProbePending, isFalse, reason: '不得给新会话挂复核');
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      await pumpEventQueue();
+      expect(navi.statusProbeCount, countBefore, reason: '跨会话不得触发任何探测');
+      expect(client.naviStatusCalls, callsBefore,
+          reason: '旧 verdict 被丢弃，不应顺带引出发一次复核探测');
+      expect(navi.state, NaviState.navigating);
+    });
+
+    test('中途开关心跳：关→开立即生效并补探一次（P0-1）', () async {
+      await navi.start('https://surl.amap.com/abc');
+      await feedDistance(300);
+      final before = navi.statusProbeCount;
+
+      SharedPreferences.setMockInitialValues(
+          {'settings_navi_shareStatusWatchOn': false});
+      final off = SettingsProvider();
+      await off.init();
+      navi.updateSettings(off);
+
+      SharedPreferences.setMockInitialValues(
+          {'settings_navi_shareStatusWatchOn': true});
+      final on = SettingsProvider();
+      await on.init();
+      navi.updateSettings(on);
+
+      expect(navi.statusProbeCount, before + 1,
+          reason: '关→开是"从盲到明"，应像回前台一样立即补探（原来要等下次 start()）');
+    });
+
+    test('单次 stopped 不收尾；短间隔复核后自动收尾（防后端节点抖动误停）', () async {
       await navi.start('https://surl.amap.com/abc');
       await feedDistance(300);
       expect(navi.state, NaviState.navigating);
 
       client.naviShareStatus = 5; // 导航中途，高德那边停了
-      await probe();
+      await probeOnce();
       expect(navi.state, NaviState.navigating,
           reason: '一次判据不足以证明此刻真的停了');
+      expect(navi.debugConfirmProbePending, isTrue,
+          reason: 'B：首次判据后应挂上短间隔复核，而不是等满 15s');
 
-      await probe();
+      // 不再手动探测：等复核定时器自己跑完（注入 100ms）
+      await Future.delayed(const Duration(milliseconds: 300));
+      await pumpEventQueue();
       expect(navi.state, NaviState.off, reason: '静默收尾：不摆"导航已结束"卡');
+      expect(navi.debugConfirmProbePending, isFalse, reason: '收尾后复核也要清掉');
       expect(navi.isActive, isFalse);
       expect(navi.hasSession, isFalse, reason: '第三列回默认面板');
       expect(navi.errorMessage, contains('高德那边已停止导航'));
     });
 
-    test('抖动不累计：stopped → navigating → stopped 仍在导航', () async {
+    test('抖动不累计：stopped → navigating 后计数清零，下一次只算第 1 次', () async {
       await navi.start('https://surl.amap.com/abc');
       await feedDistance(300);
 
       client.naviShareStatus = 5;
-      await probe();
-      client.naviShareStatus = 1; // 又活着了 → 清零
-      await probe();
-      client.naviShareStatus = 5;
-      await probe();
+      await probeOnce(); // strikes=1，挂复核
+      expect(navi.debugConfirmProbePending, isTrue);
 
-      expect(navi.state, NaviState.navigating);
+      client.naviShareStatus = 1; // 复核时又活着了 → 计数清零 + 撤销复核
+      await probeConfirmed();
+      expect(navi.debugConfirmProbePending, isFalse);
+
+      client.naviShareStatus = 5;
+      await probeOnce(); // 从 1 重新开始
+      expect(navi.state, NaviState.navigating,
+          reason: '上一次的 1 次确认不得与这一次凑成收尾');
+      expect(navi.debugConfirmProbePending, isTrue,
+          reason: '这一次又挂起复核，说明计数确实回到了 1');
     });
 
     test('行中端点给不出结论 → 回落行前端点复核', () async {
@@ -813,8 +1041,8 @@ void main() {
       client.naviShareStatus = null; // 字段缺失 → unknown
       client.beforeStatus = 4; // 行前：分享者已在导航中 → 不是结束
 
-      await probe();
-      await probe();
+      await probeOnce();
+      await probeOnce();
       expect(client.beforeStatusCalls, greaterThanOrEqualTo(2),
           reason: '行中判不出时必须问行前端点');
       expect(navi.state, NaviState.navigating,
@@ -827,9 +1055,9 @@ void main() {
       client.naviShareStatus = null;
       client.beforeStatus = 2; // 路线分享已停止
 
-      await probe();
+      await probeOnce();
       expect(navi.state, NaviState.navigating);
-      await probe();
+      await probeOnce();
       expect(navi.state, NaviState.off, reason: '静默收尾');
       expect(navi.hasSession, isFalse);
     });
@@ -840,8 +1068,8 @@ void main() {
       client.naviShareStatus = null;
       client.beforeCode = '10001';
 
-      await probe();
-      await probe();
+      await probeOnce();
+      await probeOnce();
       expect(navi.state, NaviState.off, reason: '静默收尾');
       expect(navi.errorMessage, contains('该分享已过期'));
       expect(navi.errorMessage, isNot(contains('失效')));
@@ -854,7 +1082,7 @@ void main() {
       client.beforeCode = '2';
 
       for (var i = 0; i < 5; i++) {
-        await probe();
+        await probeOnce();
       }
       expect(navi.state, NaviState.navigating);
     });
@@ -864,9 +1092,9 @@ void main() {
       await feedDistance(300);
       client.statusError = Exception('boom'); // 启动之后才开始探不通
 
-      await probe();
-      await probe();
-      await probe();
+      await probeOnce();
+      await probeOnce();
+      await probeOnce();
       expect(navi.state, NaviState.navigating);
       expect(navi.statusProbeFailureCount, 3);
     });
@@ -875,8 +1103,8 @@ void main() {
       await navi.start('https://surl.amap.com/abc');
       await feedDistance(300);
       client.naviShareStatus = 6; // 路线分享结束
-      await probe();
-      await probe();
+      await probeOnce();
+      await probeOnce();
       expect(navi.state, NaviState.off, reason: '静默收尾');
 
       // 再探测不再产生任何变化（定时器已停）
@@ -899,8 +1127,8 @@ void main() {
       await feedDistance(300);
 
       client.naviShareStatus = 5; // 导航中途高德那边停了
-      await probe();
-      await probe();
+      await probeOnce();
+      await probeOnce();
       expect(navi.state, NaviState.navigating, reason: '开关关掉就不掐导航');
       expect(navi.shareStoppedHint, isTrue, reason: '但必须让用户知道高德停了');
     });
@@ -909,7 +1137,7 @@ void main() {
       await navi.start('https://surl.amap.com/abc');
       await feedDistance(300);
       client.naviShareStatus = 5;
-      await probe(); // 只确认 1 次，不收尾
+      await probeOnce(); // 只确认 1 次，不收尾
       await navi.stop();
 
       // 重新开始时计数必须清零，否则"上一次的 1 次确认"会凑成这一次的收尾
@@ -917,7 +1145,7 @@ void main() {
       await navi.start('https://surl.amap.com/abc');
       await feedDistance(300);
       client.naviShareStatus = 5;
-      await probe();
+      await probeOnce();
       expect(navi.state, NaviState.navigating);
     });
   });
@@ -1056,15 +1284,25 @@ class _FakeShareClient extends AmapShareClient {
   /// 非空时两个状态端点都抛异常（模拟网络/传输层失败）
   Object? statusError;
 
+  /// 非空时状态探测会先在此 future 上等待：模拟"探测 in-flight"（P0-2 / P0-3 用例）。
+  Completer<void>? statusGate;
+
   int naviStatusCalls = 0;
   int beforeStatusCalls = 0;
+
+  /// 每次行中探测的**调用时刻**，供"复核间隔 < 心跳周期"断言用。
+  final List<DateTime> naviStatusTimes = [];
+
+  /// 每次 `resolveParam` 都给出不同值：真实场景里"重贴短链"就是换了一条分享，
+  /// 只有 param 会变，才能守住"旧会话的迟到探测不打在新会话上"（P0-3）。
+  int _paramSeq = 0;
 
   AmapRoute get _route => routeOverride ?? route;
 
   @override
   Future<String> resolveParam(String shareUrl) async {
     if (linkError != null) throw linkError!;
-    return 'param-test';
+    return 'param-test-${++_paramSeq}';
   }
 
   @override
@@ -1083,6 +1321,9 @@ class _FakeShareClient extends AmapShareClient {
   @override
   Future<ShareInfoEnvelope> probeNaviStatus(String param) async {
     naviStatusCalls++;
+    naviStatusTimes.add(DateTime.now());
+    final gate = statusGate;
+    if (gate != null) await gate.future; // 模拟"探测还挂在网络上"
     if (statusError != null) throw statusError!;
     return ShareInfoEnvelope(
       result: true,
@@ -1096,6 +1337,8 @@ class _FakeShareClient extends AmapShareClient {
   @override
   Future<ShareStatusEnvelope> fetchShareStatus(String param) async {
     beforeStatusCalls++;
+    final gate = statusGate;
+    if (gate != null) await gate.future;
     if (statusError != null) throw statusError!;
     return ShareStatusEnvelope(
       result: beforeCode == '1',

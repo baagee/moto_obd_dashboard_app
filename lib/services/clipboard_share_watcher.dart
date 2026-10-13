@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -98,7 +100,7 @@ class ClipboardShareWatcher with WidgetsBindingObserver {
     if (_started) return;
     _started = true;
     WidgetsBinding.instance.addObserver(this);
-    unawaitedCheck();
+    _triggerCheck();
   }
 
   /// 停止监听（不改变 NaviProvider 状态）
@@ -113,14 +115,12 @@ class ClipboardShareWatcher with WidgetsBindingObserver {
     if (!_started) return;
     if (state == AppLifecycleState.resumed) {
       // 回前台是唯一稳定可读剪贴板的时机
-      unawaitedCheck();
+      _triggerCheck();
     }
   }
 
-  void unawaitedCheck() {
-    // ignore: discarded_futures
-    checkOnce();
-  }
+  /// 生命周期钩子里不能 await：显式丢弃这次检测的 Future（不阻塞钩子）。
+  void _triggerCheck() => unawaited(checkOnce());
 
   /// 检测一次剪贴板并（条件满足时）自动开始导航。
   ///

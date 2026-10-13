@@ -426,6 +426,13 @@ class ShareInfoEnvelope {
   }
 }
 
+/// 分享成员（分享者本人的实时状态快照）。
+///
+/// **App 当前未接线**：[NaviProvider] 只用**本机 GPS**定位 + `shareStatus` 判活，
+/// 不消费成员位置 / 电量 / 导航统计等字段。这一族模型（[ShareMember] / [LocInfo] /
+/// [DriveInfo] / [DriveOtherInfo] / [NavigationInfo] / [NamedPoint]）保留是为了
+/// 与 JS 参考实现对拍一致、以及真机验证页逐字取证，将来可复用。
+/// ⚠️ 切勿用其中的位置 / 新鲜度 / online 字段判定"导航是否已结束"（见 [ShareAlive]）。
 class ShareMember {
   ShareMember(Map<String, Object?> m)
       : uid = asInt(m['uid']),
@@ -573,7 +580,7 @@ class ActionCodes {
   /// `main_action` 官方枚举（14 项，0~13）→ 中文名。
   ///
   /// **来源**：高德 Web 服务官方「驾车动作列表」，见
-  /// `amap_test01/docs/amap-share-api-reference.md` §2.11。该表有三重佐证
+  /// `docs/amap-share-api-reference.md` §2.11。该表有三重佐证
   /// （`main_action` 取值区间闭合 / 用 coords 在段末算的几何转角吻合 / 语义吻合），
   /// 并明确记录了"**早期对 5 个动作码的几何猜测已被官方枚举推翻**"——
   /// 本表就是按官方枚举重建的版本，不要再改回几何猜测。

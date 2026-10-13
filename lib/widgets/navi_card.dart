@@ -110,36 +110,25 @@ class NaviCard extends StatelessWidget {
   // ==========================================================================
 
   Widget _buildActive(BuildContext context, NaviProvider navi, double factor) {
-    final deviated = navi.state == NaviState.deviated;
     final locating = navi.state == NaviState.locating;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(height: _titleHeight, child: _buildTitleRow(context, navi)),
+        // 标题行与地图区都用 **const + 自 select** 的子组件：
+        // 本方法在 NaviProvider 每次通知（里程平滑 5Hz）时都会重跑，若把这两块
+        // 写成 inline，地图的 CustomPaint（含 LayoutBuilder/包围盒/标记）会跟着
+        // 5Hz 重建。做成 const 子组件后，只有它们**自己 select 的值**变化时才重建
+        // ——地图约 2.5Hz（里程每前移一个锚点步才重算切片）、标题行更少。
+        const SizedBox(height: _titleHeight, child: _NaviTitleRow()),
         const SizedBox(height: _gap),
 
         // ② 地图区：真实路线为主体（弹性，吃掉所有剩余高度）
-        Expanded(
-          child: RepaintBoundary(
-            child: CustomPaint(
-              key: mapKey,
-              size: Size.infinite,
-              painter: _RouteMapPainter(
-                slice: navi.routeSlice,
-                markers: navi.routeMarkers,
-                hasFix: navi.projection != null,
-                deviated: deviated,
-                trafficColor: navi.routeTrafficColor,
-                lineColor: AppTheme.gaugeNormal,
-              ),
-            ),
-          ),
-        ),
+        const Expanded(child: _NaviMap()),
 
         const SizedBox(height: _gap),
 
-        // ③ 下一个动作（独立元素）
+        // ③ 下一个动作（独立元素；距离/剩余量每帧都在变，本就在这里重建）
         SizedBox(
           height: (_actionStripHeight * factor).clamp(40.0, _actionStripHeight),
           child: _buildActionStrip(context, navi, factor, locating: locating),
@@ -147,93 +136,11 @@ class NaviCard extends StatelessWidget {
 
         const SizedBox(height: _gap),
 
-        // ④ 指标条（固定列宽，不截断；高度略收，把空间让给底图）
+        // ④ 指标条（高度略收，把空间让给底图）
         SizedBox(
           height: (_metricsHeight * factor).clamp(30.0, _metricsHeight),
           child: _buildMetricsBar(navi, factor),
         ),
-      ],
-    );
-  }
-
-  Widget _buildTitleRow(BuildContext context, NaviProvider navi) {
-    final String title;
-    final Color dotColor;
-    switch (navi.state) {
-      case NaviState.deviated:
-        final off = navi.offsetMeters;
-        final offText = off == null ? '' : ' ${off.round()}m';
-        // 分享链接是快照：拿不到新路线时必须说实话，并给出唯一可行的出口
-        title = navi.replanFailed
-            ? '已偏离$offText · 点此重新粘贴短链'
-            : '已偏离路线 · 重新规划中…';
-        dotColor = AppTheme.gaugeWarn;
-      case NaviState.locating:
-        title = switch (navi.gpsIssue) {
-          NaviGpsIssue.denied || NaviGpsIssue.deniedForever =>
-            '导航中 · 没有定位权限（点此去设置）',
-          NaviGpsIssue.serviceDisabled => '导航中 · 系统定位未开启（点此去设置）',
-          NaviGpsIssue.streamError => '导航中 · 定位异常，检查权限与信号',
-          NaviGpsIssue.noFixYet => '导航中 · 等不到定位（信号弱或室内）',
-          NaviGpsIssue.none => '导航中 · 定位中…',
-        };
-        dotColor = navi.gpsIssue == NaviGpsIssue.none
-            ? AppTheme.textMuted
-            : AppTheme.gaugeWarn;
-      case _:
-        title = '导航中 · ${navi.currentRoad ?? '未知道路'}';
-        // 用导航主色青：与卡片边框/路线/进度条同色系，避免 8px 圆点下
-        // 绿色(accentGreen)与青色(gaugeNormal)难分辨；绿色留给地图红绿灯标记
-        dotColor = AppTheme.gaugeNormal;
-    }
-    final live = navi.state == NaviState.navigating;
-
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: AppTheme.labelMedium.copyWith(
-              fontSize: 11,
-              color: AppTheme.textSecondary,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        if (navi.state == NaviState.stale)
-          const Padding(
-            padding: EdgeInsets.only(right: 4),
-            child: Text('信号弱',
-                style: TextStyle(color: AppTheme.gaugeWarn, fontSize: 10)),
-          ),
-        if (navi.extrapolating)
-          const Padding(
-            padding: EdgeInsets.only(right: 4),
-            child: Text('推算中',
-                style: TextStyle(color: AppTheme.textMuted, fontSize: 10)),
-          ),
-        // 已探到"高德那边停了"但用户选择继续导航（naviStopOnShareEnd=false）：
-        // 必须让他知道指引已不再来自高德，而不是静默继续
-        if (navi.shareStoppedHint)
-          const Padding(
-            padding: EdgeInsets.only(right: 4),
-            child: Text('已停止',
-                style: TextStyle(color: AppTheme.gaugeWarn, fontSize: 10)),
-          ),
-        _dot(dotColor, breathe: live),
-        const SizedBox(width: 4),
-        Text(
-          switch (navi.state) {
-            NaviState.locating =>
-              navi.gpsIssue == NaviGpsIssue.none ? 'WAIT' : 'NO GPS',
-            NaviState.deviated => navi.replanFailed ? 'OFF' : 'REROUTE',
-            NaviState.stale => 'WEAK',
-            _ => 'LIVE',
-          },
-          style: AppTheme.labelTiny.copyWith(color: dotColor),
-        ),
-        _closeButton(navi),
       ],
     );
   }
@@ -334,7 +241,9 @@ class NaviCard extends StatelessWidget {
     return '$from → $to';
   }
 
-  /// ④ 指标条：固定列宽 + `FittedBox(scaleDown)`，任何情况都不会被 ellipsis 吃掉
+  /// ④ 指标条：四列**等分（flex）独立渲染** + `FittedBox(scaleDown)` 兜底，
+  /// 任何情况都不会被 ellipsis 吃掉（"列宽"是比例而非像素——比硬编码固定宽度
+  /// 更抗窄卡片溢出，且同样满足"不拼接成单行字符串"这条不变量）。
   Widget _buildMetricsBar(NaviProvider navi, double factor) {
     final remaining = navi.remaining;
     final km = remaining == null
@@ -427,12 +336,66 @@ class NaviCard extends StatelessWidget {
   // 小组件
   // ==========================================================================
 
-  Widget _statusRow(
-    BuildContext context, {
-    required String title,
-    required Color dotColor,
-    Widget? trailing,
-  }) {
+}
+
+// ===========================================================================
+// 自 select 的卡片子块
+//
+// 把标题行与地图区从 `NaviCard.build` 里拆出来，是为了**把 5Hz 的里程平滑通知
+// 挡在门外**：它们用 `context.select` 只订阅自己关心的字段，值不变就不重建。
+// 外层因此可以每次通知都照常重跑（动作条/指标条本来就要跟着距离与剩余量刷新），
+// 成本只剩几何布局，不再包含 CustomPaint 的路径 / 包围盒 / 标记重算。
+// ===========================================================================
+
+/// 标题行（状态文案 + 信号徽标 + 关闭按钮）
+class _NaviTitleRow extends StatelessWidget {
+  const _NaviTitleRow();
+
+  @override
+  Widget build(BuildContext context) {
+    // offsetMeters 取整后再进 select：偏离态下它每秒都在抖，取整避免无意义重建
+    final (state, offM, replanFailed, gpsIssue, currentRoad, extrapolating,
+        stopped) = context.select<NaviProvider,
+        (NaviState, int?, bool, NaviGpsIssue, String?, bool, bool)>((p) => (
+              p.state,
+              p.offsetMeters?.round(),
+              p.replanFailed,
+              p.gpsIssue,
+              p.currentRoad,
+              p.extrapolating,
+              p.shareStoppedHint,
+            ));
+
+    final String title;
+    final Color dotColor;
+    switch (state) {
+      case NaviState.deviated:
+        final offText = offM == null ? '' : ' ${offM}m';
+        // 分享链接是快照：拿不到新路线时必须说实话，并给出唯一可行的出口
+        title = replanFailed
+            ? '已偏离$offText · 点此重新粘贴短链'
+            : '已偏离路线 · 重新规划中…';
+        dotColor = AppTheme.gaugeWarn;
+      case NaviState.locating:
+        title = switch (gpsIssue) {
+          NaviGpsIssue.denied || NaviGpsIssue.deniedForever =>
+            '导航中 · 没有定位权限（点此去设置）',
+          NaviGpsIssue.serviceDisabled => '导航中 · 系统定位未开启（点此去设置）',
+          NaviGpsIssue.streamError => '导航中 · 定位异常，检查权限与信号',
+          NaviGpsIssue.noFixYet => '导航中 · 等不到定位（信号弱或室内）',
+          NaviGpsIssue.none => '导航中 · 定位中…',
+        };
+        dotColor = gpsIssue == NaviGpsIssue.none
+            ? AppTheme.textMuted
+            : AppTheme.gaugeWarn;
+      case _:
+        title = '导航中 · ${currentRoad ?? '未知道路'}';
+        // 用导航主色青：与卡片边框/路线同色系，避免 8px 圆点下绿色与青色难分辨；
+        // 绿色留给地图红绿灯标记
+        dotColor = AppTheme.gaugeNormal;
+    }
+    final live = state == NaviState.navigating;
+
     return Row(
       children: [
         Expanded(
@@ -446,36 +409,98 @@ class NaviCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        if (trailing != null) trailing else _dot(dotColor),
+        if (state == NaviState.stale)
+          const Padding(
+            padding: EdgeInsets.only(right: 4),
+            child: Text('信号弱',
+                style: TextStyle(color: AppTheme.gaugeWarn, fontSize: 10)),
+          ),
+        if (extrapolating)
+          const Padding(
+            padding: EdgeInsets.only(right: 4),
+            child: Text('推算中',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 10)),
+          ),
+        // 已探到"高德那边停了"但用户选择继续导航（naviStopOnShareEnd=false）：
+        // 必须让他知道指引已不再来自高德，而不是静默继续
+        if (stopped)
+          const Padding(
+            padding: EdgeInsets.only(right: 4),
+            child: Text('已停止',
+                style: TextStyle(color: AppTheme.gaugeWarn, fontSize: 10)),
+          ),
+        _naviDot(dotColor, breathe: live),
+        const SizedBox(width: 4),
+        Text(
+          switch (state) {
+            NaviState.locating =>
+              gpsIssue == NaviGpsIssue.none ? 'WAIT' : 'NO GPS',
+            NaviState.deviated => replanFailed ? 'OFF' : 'REROUTE',
+            NaviState.stale => 'WEAK',
+            _ => 'LIVE',
+          },
+          style: AppTheme.labelTiny.copyWith(color: dotColor),
+        ),
+        GestureDetector(
+          onTap: () => context.read<NaviProvider>().stop(),
+          behavior: HitTestBehavior.opaque,
+          child: const Padding(
+            padding: EdgeInsets.only(left: 6),
+            child: Icon(Icons.close, size: 13, color: AppTheme.textMuted),
+          ),
+        ),
       ],
     );
   }
+}
 
-  Widget _dot(Color color, {bool breathe = false}) {
-    if (!breathe) {
-      return Container(
-        width: 8,
-        height: 8,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color,
-          boxShadow: AppTheme.glowShadow(color, blur: 6),
+/// 地图区（真实路线底图 + 红绿灯/限速标记 + 车标）
+class _NaviMap extends StatelessWidget {
+  const _NaviMap();
+
+  @override
+  Widget build(BuildContext context) {
+    final (slice, markers, hasFix, deviated, trafficColor) = context.select<
+        NaviProvider,
+        (RouteSlice, List<RouteMarker>, bool, bool, bool)>((p) => (
+          p.routeSlice,
+          p.routeMarkers,
+          p.projection != null,
+          p.state == NaviState.deviated,
+          p.routeTrafficColor,
+        ));
+
+    return RepaintBoundary(
+      child: CustomPaint(
+        key: NaviCard.mapKey,
+        size: Size.infinite,
+        painter: _RouteMapPainter(
+          slice: slice,
+          markers: markers,
+          hasFix: hasFix,
+          deviated: deviated,
+          trafficColor: trafficColor,
+          lineColor: AppTheme.gaugeNormal,
         ),
-      );
-    }
-    return _BreathingDot(color: color);
-  }
-
-  Widget _closeButton(NaviProvider navi) {
-    return GestureDetector(
-      onTap: () => navi.stop(),
-      behavior: HitTestBehavior.opaque,
-      child: const Padding(
-        padding: EdgeInsets.only(left: 6),
-        child: Icon(Icons.close, size: 13, color: AppTheme.textMuted),
       ),
     );
   }
+}
+
+/// 状态圆点（8px；[breathe] 为 true 时呼吸）
+Widget _naviDot(Color color, {bool breathe = false}) {
+  if (!breathe) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: AppTheme.glowShadow(color, blur: 6),
+      ),
+    );
+  }
+  return _BreathingDot(color: color);
 }
 
 /// 呼吸状态点（8px，1.2s 周期）

@@ -135,6 +135,8 @@ class AmapShareClient {
   ///
   /// 业务失败抛 [ShareApiException]（[ShareSession.refresh] 依赖这个语义）；
   /// 只想读状态、不关心失败的话用 [probeNaviStatus]。
+  ///
+  /// **App 当前未接线**（保留给"跟随分享者位置"的将来场景，见文末 §3 说明）。
   Future<ShareInfoEnvelope> fetchInfo(String param) async {
     final env = await probeNaviStatus(param);
     if (!env.result) {
@@ -222,6 +224,12 @@ class ShareApiException implements Exception {
 
 // ---------------------------------------------------------------------------
 // 3. 便捷封装：一次拿到"路线 + 位置 + 指引"
+//
+// ⚠️ **App 当前未接线**：`ShareSession` / `ShareSnapshot`（以及 `fetchInfo`）
+// 是给"用 info 接口的位置当车辆位置"的旧思路准备的便利封装；实际
+// `NaviProvider` 用**本机 GPS** 定位，只单独调 `fetchRoute` + 状态探测端点，
+// 因此这一节没有生产调用点。保留是为了与 JS 参考实现对拍、以及将来
+// "跟随分享者位置"的场景复用 —— 改数据层时**不要**把它当作活代码删改。
 // ---------------------------------------------------------------------------
 
 /// 一次刷新后的完整快照

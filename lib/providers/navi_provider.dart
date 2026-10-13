@@ -83,10 +83,16 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
     Future<LocationPermissionStatus> Function()? locationGate,
     Future<Position?> Function()? firstFixProvider,
     Duration smoothTickPeriod = const Duration(milliseconds: smoothTickMs),
+    // 分享状态"复核"间隔（B）：首次判到停止后，用远小于心跳的间隔**再确认一次**，
+    // 不再等满一个心跳周期（见方案 §1.1/§1.5）。可注入是为了测试确定性：真实 3s
+    // 会让每个收尾用例多等 3s，测试注入 20ms。
+    Duration confirmProbePeriod =
+        const Duration(seconds: shareEndConfirmDelaySec),
   })  : _obdDataProvider = obdDataProvider,
         _client = client ?? AmapShareClient(),
         _ownsClient = client == null,
         _smoothTickPeriod = smoothTickPeriod,
+        _confirmProbePeriod = confirmProbePeriod,
         _positionStreamFactory = positionStreamFactory ??
             // 采样频率由 LocationService.androidFixInterval（Android 1s/帧）
             // 显式下传 —— 不传的话 Android 回退到 5s 默认值，60km/h 下会滞后
@@ -175,6 +181,13 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
   static const int minStatusWatchSec = 5;
   static const int maxStatusWatchSec = 60;
 
+  /// 首次判到"分享已停止"后的**复核间隔**（秒）。
+  ///
+  /// 原实现第二次确认要等满一个心跳周期（15s），把收尾硬拖到 15~30s。
+  /// 复核只回答"刚刚这一次判据是不是真的"，所以用远小于心跳的间隔。
+  /// 真值可由构造参数 `confirmProbePeriod` 注入（测试确定性）。
+  static const int shareEndConfirmDelaySec = 3;
+
   // ===== 依赖 =====
   final OBDDataProvider _obdDataProvider;
   final AmapShareClient _client;
@@ -190,6 +203,9 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// 长以冻结推进（见 `test/widgets/navi_hud_widgets_test.dart`）；平滑本身的
   /// 用例反过来设成 20ms 以便毫秒级观察（见「里程平滑」组）。
   final Duration _smoothTickPeriod;
+
+  /// 分享状态复核间隔（默认 [shareEndConfirmDelaySec] 秒，可注入，见构造函数）。
+  final Duration _confirmProbePeriod;
   SettingsProvider? _settings;
   late void Function(String source, LogType type, String message) _logCallback;
 
@@ -261,6 +277,13 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// 连续同向确认计数（见 [statusConfirmCount]）
   int _statusStrikes = 0;
 
+  /// 一次性"复核"定时器（B）：首次判到停止后，用远小于心跳的间隔再确认一次。
+  Timer? _statusConfirmTimer;
+
+  /// 探测互斥：周期心跳与短复核并发返回时，会把"同一时间点的一次信息"误算成
+  /// 两次独立确认（正好绕过 [statusConfirmCount] 的防护），所以必须串行。
+  bool _probeInFlight = false;
+
   /// 已探到"停止"但因 `naviStopOnShareEnd = false` 没有收尾 —— 卡片据此提示
   bool _shareStoppedHint = false;
 
@@ -296,6 +319,12 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   String? _errorMessage;
   bool _suspended = false;
+
+  /// 已 dispose —— 微任务里补发的通知要据此跳过（dispose 后再通知会抛异常）
+  bool _disposed = false;
+
+  /// 同一帧内合并"设置变化"引发的通知（见 [_notifySoon]）
+  bool _notifyScheduled = false;
 
   // ===== Getter（暴露状态，不使用直接字段访问）=====
 
@@ -461,6 +490,10 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
   static const double sliceBehindMeters = 40;
 
   /// 由 main.dart 的 ProxyProvider 注入（与 OBDDataProvider 同模式）
+  ///
+  /// **本方法在 build 阶段被 `ChangeNotifierProxyProvider.update` 调用**，所以
+  /// 绝不能同步 `notifyListeners()`（会在构建期改状态，触发 Flutter 断言）；
+  /// 需要刷新 UI 时统一走 [_notifySoon]：微任务里补发一次，并合并同一帧的重复调用。
   void updateSettings(SettingsProvider? settings) {
     _settings = settings;
     if (settings == null) return;
@@ -469,9 +502,26 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
       _routeRefreshSec = sec;
       if (_routeTimer != null) _startRouteTimer();
     }
-    _mapAheadMeters = settings.naviMapAheadMeters;
-    _routeTrafficColor = settings.naviRouteTrafficColor;
-    _etaMode = settings.naviEtaMode;
+
+    var changed = false;
+    // 底图视窗里程：不只是存个值 —— 锚点与切片必须整体重算，否则静止时在设置页
+    // 把 300 改成 150 底图永远不刷新（要等里程前移 ≥8m 才重算）。
+    final ahead = settings.naviMapAheadMeters;
+    if (ahead != _mapAheadMeters) {
+      _mapAheadMeters = ahead;
+      _sliceAnchorDistance = null; // 强制重算
+      _rebuildRouteSlice();
+      changed = true;
+    }
+    if (_routeTrafficColor != settings.naviRouteTrafficColor) {
+      _routeTrafficColor = settings.naviRouteTrafficColor;
+      changed = true;
+    }
+    if (_etaMode != settings.naviEtaMode) {
+      _etaMode = settings.naviEtaMode;
+      changed = true;
+    }
+    if (changed) _notifySoon();
 
     // 分享状态心跳：周期/开关变化要重建定时器
     final watchOn = settings.naviShareStatusWatchOn;
@@ -479,10 +529,32 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
         settings.naviShareStatusWatchSec.clamp(minStatusWatchSec, maxStatusWatchSec);
     _stopOnShareEnd = settings.naviStopOnShareEnd;
     if (watchOn != _statusWatchOn || watchSec != _statusWatchSec) {
+      final wasOn = _statusWatchOn;
       _statusWatchOn = watchOn;
       _statusWatchSec = watchSec;
-      if (_statusTimer != null) _startStatusWatch();
+      // 原来守卫是 `_statusTimer != null`，而关闭分支会把 `_statusTimer` 置 null
+      // —— 于是骑行中途「关→开」根本重建不起来（要等下次 start()；P0-1）。
+      // 现在只要"会话在跑且不在后台"：开着就重建（关→开也算），关着且有定时器
+      // 就停掉；关着且本来就没开（`_statusTimer == null`）什么都不做，免得
+      // 每次改周期都记一条"已关闭"。关→开是"从盲到明"，与 _resume() 同构，
+      // 顺带立即补探一次。
+      if (isActive && !_suspended && (watchOn || _statusTimer != null)) {
+        _startStatusWatch(probeNow: watchOn && !wasOn);
+      }
     }
+  }
+
+  /// 延迟到微任务里补发一次通知（合并同一帧的多次调用）。
+  ///
+  /// 微任务在当前帧的 build/layout/paint 全部同步执行完之后才跑，因此从
+  /// `updateSettings`（build 期）调用它是安全的。
+  void _notifySoon() {
+    if (_notifyScheduled) return;
+    _notifyScheduled = true;
+    scheduleMicrotask(() {
+      _notifyScheduled = false;
+      if (!_disposed) notifyListeners();
+    });
   }
 
   /// 设置底图前方视窗里程（米），持久化并立即生效
@@ -507,6 +579,13 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// 测试钩子：手动触发一次分享状态探测（避免测试真等一个心跳周期）
   @visibleForTesting
   Future<void> debugStatusProbeNow() => _onStatusProbe();
+
+  /// 测试钩子：是否有待执行的分享状态**复核**定时器（B）。
+  ///
+  /// 用于守住两条不变量：进后台 / 收尾后不得残留复核定时器；以及跨会话时
+  /// 旧探测的返回不得给新会话挂出复核。
+  @visibleForTesting
+  bool get debugConfirmProbePending => _statusConfirmTimer != null;
 
   // ==========================================================================
   // 生命周期：开始 / 停止 / 前台后台
@@ -696,6 +775,7 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
     _smoothTicker = null;
     _statusTimer?.cancel();
     _statusTimer = null;
+    _cancelConfirmProbe();
     _gpsSub?.cancel();
     _gpsSub = null;
     _log(LogType.info, '应用进入后台，暂停路线轮询 / 状态心跳与 GPS 订阅');
@@ -709,13 +789,16 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
     _log(LogType.info, '应用回到前台，恢复路线轮询与 GPS 订阅');
     _startRouteTimer();
     _startSmoothTicker();
-    _startStatusWatch();
+    // A：后台期间一次都没探（_suspend 已把定时器清掉），回前台立刻补一次，
+    // 否则还得从 0 开始等一个完整心跳周期。
+    _startStatusWatch(probeNow: true);
     _startGps();
     unawaited(_refreshRoute());
   }
 
   @override
   void dispose() {
+    _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
     _stopRuntime();
     if (_ownsClient) _client.close();
@@ -729,6 +812,7 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
     _smoothTicker = null;
     _statusTimer?.cancel();
     _statusTimer = null;
+    _cancelConfirmProbe();
     _fixTimeoutTimer?.cancel();
     _fixTimeoutTimer = null;
     _gpsSub?.cancel();
@@ -857,9 +941,10 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
   //   行中 POST /ws/share/lbs/info          -> data.shareInfo.shareStatus（1/5/7/6）
   //   行前 GET  /ws/user/route/share/info   -> data.status（1/4/2/3）、code 10001 已过期
 
-  void _startStatusWatch() {
+  void _startStatusWatch({bool probeNow = false}) {
     _statusTimer?.cancel();
     _statusTimer = null;
+    _cancelConfirmProbe(); // 重建心跳时顺手撤销待执行的复核
     if (!_statusWatchOn) {
       _log(LogType.info, '分享状态心跳已关闭（设置项 naviShareStatusWatchOn）');
       return;
@@ -868,6 +953,9 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
       Duration(seconds: _statusWatchSec),
       (_) => unawaited(_onStatusProbe()),
     );
+    // A：立即补探一次。回前台 / 中途开启心跳时，"后台 / 关闭期间一次都没探"，
+    // 不补的话还得从 0 开始等一个完整周期（见方案 §0/§1.3）。
+    if (probeNow) unawaited(_onStatusProbe());
   }
 
   /// 一次**两步求证**的分享状态探测（主判据 + 复核）。
@@ -904,15 +992,23 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// 一次状态心跳：只有"明确判据"（[ShareAlive.stopped] / [ShareAlive.expired]）
   /// 才计数；`unknown` 一律清零计数并什么都不做。
   Future<void> _onStatusProbe() async {
-    if (!isActive) return;
+    if (!isActive || _probeInFlight) return;
     final param = _param;
     if (param == null) return;
-    _statusProbeCount++;
-
-    final probe = await _probeShareAlive(param);
-    if (probe == null) return; // 探测不到 → 不动状态
-    if (!isActive) return; // 探测期间会话可能已结束
-    _applyStatusVerdict(probe.alive, probe.detail);
+    _probeInFlight = true;
+    _statusProbeCount++; // 移到互斥之后：被拦下的调用不计数
+    try {
+      final probe = await _probeShareAlive(param);
+      if (probe == null) return; // 探测不到 → 不动状态
+      if (!isActive) return; // 探测期间会话可能已结束
+      // 跨会话隔离：stop() 不会中止 in-flight 的探测，而新 start() 会把会话重新
+      // 拉起 —— 旧 param 的返回时 isActive 已为 true，若不校验就会把"上一次会话
+      // 的信息"算到这一次上（strikes=1 外加挂出一个复核定时器）。
+      if (_param != param) return;
+      _applyStatusVerdict(probe.alive, probe.detail);
+    } finally {
+      _probeInFlight = false;
+    }
   }
 
   /// **行前自检**：打开 App 刚粘贴（或回前台补一次自动同步）时，先问一句
@@ -957,7 +1053,12 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
           '分享状态：$detail → ${alive.name}'
           '（第 $_statusStrikes/$statusConfirmCount 次确认）',
         );
-        if (_statusStrikes < statusConfirmCount) return;
+        if (_statusStrikes < statusConfirmCount) {
+          // B：不再等满一个心跳周期，用远小于它的间隔自己再探一次
+          _scheduleConfirmProbe();
+          return;
+        }
+        _cancelConfirmProbe();
         if (!_stopOnShareEnd) {
           // 用户关掉了"停止即收尾"：只提示，不掐导航（可能只是想按这条路继续骑）
           if (!_shareStoppedHint) {
@@ -979,10 +1080,28 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
           _log(LogType.info, '分享状态恢复：$detail → ${alive.name}，确认计数清零');
         }
         _statusStrikes = 0;
+        _cancelConfirmProbe();
       case ShareAlive.unknown:
         // 不确认就打断"连续确认"链（半途的 unknown 说明快照不稳定）
         _statusStrikes = 0;
+        _cancelConfirmProbe();
     }
+  }
+
+  /// B：首次判到停止后，用远小于心跳的间隔**再复核一次**（不再等满一个周期）。
+  void _scheduleConfirmProbe() {
+    _cancelConfirmProbe();
+    // 后台期间一次都不探（见方案 §0）：探测 in-flight 时进后台，verdict 会在
+    // suspend **之后**才落地；这里若不判，就会在后台挂出定时器、继续发请求。
+    // strikes 故意保留 —— 回前台后 _resume() 的 probeNow 会立刻补上这次确认。
+    if (_suspended) return;
+    _statusConfirmTimer =
+        Timer(_confirmProbePeriod, () => unawaited(_onStatusProbe()));
+  }
+
+  void _cancelConfirmProbe() {
+    _statusConfirmTimer?.cancel();
+    _statusConfirmTimer = null;
   }
 
   /// **静默收尾**：分享失效 / 该分享已过期 / 高德那边停止了导航。
@@ -1170,7 +1289,7 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
     final gcj = GeocodingService.wgs84ToGcj02(pos.latitude, pos.longitude);
     final now = DateTime.now();
     final prevFixAt = _lastFixAt; // 上一帧的**送达**时刻（采样间隔诊断用）
-    final prior = _continuityPrior(prevFixAt);
+    final prior = _continuityPrior(now, prevFixAt);
     _lastKnownGcj = LonLat(gcj[1], gcj[0]);
     _gpsFixCount++;
     _lastFixAt = now;
@@ -1287,12 +1406,18 @@ class NaviProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// **基准必须是"实测里程"而不是"当前显示里程"**：显示里程含平滑外推量，
   /// 在它之上再加 `车速 × 定位间隔` 会把同一个间隔算两遍（先验偏前一帧车程，
   /// 窗口甚至会把真实位置排除在外 —— 隧道恢复时最明显）。
-  ({double? anchor, double windowAhead}) _continuityPrior(DateTime? prevFixAt) {
+  ///
+  /// [now] 由调用方传入（同一帧只取一次时钟），避免与 `_lastFixAt` 的写入时刻
+  /// 之间出现微小偏差。
+  ({double? anchor, double windowAhead}) _continuityPrior(
+    DateTime now,
+    DateTime? prevFixAt,
+  ) {
     final base = _measuredDistance;
     if (base == null || prevFixAt == null) {
       return (anchor: null, windowAhead: 400);
     }
-    final dt = DateTime.now().difference(prevFixAt).inMilliseconds / 1000.0;
+    final dt = now.difference(prevFixAt).inMilliseconds / 1000.0;
     if (dt < 0 || dt > 60) return (anchor: null, windowAhead: 400);
     final advance = _speedKmh / 3.6 * dt;
     return (

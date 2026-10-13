@@ -77,7 +77,7 @@ lib/
 │   └── device_storage_service.dart  # 上次连接设备持久化
 ├── screens/
 │   ├── main_container.dart          # 主容器（PageView + 顶部导航 + 剪贴板watcher）
-│   ├── dashboard_screen.dart        # 主仪表盘（顶部通栏占位 + 三栏）
+│   ├── dashboard_screen.dart        # 主仪表盘（顶部通栏悬浮覆盖 + 三栏）
 │   ├── record_screen.dart           # 骑行记录列表
 │   ├── riding_track_screen.dart     # 骑行轨迹详情
 │   ├── logs_screen.dart             # 诊断日志
@@ -97,6 +97,14 @@ lib/
 
 tool/
 └── verify_navi.dart                 # 导航算法离线对拍/回归工具（基线失败退出码 1）
+
+test/
+├── fixtures/amap/
+│   └── sample-restoration.json      # 真实响应离线样本（随仓库分发，verify_navi 与真实样本断言共用）
+└── ...
+
+docs/
+└── amap-share-api-reference.md      # 高德分享接口/驾车动作码的**唯一权威**（§2.11 动作表）
 ```
 
 ---
@@ -444,13 +452,20 @@ static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
 1. **底图是主体，转向动作不覆盖在地图上**：真实路线用 `gaugeNormal` 实色（3px，带辉光）
    绘制，转向箭头降为地图**下方**独立动作条里的小元素（≈42px），二者不共用同一块矩形。
    高度预算：底图占卡片高度**一半以上**（244px 槽位下 ≈129px）。空间不够时**优先压留白
-   （`_gap`）与指标条，不要压底图**；车标锚点 `_vehicleAnchorY = 0.85`（后视只有 40m，
-   把高度让给前方视野）。
-2. **航向朝上 + 只截取最近一段里程**：底图按 `routeSlice.bearing` 绕车辆点旋转（车辆固定在
-   宽度中点、约 72% 高度处），视窗为"车后 40m + 车前 `naviMapAheadMeters`"，避免把整条
-   路线压成一团；带 8m / ~6° 死区，防止底图逐帧抖动。
-3. **底部指标不拼接**：剩余里程 / 剩余时间 / 红绿灯 / 限速 四列固定宽度独立渲染，
-   数值用 `FittedBox(scaleDown)`，**禁止**再退化成单行字符串拼接（会被 ellipsize 截断）。
+   （`_gap`）与指标条，不要压底图**。
+2. **航向朝上 + fit-to-viewport**：底图按 `routeSlice.bearing` 绕车辆点旋转，再按
+   **旋转后包围盒** fit 到画布（四周仅留 8px；`_minVisibleMeters = 80` 兜底，防止极短弯被
+   无限放大）；因此车标位置随路线弯曲而变，**不是**固定的 72% 高度锚点。视窗只截取
+   "车后 40m + 车前 `naviMapAheadMeters`"，避免把整条路线压成一团；带 8m / ~6° 死区，
+   防止底图逐帧抖动。
+3. **底部指标不拼接**：剩余里程 / 剩余时间 / 红绿灯 / 总里程 四列**等分（flex
+   11:11:8:11）独立渲染**，数值用 `FittedBox(scaleDown)` 兜底，**禁止**再退化成单行
+   字符串拼接（会被 ellipsize 截断）。限速牌属于通栏，不在本指标条内。
+
+> 底图与标题行已从 `NaviCard.build` 拆成 `_NaviMap` / `_NaviTitleRow` 两个
+> **const + 自 `context.select`** 的子组件：里程平滑 5Hz 通知下，外层每帧重跑只花几何
+> 布局，地图（CustomPaint 的路径 / 包围盒 / 标记）只在切片或标记真的变化时才重建。
+> 改这两块时保持"const + 自己 select"，别退回成外层 inline。
 
 转向箭头的头部几何（`lib/widgets/navi_turn_arrow.dart`）：三角头由 `_headGeometry()`
 统一给出（`len = min(2.8×线宽, 末段 ×0.7)`、`half = len×0.44`，顶角 ≈47°），
@@ -463,7 +478,7 @@ static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
 
 **动作码映射必须用官方枚举，禁止几何猜测**（`lib/data/amap/models.dart` 的 `ActionCodes`
 与 `lib/widgets/navi_turn_arrow.dart` 的 `naviTurnTypeOf`）：唯一权威是
-`amap_test01/docs/amap-share-api-reference.md` §2.11「驾车动作列表」（14 项 0~13）。
+`docs/amap-share-api-reference.md` §2.11「驾车动作列表」（14 项 0~13）。
 
 | 码 | 含义 | 码 | 含义 |
 |---|---|---|---|
@@ -488,6 +503,12 @@ static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
 `naviShareStatusWatchOn`（默认 true）、`naviShareStatusWatchSec`（默认 15，钳制 5~60）、
 `naviStopOnShareEnd`（默认 true）。设置页入口在「第三方服务 → 导航 HUD」，
 并提供手动粘贴短链的永久兜底入口（偏离且重规划失败时整卡可点亦复用同一个弹窗）。
+数值项的边界在 **getter 与 setter 两处共用同一组常量**（`SettingsProvider` 的
+`naviRouteRefreshMinSec` / `naviMapAheadMinMeters` / `naviStatusWatchMinSec` 等），
+避免"读时钳、写时不钳"把越界值持久化。`NaviProvider.updateSettings` 由
+`main.dart` 的 `ChangeNotifierProxyProvider3` 在 **build 期**调用，因此**不得同步
+`notifyListeners()`**：它在视窗里程/路况色/时间制式变化时重算底图切片（否则静止时
+改设置底图不刷新），并经 `_notifySoon()` 用微任务补发一次通知（合并同帧多次调用）。
 
 > **必须跟随高德停止（分享状态心跳）**：本机 GPS 只知道"我在哪"，**永远不知道
 > 分享者（你自己）在高德里停止了导航** —— 旧版因此会把里程一直投影到那条**已冻结**
@@ -500,14 +521,32 @@ static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
 > | `/ws/share/lbs/info`（行中，**主判据**） | POST | `data.shareInfo.shareStatus` | `5` / `7`（已停止）、`6`（已结束） |
 > | `/ws/user/route/share/info`（行前，复核） | GET | `data.status` | `2` / `3`；顶层 `code = 10001`（已过期） |
 >
-> 三条不可退让的规则（改动 `_applyStatusVerdict` 必须过
-> `test/providers/navi_provider_test.dart` 的「分享状态心跳」组）：
+> 六条不可退让的规则（改动 `_applyStatusVerdict` / `_onStatusProbe` / `_startStatusWatch`
+> 必须过 `test/providers/navi_provider_test.dart` 的「分享状态心跳」组）：
 > 1. **连续 2 次同向确认才收尾**（`statusConfirmCount`）：状态文档实测过"同一 param
 >    落到不同后端节点快照不一致"（差 46 小时），单次判据不足以证明此刻真停了 ——
 >    而**误停导航不可恢复**（分享链接是快照，只能重贴）。
 > 2. **`unknown` 一律清零计数、什么都不做**：取值不认识 / 字段缺失 / `code = 2/3`
 >    （参数问题）都不等于"已结束"。**探测失败（网络异常）也不改状态**。
 > 3. `status == 4` 不是结束，是"该改用行中端点"。
+> 4. **首次判到停止后，用远短于心跳的间隔复核一次**（`shareEndConfirmDelaySec`，默认 3s，
+>    可注入 `confirmProbePeriod`）：第二次确认**不再等满一个心跳周期**，否则前台中途收尾
+>    要拖到 15~30s。`_probeInFlight` 是这条的**必要护栏** —— 复核定时器与周期心跳可能
+>    同时触发，两次并行返回会把"同一时间点的一次信息"误算成两次独立确认，正好绕过
+>    `statusConfirmCount`（所以 `_statusProbeCount++` 必须在互斥**之后**）。
+> 5. **`_onStatusProbe` 的 `await` 之后必须校验 `_param` 未变**：`stop()` 不中止 in-flight
+>    探测，而重贴短链会立刻拉起新会话 —— 旧 param 的迟到 verdict 会落在新会话上
+>    （`strikes=1` 外加一个复核定时器）。同理 `_scheduleConfirmProbe` 必须判 `_suspended`
+>    （后台不排复核），`_cancelConfirmProbe` 必须进 `_stopRuntime()` 与 `_suspend()`。
+> 6. **`updateSettings` 的心跳重建守卫不得以 `_statusTimer != null` 为条件**：关闭分支会
+>    把 `_statusTimer` 置 null，于是"骑行中途关掉再打开"永远重建不起心跳。改用 `wasOn`
+>    （更新前的 `_statusWatchOn`）判断，且"关→开"要像 `_resume()` 一样 `probeNow: true`
+>    立即补探一次。
+>
+> `_startStatusWatch(probeNow: true)` 只在**两处**用：`_resume()`（后台期间一次都不探，
+> 回前台必须立刻补一次，否则又要从 0 等一个完整周期 ← A 的唯一有效场景）与
+> `updateSettings()` 的"关→开"（同理，从盲到明）。**启动（`start()`）传 `false`**：
+> 行前自检刚探过，再探是浪费。
 >
 > **收尾一律静默，没有"导航已结束"卡片**（`_endSession()`）：分享失效 / 该分享已过期 /
 > 高德那边停止了导航，三者都全量清零回 `NaviState.off` ⇒ `hasSession == false`
@@ -539,12 +578,15 @@ static const Color primary20 = Color(0x330DA6F2); // 0.2 opacity
 
 ```bash
 dart run tool/verify_navi.dart   # 离线样本对拍：distance=27734 links=335 coords=526 segments=21 actions=21
-flutter test                     # 含 test/data/amap/、test/providers/navi_provider_test.dart、
+flutter test                     # 含 test/data/amap/、test/providers/navi_provider_test.dart
+                                 #   （「分享状态心跳」组覆盖 A/B/P0 五条护栏）、
+                                 #   test/widgets/navi_hud_widgets_test.dart、
                                  #   test/widgets/navi_turn_arrow_paint_test.dart 等
 ```
 
-实测基线（`amap_test01/amap-live/sample-restoration.json`，该目录未纳入版本库，
-缺失时相关用例自动 skip）：连续多动作 17594/17625/17676m，在 d=17560m、80km/h 下
+实测基线（`test/fixtures/amap/sample-restoration.json`，**随仓库分发**，
+`tool/verify_navi.dart` 与 `test/data/amap/` 的真实样本断言共用它；**不依赖**
+`amap_test01/`（那是被 .gitignore 忽略的 JS 参考实现/抓包工作区））：连续多动作 17594/17625/17676m，在 d=17560m、80km/h 下
 ETA 为 1.5 / 2.9 / 5.2 秒——三个动作同时落在 8 秒通栏窗口内。
 
 > **`locating` 必须有话可说**：权限被拒 / 系统定位未开 / 等不到定位 / 定位流出错，

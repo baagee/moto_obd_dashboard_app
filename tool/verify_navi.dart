@@ -6,11 +6,11 @@
 ///
 /// 用法：
 /// ```bash
-/// # 离线样本对拍（默认路径：amap_test01/amap-live/sample-restoration.json）
+/// # 离线样本对拍（默认路径：test/fixtures/amap/sample-restoration.json）
 /// dart run tool/verify_navi.dart
 ///
 /// # 指定样本
-/// dart run tool/verify_navi.dart amap_test01/amap-live/sample-restoration.json
+/// dart run tool/verify_navi.dart test/fixtures/amap/sample-restoration.json
 ///
 /// # 投影对拍（与 JS 版 window.__debug 同构，输出 {"dist":x,"off":y}）
 /// dart run tool/verify_navi.dart --project <lon> <lat>
@@ -28,7 +28,10 @@ import 'package:obd_dashboard/data/amap/route_analyzer.dart';
 // 基线（与 phase4-navi-hud-plan.md §5.2 保持一致）
 // ---------------------------------------------------------------------------
 
-const String _defaultSample = 'amap_test01/amap-live/sample-restoration.json';
+/// 默认样本随仓库分发（`test/fixtures/`），**不依赖** `amap_test01/`（那是
+/// 忽略进版本库的 JS 参考实现/抓包工作区）。真实响应含外层 envelope。
+const String _defaultSample =
+    'test/fixtures/amap/sample-restoration.json';
 
 /// 真实样本 27.7km 的路线指纹基线
 const int _baseDistance = 27734;

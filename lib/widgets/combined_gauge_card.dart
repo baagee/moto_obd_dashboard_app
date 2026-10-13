@@ -225,16 +225,24 @@ class CombinedGaugePainter extends CustomPainter {
           .addArc(rect, startAngle, segFill);
     }
 
-    // 每种颜色：先画发光层（1 次 blur），再画实体层
+    // 每种颜色：多层递减描边模拟辉光（替代 MaskFilter.blur，省掉离屏模糊通道），
+    // 再画实体层。颜色只有 3 种离散值，这组 drawPath 调用量级不随数据频率放大。
     pathsByColor.forEach((color, path) {
       canvas.drawPath(
         path,
         Paint()
-          ..color = color.withValues(alpha: 0.35)
+          ..color = color.withValues(alpha: 0.12)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 40
-          ..strokeCap = StrokeCap.butt
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+          ..strokeWidth = 44
+          ..strokeCap = StrokeCap.butt,
+      );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = color.withValues(alpha: 0.24)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 34
+          ..strokeCap = StrokeCap.butt,
       );
       canvas.drawPath(
         path,
@@ -285,7 +293,7 @@ class CombinedGaugePainter extends CustomPainter {
         ..strokeCap = StrokeCap.butt,
     );
 
-    // 发光层：仅末端 1/4 弧
+    // 发光层：仅末端 1/4 弧，用两层递减描边模拟辉光（替代 MaskFilter.blur）
     final glowSweep = sweepAngle * 0.25;
     canvas.drawArc(
       rect,
@@ -293,11 +301,21 @@ class CombinedGaugePainter extends CustomPainter {
       glowSweep,
       false,
       Paint()
-        ..color = endColor.withValues(alpha: 0.38)
+        ..color = endColor.withValues(alpha: 0.16)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 40
-        ..strokeCap = StrokeCap.butt
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+        ..strokeWidth = 44
+        ..strokeCap = StrokeCap.butt,
+    );
+    canvas.drawArc(
+      rect,
+      pi - sweepAngle,
+      glowSweep,
+      false,
+      Paint()
+        ..color = endColor.withValues(alpha: 0.30)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 34
+        ..strokeCap = StrokeCap.butt,
     );
   }
 
@@ -431,13 +449,21 @@ class CombinedGaugePainter extends CustomPainter {
   void _drawCenterHub(Canvas canvas, Offset center, double radius) {
     final hubR = radius * 0.065;
 
-    // 最外层散射光晕
+    // 最外层散射光晕：多层递减半透明圆替代 MaskFilter.blur
     canvas.drawCircle(
       center,
       hubR * 2.8,
-      Paint()
-        ..color = AppTheme.primary.withValues(alpha: 0.12)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+      Paint()..color = AppTheme.primary.withValues(alpha: 0.05),
+    );
+    canvas.drawCircle(
+      center,
+      hubR * 2.0,
+      Paint()..color = AppTheme.primary.withValues(alpha: 0.08),
+    );
+    canvas.drawCircle(
+      center,
+      hubR * 1.4,
+      Paint()..color = AppTheme.primary.withValues(alpha: 0.12),
     );
 
     // 金属质感径向渐变圆盘
@@ -474,18 +500,28 @@ class CombinedGaugePainter extends CustomPainter {
       final peakColor = zoneColor(peakRpm, warnRpm, dangerRpm);
       const markerArc = 0.03; // 约 5° 短弧段
 
-      // 发光层
+      // 发光层：两层递减描边替代 MaskFilter.blur
       canvas.drawArc(
         rect,
         peakAngle - markerArc / 2,
         markerArc,
         false,
         Paint()
-          ..color = peakColor.withValues(alpha: 0.5)
+          ..color = peakColor.withValues(alpha: 0.22)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 34
-          ..strokeCap = StrokeCap.butt
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+          ..strokeCap = StrokeCap.butt,
+      );
+      canvas.drawArc(
+        rect,
+        peakAngle - markerArc / 2,
+        markerArc,
+        false,
+        Paint()
+          ..color = peakColor.withValues(alpha: 0.4)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 18
+          ..strokeCap = StrokeCap.butt,
       );
       // 实体层：弧正上方覆盖
       canvas.drawArc(
@@ -507,18 +543,28 @@ class CombinedGaugePainter extends CustomPainter {
       final peakColor = zoneColor(peakSpeed, warnSpeed, dangerSpeed);
       const markerArc = 0.03;
 
-      // 发光层
+      // 发光层：两层递减描边替代 MaskFilter.blur
       canvas.drawArc(
         rect,
         peakAngle - markerArc / 2,
         markerArc,
         false,
         Paint()
-          ..color = peakColor.withValues(alpha: 0.5)
+          ..color = peakColor.withValues(alpha: 0.22)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 34
-          ..strokeCap = StrokeCap.butt
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+          ..strokeCap = StrokeCap.butt,
+      );
+      canvas.drawArc(
+        rect,
+        peakAngle - markerArc / 2,
+        markerArc,
+        false,
+        Paint()
+          ..color = peakColor.withValues(alpha: 0.4)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 18
+          ..strokeCap = StrokeCap.butt,
       );
       // 实体层
       canvas.drawArc(
@@ -782,14 +828,16 @@ class CombinedGaugePainter extends CustomPainter {
 
       canvas.drawPath(segPath, segPaint);
 
-      // 已填充分段添加发光效果
+      // 已填充分段添加发光效果：描边叠加模拟辉光（替代 MaskFilter.blur，
+      // 避免每个温度分段都触发一次离屏模糊）
       if (isFilled) {
-        final glowPaint = Paint()
-          ..color = segmentColor.withValues(alpha: 0.4)
-          ..style = PaintingStyle.fill
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-
-        canvas.drawPath(segPath, glowPaint);
+        canvas.drawPath(
+          segPath,
+          Paint()
+            ..color = segmentColor.withValues(alpha: 0.5)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
       }
     }
 

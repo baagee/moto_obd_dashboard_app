@@ -46,7 +46,7 @@ class _MainContainerState extends State<MainContainer> {
   ClipboardShareWatcher? _clipboardWatcher;
 
   final List<Widget> _pages = const [
-    DashboardScreen(),
+    TickerModeBoundPage(pageIndex: 0, child: DashboardScreen()),
     RecordScreen(),
     LogsScreen(),
     SettingsScreen(),
@@ -311,5 +311,32 @@ class _MainContainerState extends State<MainContainer> {
         ),
       ),
     );
+  }
+}
+
+/// 用 [TickerMode] 包裹仪表盘页：切到其他 Tab（骑行记录/日志/设置/设备）时，
+/// PageView 仍把它留在 keepAlive 的 element 树里（见各 Screen 的
+/// AutomaticKeepAliveClientMixin），但 TickerMode.enabled=false 会让子树内
+/// 所有 AnimationController（雷达扫描、导航呼吸、背景光点…）的 ticker 回调
+/// 整体挂起，离屏时零 FPS 开销；切回来自动恢复，不需要逐个组件改造。
+///
+/// 非私有：供 [main_container_test.dart] 单独测试，避免拖着
+/// MainContainer 的蓝牙/定位/剪贴板依赖搭测试环境。
+class TickerModeBoundPage extends StatelessWidget {
+  final int pageIndex;
+  final Widget child;
+
+  const TickerModeBoundPage({
+    super.key,
+    required this.pageIndex,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isVisible = context.select<NavigationProvider, bool>(
+      (nav) => nav.currentIndex == pageIndex,
+    );
+    return TickerMode(enabled: isVisible, child: child);
   }
 }

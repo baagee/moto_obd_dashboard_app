@@ -177,7 +177,11 @@ class RouteMarker {
   final int? value;
 }
 
-/// 导航指引
+/// 导航指引（当前所在的 link / 距下一个动作多远）。
+///
+/// **App 当前未接线**：[NaviProvider] 走的是 `linkAt` / `upcomingActions` /
+/// `remainingAt` 等更细的 API，[Guidance] 只被 `share_client.dart` 的离线便捷封装
+/// （`ShareSession`）使用；保留以维持与 JS 参考实现的对拍与将来复用。
 class Guidance {
   Guidance({
     required this.currentRoad,
@@ -686,9 +690,12 @@ class RouteAnalyzer {
       return math.atan2(dx, dy) * 180 / math.pi;
     }
 
-    final a = cs[i0], b = cs[k], c = cs[k], d = cs[j0];
-    if (identical(a, c) || identical(b, d)) return null;
-    final raw = bearing(c, d) - bearing(a, b);
+    // i0 / j0 与 k 重合时方向向量退化为零向量（atan2(0,0) 给出的 0 是假值）：
+    // 用**索引**判断，比原来的 identical(a, c) / identical(b, d) 更直白
+    // （后者等价于 i0==k / j0==k，其中 j0==k 在 k 已是视角窗口边缘时可达）。
+    if (i0 == k || j0 == k) return null;
+
+    final raw = bearing(cs[k], cs[j0]) - bearing(cs[i0], cs[k]);
     return (raw + 540) % 360 - 180;
   }
 }

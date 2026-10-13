@@ -43,9 +43,22 @@ class _TrackRadarCardState extends State<TrackRadarCard>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
-    )..repeat();
+    );
     // 用 addListener 每帧更新朝向，不调用 setState（AnimatedBuilder 已覆盖重建）
     _controller.addListener(_updateHeading);
+  }
+
+  /// 根据骑行状态启停扫描/脉冲动画：未骑行（STANDBY）时这个"正在扫描"的
+  /// 视觉暗示本身是错的，常驻 60fps 重绘纯属浪费（停车、未连接 OBD、
+  /// 刚开机还没出发都算在内）。与 build() 里已 select 的 isRiding 同步，
+  /// 不需要额外定时器。骑行结束后轨迹停在最后一帧，不再动画，也顺带
+  /// 省掉了"收车后仍按满 15 分钟窗口持续重绘旧轨迹"的开销。
+  void _syncAnimation(bool isRiding) {
+    if (isRiding && !_controller.isAnimating) {
+      _controller.repeat();
+    } else if (!isRiding && _controller.isAnimating) {
+      _controller.stop();
+    }
   }
 
   @override
@@ -105,6 +118,9 @@ class _TrackRadarCardState extends State<TrackRadarCard>
     final statsProvider = context.read<RidingStatsProvider>();
     final isRiding =
         context.select<RidingStatsProvider, bool>((p) => p.isRiding);
+    // 启停扫描动画：只调用 AnimationController 的 ticker 开关，不触发
+    // setState / 重建，在 build() 内调用是安全的
+    _syncAnimation(isRiding);
     // 速度着色阈值与仪表盘共用，用户在设置页调整后轨迹雷达同步生效
     final warnSpeed =
         context.select<SettingsProvider, int>((s) => s.warnSpeed);

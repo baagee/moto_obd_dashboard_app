@@ -288,6 +288,15 @@ class SettingsProvider extends ChangeNotifier {
 
   // ===== 导航 HUD（高德分享路线）=====
 
+  /// 导航设置各数值项的合法区间（getter / setter **共用同一份**边界，
+  /// 避免"读时钳、写时不钳"造成持久化了越界值、别处直接读到就越界）。
+  static const int naviRouteRefreshMinSec = 10;
+  static const int naviRouteRefreshMaxSec = 120;
+  static const int naviMapAheadMinMeters = 100;
+  static const int naviMapAheadMaxMeters = 2000;
+  static const int naviStatusWatchMinSec = 5;
+  static const int naviStatusWatchMaxSec = 60;
+
   /// 回到前台时是否自动读取剪贴板中的高德分享短链并开始导航
   bool get naviAutoSync => _getBool('settings_navi_autoSync', true);
   Future<void> setNaviAutoSync(bool v) =>
@@ -295,17 +304,18 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 导航路线刷新间隔（秒）。端点 A 单次响应约 228KB，30s 约 27MB/小时，
   /// 因此下限钳到 10s，避免误配成高频轮询把流量打爆。
-  int get naviRouteRefreshSec =>
-      _getInt('settings_navi_routeRefreshSec', 30).clamp(10, 120);
+  int get naviRouteRefreshSec => _getInt('settings_navi_routeRefreshSec', 30)
+      .clamp(naviRouteRefreshMinSec, naviRouteRefreshMaxSec);
   Future<void> setNaviRouteRefreshSec(int v) =>
-      _setInt('settings_navi_routeRefreshSec', v);
+      _setInt('settings_navi_routeRefreshSec',
+          v.clamp(naviRouteRefreshMinSec, naviRouteRefreshMaxSec));
 
   /// 导航卡底图的**前方视窗里程**（米）。底图只截取最近一段真实路线，
   /// 视窗越长越像"路线全貌"、越短越像"眼前这段路"。
-  int get naviMapAheadMeters =>
-      _getInt('settings_navi_mapAheadMeters', 300).clamp(100, 2000);
-  Future<void> setNaviMapAheadMeters(int v) =>
-      _setInt('settings_navi_mapAheadMeters', v);
+  int get naviMapAheadMeters => _getInt('settings_navi_mapAheadMeters', 300)
+      .clamp(naviMapAheadMinMeters, naviMapAheadMaxMeters);
+  Future<void> setNaviMapAheadMeters(int v) => _setInt(
+      'settings_navi_mapAheadMeters', v.clamp(naviMapAheadMinMeters, naviMapAheadMaxMeters));
 
   /// 是否给底图路线叠加路况着色（默认关：红/琥珀在本项目已被
   /// "危险 / 超速"语义占用，开着容易与告警混淆）
@@ -330,10 +340,11 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 分享状态心跳周期（秒）。行中端点响应仅 ~2.5KB（路线轮询是 228KB/30s），
   /// 所以下限可以比路线轮询更短；默认 15s（判到停止最多 2 个周期，即 ≤30s）。
-  int get naviShareStatusWatchSec =>
-      _getInt('settings_navi_shareStatusWatchSec', 15).clamp(5, 60);
+  int get naviShareStatusWatchSec => _getInt('settings_navi_shareStatusWatchSec', 15)
+      .clamp(naviStatusWatchMinSec, naviStatusWatchMaxSec);
   Future<void> setNaviShareStatusWatchSec(int v) =>
-      _setInt('settings_navi_shareStatusWatchSec', v);
+      _setInt('settings_navi_shareStatusWatchSec',
+          v.clamp(naviStatusWatchMinSec, naviStatusWatchMaxSec));
 
   /// 判到"高德那边已停止导航"时是否直接收尾。
   ///

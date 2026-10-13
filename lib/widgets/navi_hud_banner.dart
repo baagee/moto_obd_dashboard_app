@@ -13,8 +13,11 @@ import 'navi_turn_arrow.dart';
 /// 就保持展开，只更新内容 —— 连续转弯（实测 153m/31m/51m 三个动作）期间
 /// 不出现"展开→收回→展开"的抖动。
 ///
-/// 作为仪表盘 Column 的第一个子项**占位**展开（不是 Positioned 覆盖），
-/// 三栏由 Expanded 自动等比压缩；未展开时高度为零，非导航态完全零占位。
+/// **作为悬浮覆盖层**叠加在仪表盘顶部：`dashboard_screen.dart` 里挂在
+/// `Positioned(top:0, left:0, right:0)` 上，**不参与三栏 Column 的布局**，
+/// 因此不会把下方的仪表压缩变形（这是本轮的既有实现；早期文档曾写成"Column
+/// 占位 + 三栏压缩"，已按实现更正）。为在覆盖时不被底层仪表透出干扰读数，底色
+/// 近乎不透明；未展开时高度为零，非导航态完全零占位。
 class NaviHudBanner extends StatelessWidget {
   const NaviHudBanner({super.key});
 

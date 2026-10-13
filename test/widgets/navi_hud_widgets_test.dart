@@ -339,6 +339,43 @@ void main() {
       }
     });
 
+    naviTestWidgets('W2 自动复核也能收尾：探测一次后由复核定时器收尾，无残留', (tester) async {
+      final local = NaviProvider(
+        obdDataProvider: obd,
+        logProvider: LogProvider(),
+        client: client,
+        positionStreamFactory: () => positions.stream,
+        locationGate: () async => LocationPermissionStatus.granted,
+        firstFixProvider: () async => null,
+        smoothTickPeriod: const Duration(hours: 1),
+        // 复核间隔注入 20ms（FakeAsync 下由 tester.pump 精确推进，不会等真实 3s）
+        confirmProbePeriod: const Duration(milliseconds: 20),
+      );
+      try {
+        await startAndMount(tester, const NaviCard(),
+            size: const Size(212, 244), provider: local);
+        await feed(tester, 300, provider: local);
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(local.state, NaviState.navigating);
+
+        client.naviShareStatus = 5; // 导航中途高德那边停了
+
+        // 只探一次：第二次交给 20ms 复核定时器，不手动探测
+        await local.debugStatusProbeNow();
+        expect(local.debugConfirmProbePending, isTrue);
+
+        await tester.pump(const Duration(milliseconds: 20));
+        await tester.pump();
+        expect(local.debugConfirmProbePending, isFalse, reason: '复核应已跑完并撤销');
+        expect(local.state, NaviState.off);
+        expect(local.hasSession, isFalse, reason: '第三列回默认面板');
+        // 无 pending timer：naviTestWidgets 的 finally + 框架不变式会替我们再确认一次
+      } finally {
+        await local.stop();
+        local.dispose();
+      }
+    });
+
     naviTestWidgets('行前自检：粘贴时分享已结束 → 卡片根本不被拉起', (tester) async {
       client.naviShareStatus = 5; // 刚粘贴时高德那边就已经停了
       final local = NaviProvider(
