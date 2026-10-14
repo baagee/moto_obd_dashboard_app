@@ -122,10 +122,18 @@ class _ProgressBar extends StatelessWidget {
                 child: Container(
                   height: 14,
                   decoration: BoxDecoration(
-                    color: color,
-                    boxShadow: [
-                      BoxShadow(color: color, blurRadius: 8, spreadRadius: -2),
-                    ],
+                    // 高亮不用模糊：顶部亮色竖向渐变替代原 BoxShadow 发光。
+                    // BoxShadow.toPaint() 内部会构造 MaskFilter.blur，等于每次
+                    // 重建都触发一次离屏模糊；而这条进度条每个 OBD 数据 tick
+                    // 都会重建（throttle/load 各自 select）。
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color.lerp(color, Colors.white, 0.45)!,
+                        color,
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -233,9 +241,6 @@ class PressureChartPainter extends CustomPainter {
 
     final barPaint = Paint()..shader = sharedShader;
     final lastBarPaint = Paint()..color = AppTheme.primary;
-    final glowPaint = Paint()
-      ..color = const Color(0x72006EAF) // AppTheme.primary.withOpacity(0.45) 预算
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
 
     for (int i = 0; i < count; i++) {
       final left = i * (barW + _gap);
@@ -244,10 +249,13 @@ class PressureChartPainter extends CustomPainter {
       final top = height - barH;
       final rect = Rect.fromLTWH(left, top, barW, barH);
 
-      // 最新一根柱子（最右侧）高亮发光
+      // 最新一根柱子（最右侧）高亮：纯色亮柱 + 顶部亮边，不做模糊发光
       if (i == count - 1) {
-        canvas.drawRect(rect, glowPaint);
         canvas.drawRect(rect, lastBarPaint);
+        canvas.drawRect(
+          Rect.fromLTWH(rect.left, rect.top, rect.width, 1.5),
+          Paint()..color = Colors.white.withValues(alpha: 0.7),
+        );
       } else {
         canvas.drawRect(rect, barPaint);
       }

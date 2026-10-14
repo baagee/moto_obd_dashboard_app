@@ -114,7 +114,6 @@
 | **flutter_map** | 8.2.2 | 地图显示 (OpenStreetMap) |
 | **sensors_plus** | 4.0.0 | 手机传感器 (陀螺仪) |
 | **audioplayers** | 6.0.0 | 语音播报 |
-| **google_fonts** | 6.1.0 | Space Grotesk 字体 |
 
 ### 项目架构
 

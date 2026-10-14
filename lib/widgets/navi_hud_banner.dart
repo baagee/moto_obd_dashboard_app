@@ -214,10 +214,10 @@ class _BreathingBannerState extends State<_BreathingBanner>
 
               // 动作名 + 路线：横屏空间充足，合并一行；动作名加大到 20px
               Expanded(
-                child: RichText(
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  text: TextSpan(
+                // 必须用 Text.rich：只有它会继承 DefaultTextStyle（主题 fontFamily）；
+                // RichText 不继承，动作名/路名会掉到系统默认字体。
+                child: Text.rich(
+                  TextSpan(
                     children: [
                       TextSpan(
                         text: widget.actionLabel,
@@ -243,6 +243,8 @@ class _BreathingBannerState extends State<_BreathingBanner>
                       ],
                     ],
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
 

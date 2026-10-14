@@ -797,11 +797,9 @@ class _RouteMapPainter extends CustomPainter {
             canvas,
             '${m.value ?? ''}',
             o,
-            const TextStyle(
-              color: Colors.black,
-              fontSize: 6.5,
-              fontWeight: FontWeight.bold,
-            ),
+            // 走等宽数据字体：painter 里没有 BuildContext，不显式指定会
+            // 掉到系统默认字体，和地图其它数字不一致
+            AppFonts.monoStyle(fontSize: 6.5, color: Colors.black),
             center: true,
           );
       }

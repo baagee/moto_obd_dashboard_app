@@ -50,8 +50,11 @@ class TopNavigationBar extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  RichText(
-                    text: const TextSpan(
+                  // 必须用 Text.rich：只有它会继承 DefaultTextStyle（主题 fontFamily）；
+                  // RichText 不继承，会掉到系统默认字体。紧挨着下一行的
+                  // 'SYSTEM PROTOCOL ACTIVE' 是 Text，两行字体原本就不一致。
+                  Text.rich(
+                    const TextSpan(
                       children: [
                         TextSpan(
                           text: 'CYBER-CYCLE ',

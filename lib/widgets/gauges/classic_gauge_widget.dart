@@ -715,6 +715,8 @@ class _ClassicGaugeDynamicPainter extends CustomPainter {
       color: AppTheme.textSecondary,
       fontSize: unitFontSize,
       fontWeight: FontWeight.w500,
+      // 单位同属"数据"，走等宽字体；不传会掉到系统默认字体
+      fontFamily: AppFonts.mono,
     );
   }
 

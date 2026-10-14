@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'providers/obd_data_provider.dart';
 import 'providers/bluetooth_provider.dart';
@@ -14,6 +13,7 @@ import 'utils/gear_util.dart';
 import 'services/audio_service.dart';
 import 'services/brightness_service.dart';
 import 'screens/main_container.dart';
+import 'theme/app_fonts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -171,7 +171,11 @@ class OBDDashboardApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
+        // 直接指向 pubspec 里打包的字体族，而不是 GoogleFonts.spaceGrotesk()
+        // 返回的 'SpaceGrotesk_regular'：后者靠 google_fonts 运行时加载
+        // （车机离线会失败），且只会注册到 400 一档字重。用打包族名可以拿到
+        // pubspec 声明的 400/500/700 三档真实字重。
+        fontFamily: AppFonts.ui,
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF0DA6F2),
           surface: Color(0xFF162229),

@@ -1,23 +1,22 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:obd_dashboard/widgets/combined_gauge_card.dart';
 
-/// 组合仪表盘 Painter 的 blur 降级回归测试（性能优化）。
+/// 组合仪表盘 Painter 的"无模糊"回归测试（性能优化）。
 ///
 /// 背景：`CombinedGaugePainter` / `GaugeStaticPainter` 原来用
 /// `MaskFilter.blur` 画发光层——每次模糊都要触发一次离屏渲染通道，是
 /// 光栅线程开销最大的一块；在 OBD 26 次/秒的高频数据下，这个发光层每次
-/// 数值变化都要重新模糊。改动后用多层递减透明度描边模拟辉光，不再触发
-/// 任何 `MaskFilter`。
+/// 数值变化都要重新模糊。改动后辉光层被**整体删除**（中途那版多层递减
+/// 描边观感偏脏，已弃用），文件内不再有任何 `MaskFilter` 调用。
 ///
 /// 这里不走 widget 树（CustomPainter 不是 Widget），直接构造真实
 /// `ui.Canvas`（`PictureRecorder` 支持的那种）调用 `paint()`：
 /// 1. 冒烟：各种数值/峰值/危险区组合下 `paint()` 不抛异常；
-/// 2. 静态回归：覆盖 RPM/速度满量程、峰值标记、温度条等所有触发过
-///    blur 的分支后，`toImage()` 能正常生成（间接证明没有残留的
-///    `MaskFilter` 导致渐变/离屏渲染异常——更直接的保证见下方源码断言）。
+/// 2. 源码断言：`combined_gauge_card.dart` 内不得再出现 `MaskFilter`。
 void main() {
   test('CombinedGaugePainter.paint 在危险区+峰值+满量程下不抛异常', () {
     final recorder = ui.PictureRecorder();
@@ -64,6 +63,22 @@ void main() {
     expect(
       () => painter.paint(canvas, const Size(300, 300)),
       returnsNormally,
+    );
+  });
+
+  test('combined_gauge_card.dart 源码内不再出现 MaskFilter 调用', () {
+    final source =
+        File('lib/widgets/combined_gauge_card.dart').readAsStringSync();
+
+    // 注释里仍会提到 MaskFilter（用来说明改动缘由），只断言真实 API 调用不存在
+    final codeLines = source
+        .split('\n')
+        .where((line) => !line.trimLeft().startsWith('//'));
+
+    expect(
+      codeLines.any((line) => line.contains('MaskFilter')),
+      isFalse,
+      reason: '辉光层应已整体删除，不得残留 MaskFilter（离屏模糊通道）',
     );
   });
 }
