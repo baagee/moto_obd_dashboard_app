@@ -68,7 +68,7 @@ class _BannerBody extends StatelessWidget {
             final turn = naviTurnTypeOfAction(action);
             final ahead = navi.distanceToNextAction;
             final imminent = ahead != null && ahead < 50;
-            final accent = imminent ? AppTheme.gaugeWarn : AppTheme.textPrimary;
+            final accent = imminent ? AppTheme.gaugeWarn : AppTheme.dashboardValue;
 
             // 内容切换 300ms 淡入淡出（方案 §2.4 ③）。
             // key 只取"当前动作的身份"，不含距离 —— 距离是实时倒计时，
@@ -222,7 +222,7 @@ class _BreathingBannerState extends State<_BreathingBanner>
                       TextSpan(
                         text: widget.actionLabel,
                         style: const TextStyle(
-                          color: AppTheme.textPrimary,
+                          color: AppTheme.dashboardValue,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),

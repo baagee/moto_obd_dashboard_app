@@ -513,7 +513,7 @@ class BluetoothProvider extends ChangeNotifier {
       // 启动 OBD 轮询
       _obdService?.startPolling();
       // 更新为已连接状态
-      _updateDeviceConnectedStatus(device, deviceIndex);
+      await _updateDeviceConnectedStatus(device, deviceIndex);
     } catch (e) {
       _logCallback('Bluetooth', LogType.error, '启动 OBD 会话失败: $e');
       _handleConnectionError(device, deviceIndex, e);
@@ -567,18 +567,24 @@ class BluetoothProvider extends ChangeNotifier {
     BluetoothDeviceModel device,
     int index,
   ) async {
-    if (index != -1) {
+    if (index == -1) {
+      _connectedDevice = device.copyWith(
+        status: DeviceConnectionStatus.connected,
+        connectionStability: 100.0,
+      );
+      _lastConnectedDevice = _connectedDevice;
+    } else {
       _scannedDevices[index] = _scannedDevices[index].copyWith(
         status: DeviceConnectionStatus.connected,
         connectionStability: 100.0,
       );
       _connectedDevice = _scannedDevices[index];
       _lastConnectedDevice = _scannedDevices[index];
-
-      // 保存设备信息
-      await DeviceStorageService.saveLastDevice(_connectedDevice!);
     }
 
+    // 扫描列表可能因刷新而暂时没有此设备；以真实会话结果为准。
+    await DeviceStorageService.saveLastDevice(_connectedDevice!);
+    _obdDataProvider.setDeviceConnected(true);
     _logCallback('Bluetooth', LogType.success, '已连接到 ${device.name}');
     notifyListeners();
 

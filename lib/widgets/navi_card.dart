@@ -40,7 +40,7 @@ class NaviCard extends StatelessWidget {
   static const Key mapKey = Key('navi-map');
 
   /// 标题行高度
-  static const double _titleHeight = 14;
+  static const double _titleHeight = 18;
 
   /// 下一个动作条设计高度
   static const double _actionStripHeight = 60;
@@ -139,7 +139,7 @@ class NaviCard extends StatelessWidget {
         // ④ 指标条（高度略收，把空间让给底图）
         SizedBox(
           height: (_metricsHeight * factor).clamp(30.0, _metricsHeight),
-          child: _buildMetricsBar(navi, factor),
+          child: _buildMetricsBar(navi),
         ),
       ],
     );
@@ -154,9 +154,8 @@ class NaviCard extends StatelessWidget {
     required bool locating,
   }) {
     final action = navi.displayAction;
-    final turn = action == null
-        ? NaviTurnType.unknown
-        : naviTurnTypeOfAction(action);
+    final turn =
+        action == null ? NaviTurnType.unknown : naviTurnTypeOfAction(action);
     final ahead = navi.distanceToNextAction;
     final actionLabel = action == null
         ? '继续前行'
@@ -164,8 +163,9 @@ class NaviCard extends StatelessWidget {
     final roadLabel = _roadLabel(navi);
 
     // < 50m 转琥珀（方案 §2.8）
-    final distanceColor =
-        (ahead != null && ahead < 50) ? AppTheme.gaugeWarn : AppTheme.textPrimary;
+    final distanceColor = (ahead != null && ahead < 50)
+        ? AppTheme.gaugeWarn
+        : AppTheme.dashboardValue;
     final distanceText = locating || ahead == null
         ? '--'
         : (ahead < 10 ? '现在' : '${ahead.round()}');
@@ -206,7 +206,7 @@ class NaviCard extends StatelessWidget {
                     child: Text(
                       actionLabel,
                       style: const TextStyle(
-                        color: AppTheme.textPrimary,
+                        color: AppTheme.dashboardValue,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
@@ -244,7 +244,7 @@ class NaviCard extends StatelessWidget {
   /// ④ 指标条：四列**等分（flex）独立渲染** + `FittedBox(scaleDown)` 兜底，
   /// 任何情况都不会被 ellipsis 吃掉（"列宽"是比例而非像素——比硬编码固定宽度
   /// 更抗窄卡片溢出，且同样满足"不拼接成单行字符串"这条不变量）。
-  Widget _buildMetricsBar(NaviProvider navi, double factor) {
+  Widget _buildMetricsBar(NaviProvider navi) {
     final remaining = navi.remaining;
     final km = remaining == null
         ? '--'
@@ -255,16 +255,15 @@ class NaviCard extends StatelessWidget {
 
     return Row(
       children: [
-        _metricCell('剩余里程', km, AppTheme.textPrimary, factor, 11),
-        _metricCell('剩余时间', _etaText(navi), AppTheme.textPrimary, factor, 11),
+        _metricCell('剩余里程', km, AppTheme.dashboardValue, 11),
+        _metricCell('剩余时间', _etaText(navi), AppTheme.dashboardValue, 11),
         _metricCell(
           '红绿灯',
           remaining == null ? '--' : '${remaining.lights}',
-          AppTheme.textPrimary,
-          factor,
+          AppTheme.dashboardValue,
           8,
         ),
-        _metricCell('总里程', totalKm, AppTheme.textPrimary, factor, 11),
+        _metricCell('总里程', totalKm, AppTheme.dashboardValue, 11),
       ],
     );
   }
@@ -274,7 +273,8 @@ class NaviCard extends StatelessWidget {
     final remaining = navi.remaining;
     if (remaining == null) return '--';
     if (navi.etaAsClock) {
-      final at = DateTime.now().add(Duration(seconds: remaining.seconds.round()));
+      final at =
+          DateTime.now().add(Duration(seconds: remaining.seconds.round()));
       final h = at.hour.toString().padLeft(2, '0');
       final m = at.minute.toString().padLeft(2, '0');
       return '$h:$m';
@@ -288,10 +288,8 @@ class NaviCard extends StatelessWidget {
     String label,
     String value,
     Color color,
-    double factor,
-    int flex, {
-    bool glow = false,
-  }) {
+    int flex,
+  ) {
     return Expanded(
       flex: flex,
       child: Column(
@@ -301,11 +299,7 @@ class NaviCard extends StatelessWidget {
             fit: BoxFit.scaleDown,
             child: Text(
               label,
-              style: AppTheme.labelTiny.copyWith(
-                letterSpacing: 0.5,
-                // 9px 弱灰在深色卡上对比度不足，提亮到次级灰
-                color: AppTheme.textSecondary,
-              ),
+              style: AppTheme.dashboardMetricLabelCompact,
               maxLines: 1,
             ),
           ),
@@ -315,14 +309,8 @@ class NaviCard extends StatelessWidget {
             child: Text(
               value,
               style: AppFonts.monoStyle(
-                fontSize: 14 * factor,
+                fontSize: 14,
                 color: color,
-              ).copyWith(
-                shadows: glow
-                    ? [
-                        Shadow(color: color.withValues(alpha: 0.6), blurRadius: 8),
-                      ]
-                    : null,
               ),
               maxLines: 1,
             ),
@@ -335,7 +323,6 @@ class NaviCard extends StatelessWidget {
   // ==========================================================================
   // 小组件
   // ==========================================================================
-
 }
 
 // ===========================================================================
@@ -354,17 +341,27 @@ class _NaviTitleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // offsetMeters 取整后再进 select：偏离态下它每秒都在抖，取整避免无意义重建
-    final (state, offM, replanFailed, gpsIssue, currentRoad, extrapolating,
-        stopped) = context.select<NaviProvider,
-        (NaviState, int?, bool, NaviGpsIssue, String?, bool, bool)>((p) => (
-              p.state,
-              p.offsetMeters?.round(),
-              p.replanFailed,
-              p.gpsIssue,
-              p.currentRoad,
-              p.extrapolating,
-              p.shareStoppedHint,
-            ));
+    final (
+      state,
+      offM,
+      replanFailed,
+      gpsIssue,
+      currentRoad,
+      extrapolating,
+      stopped
+    ) =
+        context
+            .select<NaviProvider,
+                    (NaviState, int?, bool, NaviGpsIssue, String?, bool, bool)>(
+                (p) => (
+                      p.state,
+                      p.offsetMeters?.round(),
+                      p.replanFailed,
+                      p.gpsIssue,
+                      p.currentRoad,
+                      p.extrapolating,
+                      p.shareStoppedHint,
+                    ));
 
     final String title;
     final Color dotColor;
@@ -372,13 +369,12 @@ class _NaviTitleRow extends StatelessWidget {
       case NaviState.deviated:
         final offText = offM == null ? '' : ' ${offM}m';
         // 分享链接是快照：拿不到新路线时必须说实话，并给出唯一可行的出口
-        title = replanFailed
-            ? '已偏离$offText · 点此重新粘贴短链'
-            : '已偏离路线 · 重新规划中…';
+        title = replanFailed ? '已偏离$offText · 点此重新粘贴短链' : '已偏离路线 · 重新规划中…';
         dotColor = AppTheme.gaugeWarn;
       case NaviState.locating:
         title = switch (gpsIssue) {
-          NaviGpsIssue.denied || NaviGpsIssue.deniedForever =>
+          NaviGpsIssue.denied ||
+          NaviGpsIssue.deniedForever =>
             '导航中 · 没有定位权限（点此去设置）',
           NaviGpsIssue.serviceDisabled => '导航中 · 系统定位未开启（点此去设置）',
           NaviGpsIssue.streamError => '导航中 · 定位异常，检查权限与信号',
@@ -401,10 +397,7 @@ class _NaviTitleRow extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: AppTheme.labelMedium.copyWith(
-              fontSize: 11,
-              color: AppTheme.textSecondary,
-            ),
+            style: AppTheme.dashboardNaviTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -439,7 +432,7 @@ class _NaviTitleRow extends StatelessWidget {
             NaviState.stale => 'WEAK',
             _ => 'LIVE',
           },
-          style: AppTheme.labelTiny.copyWith(color: dotColor),
+          style: AppTheme.dashboardStatus.copyWith(color: dotColor),
         ),
         GestureDetector(
           onTap: () => context.read<NaviProvider>().stop(),
@@ -461,14 +454,14 @@ class _NaviMap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (slice, markers, hasFix, deviated, trafficColor) = context.select<
-        NaviProvider,
-        (RouteSlice, List<RouteMarker>, bool, bool, bool)>((p) => (
-          p.routeSlice,
-          p.routeMarkers,
-          p.projection != null,
-          p.state == NaviState.deviated,
-          p.routeTrafficColor,
-        ));
+            NaviProvider, (RouteSlice, List<RouteMarker>, bool, bool, bool)>(
+        (p) => (
+              p.routeSlice,
+              p.routeMarkers,
+              p.projection != null,
+              p.state == NaviState.deviated,
+              p.routeTrafficColor,
+            ));
 
     return RepaintBoundary(
       child: CustomPaint(
@@ -598,8 +591,7 @@ class _RouteMapPainter extends CustomPainter {
     if (slice.isEmpty || size.isEmpty) return;
 
     final anchorPoint = slice.points[slice.vehicleIndex];
-    final metersPerLon =
-        111320.0 * math.cos(anchorPoint.lat * math.pi / 180);
+    final metersPerLon = 111320.0 * math.cos(anchorPoint.lat * math.pi / 180);
     const metersPerLat = 110540.0;
     final b = slice.bearing;
     final cb = math.cos(b);
@@ -738,9 +730,8 @@ class _RouteMapPainter extends CustomPainter {
     // 可选路况叠加：只在缓行/拥堵段加细彩带，主线的导航语义色保持不变
     if (!trafficColor) return;
     for (var i = vi; i < screen.length - 1; i++) {
-      final state = i + 1 < slice.trafficStates.length
-          ? slice.trafficStates[i + 1]
-          : 0;
+      final state =
+          i + 1 < slice.trafficStates.length ? slice.trafficStates[i + 1] : 0;
       final color = switch (state) {
         2 => AppTheme.gaugeWarn,
         3 || 4 => AppTheme.gaugeDanger,
@@ -766,7 +757,9 @@ class _RouteMapPainter extends CustomPainter {
   ) {
     for (final m in markers) {
       final o = toScreen(m.coord);
-      if (o.dx < -12 || o.dx > size.width + 12 || o.dy < -12 ||
+      if (o.dx < -12 ||
+          o.dx > size.width + 12 ||
+          o.dy < -12 ||
           o.dy > size.height + 12) {
         continue;
       }
@@ -875,7 +868,8 @@ class _RouteMapPainter extends CustomPainter {
       ..color = AppTheme.textMuted;
     canvas.drawLine(Offset(x0, y), Offset(x0 + length, y), paint);
     canvas.drawLine(Offset(x0, y - 3), Offset(x0, y + 3), paint);
-    canvas.drawLine(Offset(x0 + length, y - 3), Offset(x0 + length, y + 3), paint);
+    canvas.drawLine(
+        Offset(x0 + length, y - 3), Offset(x0 + length, y + 3), paint);
 
     _drawText(
       canvas,
@@ -982,7 +976,8 @@ Future<void> showNaviPasteDialog(BuildContext context) async {
           child: TextField(
             controller: controller,
             autofocus: true,
-            style: AppFonts.monoStyle(fontSize: 12, color: AppTheme.textPrimary),
+            style:
+                AppFonts.monoStyle(fontSize: 12, color: AppTheme.textPrimary),
             decoration: const InputDecoration(
               isDense: true,
               border: InputBorder.none,
@@ -1022,9 +1017,7 @@ Future<void> showNaviPasteDialog(BuildContext context) async {
   final endedShare = !ok && navi.lastStartEndedShare;
   CyberToast.show(
     context,
-    ok
-        ? '导航已同步，指引已上线'
-        : (navi.errorMessage ?? '解析失败：未知错误'),
+    ok ? '导航已同步，指引已上线' : (navi.errorMessage ?? '解析失败：未知错误'),
     type: ok
         ? CyberToastType.success
         : (endedShare ? CyberToastType.warning : CyberToastType.error),

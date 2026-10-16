@@ -26,8 +26,6 @@ void main() {
       rpm: 9500, // 超过 dangerRpm，触发红色区 + 峰值标记分支
       speed: 200, // 超过 dangerSpeed
       gear: 4,
-      coolantTemp: 110, // 触发温度条高亮分段
-      intakeTemp: 70,
       peakRpm: 9800,
       peakSpeed: 210,
       maxRpm: 12000,
@@ -71,9 +69,8 @@ void main() {
         File('lib/widgets/combined_gauge_card.dart').readAsStringSync();
 
     // 注释里仍会提到 MaskFilter（用来说明改动缘由），只断言真实 API 调用不存在
-    final codeLines = source
-        .split('\n')
-        .where((line) => !line.trimLeft().startsWith('//'));
+    final codeLines =
+        source.split('\n').where((line) => !line.trimLeft().startsWith('//'));
 
     expect(
       codeLines.any((line) => line.contains('MaskFilter')),

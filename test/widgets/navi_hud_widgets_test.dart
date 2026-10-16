@@ -10,6 +10,7 @@ import 'package:obd_dashboard/providers/navi_provider.dart';
 import 'package:obd_dashboard/providers/obd_data_provider.dart';
 import 'package:obd_dashboard/services/geocoding_service.dart';
 import 'package:obd_dashboard/services/location_service.dart';
+import 'package:obd_dashboard/theme/app_theme.dart';
 import 'package:obd_dashboard/widgets/navi_card.dart';
 import 'package:obd_dashboard/widgets/navi_hud_banner.dart';
 import 'package:obd_dashboard/widgets/navi_turn_arrow.dart';
@@ -208,8 +209,7 @@ void main() {
       expect(find.text('米'), findsOneWidget);
       expect(find.text('直行'), findsOneWidget);
       final arrow = tester.widget<NaviTurnArrow>(find.byType(NaviTurnArrow));
-      expect(arrow.size, lessThan(48),
-          reason: '转向箭头从旧的 88px 居中主体降为动作条内的小尺寸元素');
+      expect(arrow.size, lessThan(48), reason: '转向箭头从旧的 88px 居中主体降为动作条内的小尺寸元素');
       expect(arrow.size, greaterThan(30));
       final mapRect = tester.getRect(find.byKey(NaviCard.mapKey));
       final arrowRect = tester.getRect(find.byType(NaviTurnArrow));
@@ -231,6 +231,11 @@ void main() {
       expect(find.text('剩余时间'), findsOneWidget);
       expect(find.text('红绿灯'), findsOneWidget);
       expect(find.text('总里程'), findsOneWidget);
+      final metricLabel = tester.widget<Text>(find.text('剩余里程'));
+      final metricValue = tester.widget<Text>(find.text('1.5 km'));
+      expect(metricLabel.style!.fontSize, 11);
+      expect(metricValue.style!.fontSize, 14);
+      expect(metricLabel.style!.color, AppTheme.dashboardLabel);
       // 值：剩余里程 1.5 km（2000-500）
       expect(find.text('1.5 km'), findsOneWidget);
       // 总里程 = 路线全长 2.0 km（样本 totalDistance=2000）
@@ -260,7 +265,12 @@ void main() {
       // 压缩后指标条仍然完整可读
       expect(find.text('剩余里程'), findsOneWidget);
       expect(find.text('总里程'), findsOneWidget);
-      expect(tester.takeException(), isNull, reason: '244 → 196 压缩后不得 overflow');
+      final metricLabel = tester.widget<Text>(find.text('剩余里程'));
+      final metricValue = tester.widget<Text>(find.text('1.5 km'));
+      expect(metricLabel.style!.fontSize, 11);
+      expect(metricValue.style!.fontSize, 14);
+      expect(tester.takeException(), isNull,
+          reason: '244 → 196 压缩后不得 overflow');
     });
 
     naviTestWidgets('E0 缺少定位权限：标题说实话，整卡可点去系统设置', (tester) async {
@@ -458,7 +468,8 @@ void main() {
       );
       expect(gd, findsWidgets);
       expect(tester.widgetList<GestureDetector>(gd).any((g) => g.onTap != null),
-          isTrue, reason: '偏离且无法重新规划时整卡应可点');
+          isTrue,
+          reason: '偏离且无法重新规划时整卡应可点');
       expect(tester.takeException(), isNull);
     });
 

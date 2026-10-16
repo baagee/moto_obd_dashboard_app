@@ -148,6 +148,47 @@ class AppTheme {
     color: textPrimary,
   );
 
+  /// 仪表盘常规读数：偏青但不刺眼，区别于全应用通用纯白文本。
+  static const Color dashboardValue = Color(0xFF86C9D6);
+
+  /// 仪表盘次级数据标签：低饱和蓝青，仍保证暗底可读。
+  static const Color dashboardLabel = Color(0xFF8DBEC8);
+
+  /// 主卡片标题：字号高于内部标签，使用框架蓝而非纯白。
+  static const TextStyle dashboardCardTitle = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
+    color: primary,
+  );
+
+  /// 常规仪表指标标签。
+  static const TextStyle dashboardMetricLabel = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    color: dashboardLabel,
+  );
+
+  /// 低高度／窄列的仪表指标标签。
+  static const TextStyle dashboardMetricLabelCompact = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    color: dashboardLabel,
+  );
+
+  /// 次级状态或图表附注，避免使用宽字距的 9px tiny 样式。
+  static const TextStyle dashboardStatus = TextStyle(
+    fontSize: 10,
+    fontWeight: FontWeight.w600,
+    color: textSecondary,
+  );
+
+  /// 紧凑导航卡标题，保留右侧 LIVE／关闭标识的空间。
+  static const TextStyle dashboardNaviTitle = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    color: primary,
+  );
+
   // ========== 边框样式 ==========
   static BoxDecoration surfaceBorder({
     Color borderColor = primary,

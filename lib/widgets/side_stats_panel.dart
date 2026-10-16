@@ -1,198 +1,248 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/obd_data_provider.dart';
+import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 
-/// 侧边统计面板（车辆状态综合面板）
+/// 左侧车辆状态：三块纵向仪表，与右上车辆健康卡共用暗底与实色边线语言。
 class SideStatsPanel extends StatelessWidget {
   const SideStatsPanel({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final throttle =
-        context.select<OBDDataProvider, int>((p) => p.data.throttle);
-    final load = context.select<OBDDataProvider, int>((p) => p.data.load);
-    final pressure =
-        context.select<OBDDataProvider, int>((p) => p.data.pressure);
-    final voltage =
-        context.select<OBDDataProvider, double>((p) => p.data.voltage);
-
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: AppTheme.surfaceBorder(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 标题（静态，不依赖数据）
-          const Text('车辆状态', style: AppTheme.labelMediumPrimary),
-
-          const SizedBox(height: 2),
-
-          // 内容区域
-          Expanded(
-            child: Column(
-              children: [
-                _ProgressBar(
-                  icon: Icons.speed,
-                  iconColor: AppTheme.gaugeNormal,
-                  label: '油门开度',
-                  value: throttle,
-                  color: AppTheme.gaugeNormal,
-                ),
-
-                const SizedBox(height: 12),
-
-                _ProgressBar(
-                  icon: Icons.settings,
-                  iconColor: AppTheme.gaugeWarn,
-                  label: '发动机负载',
-                  value: load,
-                  color: AppTheme.gaugeWarn,
-                ),
-
-                const SizedBox(height: 12),
-
-                Consumer<OBDDataProvider>(
-                  builder: (context, provider, _) => _PressureChart(
-                    pressure: pressure,
-                    pressureHistory: provider.pressureHistory,
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                _VoltageDisplay(voltage: voltage),
-              ],
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxHeight < 300;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(
+                height: 18,
+                child: Text('车辆状态', style: AppTheme.dashboardCardTitle),
+              ),
+              const SizedBox(height: 6),
+              Expanded(flex: 2, child: _ThrottleMetric(compact: compact)),
+              const SizedBox(height: 6),
+              Expanded(flex: 2, child: _EngineLoadMetric(compact: compact)),
+              const SizedBox(height: 6),
+              Expanded(flex: 3, child: _PressureMetric(compact: compact)),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-/// 进度条
-class _ProgressBar extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
+class _ThrottleMetric extends StatelessWidget {
+  final bool compact;
+  const _ThrottleMetric({required this.compact});
+
+  @override
+  Widget build(BuildContext context) {
+    final value = context.select<OBDDataProvider, int>((p) => p.data.throttle);
+    return _PercentMetric(
+      label: '油门开度',
+      value: value,
+      color: AppTheme.gaugeNormal,
+      compact: compact,
+    );
+  }
+}
+
+class _EngineLoadMetric extends StatelessWidget {
+  final bool compact;
+  const _EngineLoadMetric({required this.compact});
+
+  @override
+  Widget build(BuildContext context) {
+    final value = context.select<OBDDataProvider, int>((p) => p.data.load);
+    return _PercentMetric(
+      label: '发动机负载',
+      value: value,
+      color: value >= 70 ? AppTheme.gaugeWarn : AppTheme.gaugeNormal,
+      compact: compact,
+    );
+  }
+}
+
+class _PercentMetric extends StatelessWidget {
   final String label;
   final int value;
   final Color color;
+  final bool compact;
 
-  const _ProgressBar({
-    required this.icon,
-    required this.iconColor,
+  const _PercentMetric({
     required this.label,
     required this.value,
     required this.color,
+    required this.compact,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final display = value.clamp(0, 100);
+    return _MetricSurface(
+      color: color,
+      compact: compact,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final showBar = constraints.maxHeight >= 46;
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: iconColor, size: 14),
-              const SizedBox(width: 4),
-              Text(label, style: AppTheme.labelMediumPrimary),
-              const Spacer(),
-              Text('$value%',
-                  style: AppTheme.valueSmall.copyWith(color: color)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Stack(
-            children: [
-              Container(
-                height: 14,
-                decoration: const BoxDecoration(
-                  color: AppTheme.slateGray,
-                ),
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: compact
+                      ? AppTheme.dashboardMetricLabelCompact
+                      : AppTheme.dashboardMetricLabel),
+              const SizedBox(height: 2),
+              FittedBox(
+                alignment: Alignment.centerLeft,
+                fit: BoxFit.scaleDown,
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(
+                      text: '$display',
+                      style: AppFonts.monoStyle(
+                          fontSize: compact ? 19 : 24,
+                          color: AppTheme.dashboardValue)),
+                  TextSpan(
+                      text: '%',
+                      style: AppFonts.monoStyle(
+                          fontSize: compact ? 11 : 14, color: color)),
+                ])),
               ),
-              FractionallySizedBox(
-                widthFactor: value / 100,
-                child: Container(
-                  height: 14,
-                  decoration: BoxDecoration(
-                    // 高亮不用模糊：顶部亮色竖向渐变替代原 BoxShadow 发光。
-                    // BoxShadow.toPaint() 内部会构造 MaskFilter.blur，等于每次
-                    // 重建都触发一次离屏模糊；而这条进度条每个 OBD 数据 tick
-                    // 都会重建（throttle/load 各自 select）。
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color.lerp(color, Colors.white, 0.45)!,
-                        color,
-                      ],
+              if (showBar) ...[
+                SizedBox(height: compact ? 2 : 5),
+                Container(
+                  height: compact ? 6 : 8,
+                  color: AppTheme.slateGray,
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: display / 100,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        // 无离屏模糊：沿用原卡高亮渐变，统一为轻量细数据条。
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color.lerp(color, AppTheme.dashboardValue, 0.35)!,
+                            color
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-/// 气压趋势图
-class _PressureChart extends StatelessWidget {
-  final int pressure;
-  final List<int> pressureHistory;
+/// 压力模块仅监听 010B 历史版本，不因 RPM / 车速每帧刷新柱图。
+class _PressureMetric extends StatelessWidget {
+  final bool compact;
+  const _PressureMetric({required this.compact});
 
-  const _PressureChart({
-    required this.pressure,
-    required this.pressureHistory,
-  });
+  @override
+  Widget build(BuildContext context) {
+    context.select<OBDDataProvider, int>((p) => p.pressureHistoryVersion);
+    final provider = context.read<OBDDataProvider>();
+    final pressure = provider.data.pressure;
+    final history = provider.pressureHistory;
+    return _MetricSurface(
+      color: AppTheme.gaugeNormal,
+      compact: compact,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final showChart = constraints.maxHeight >= 55;
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('进气歧管压力',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: compact
+                      ? AppTheme.dashboardMetricLabelCompact
+                      : AppTheme.dashboardMetricLabel),
+              const SizedBox(height: 2),
+              FittedBox(
+                alignment: Alignment.centerLeft,
+                fit: BoxFit.scaleDown,
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(
+                      text: '$pressure',
+                      style: AppFonts.monoStyle(
+                          fontSize: compact ? 19 : 24,
+                          color: AppTheme.dashboardValue)),
+                  TextSpan(
+                      text: ' kPa',
+                      style: AppFonts.monoStyle(
+                          fontSize: compact ? 10 : 12,
+                          color: AppTheme.gaugeNormal)),
+                ])),
+              ),
+              if (showChart) ...[
+                const SizedBox(height: 4),
+                Expanded(
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      size: Size.infinite,
+                      painter: PressureChartPainter(
+                        pressureHistory: history,
+                        minPressure: 0,
+                        maxPressure: 150,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _MetricSurface extends StatelessWidget {
+  final Color color;
+  final bool compact;
+  final Widget child;
+  const _MetricSurface(
+      {required this.color, required this.compact, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: EdgeInsets.all(compact ? 5 : 7),
+      decoration: const BoxDecoration(color: AppTheme.backgroundDark30),
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(Icons.compress, color: AppTheme.primary, size: 14),
-              const SizedBox(width: 4),
-              const Text('进气歧管压力', style: AppTheme.labelMediumPrimary),
-              const Spacer(),
-              Text('$pressure kPa', style: AppTheme.valueSmall),
-            ],
-          ),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 56,
-            child: CustomPaint(
-              size: Size.infinite,
-              painter: PressureChartPainter(
-                pressureHistory: pressureHistory,
-                minPressure: 0,
-                maxPressure: 150,
-              ),
-            ),
-          ),
+          Container(width: 2, color: color),
+          const SizedBox(width: 6),
+          Expanded(child: child),
         ],
       ),
     );
   }
 }
 
-/// 气压图表绘制器（柱状图，最近30个点，全直角矩形柱）
+/// 压力柱图：最近 30 次 010B 响应，无模糊，末段亮度强调。
 class PressureChartPainter extends CustomPainter {
   final List<int> pressureHistory;
   final int minPressure;
@@ -209,96 +259,45 @@ class PressureChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (pressureHistory.isEmpty) return;
-
-    final width = size.width;
-    final height = size.height;
-
-    // 取最后 30 个点
+    if (pressureHistory.isEmpty || size.isEmpty) return;
     final start = math.max(0, pressureHistory.length - _maxBars);
     final data = pressureHistory.sublist(start);
-    final count = data.length;
-
-    // 计算柱宽
-    final totalGap = _gap * (count - 1);
-    final barW = (width - totalGap) / count;
+    final totalGap = _gap * (data.length - 1);
+    final barW = math.max(0.0, (size.width - totalGap) / data.length);
+    if (barW == 0) return;
     final range = (maxPressure - minPressure).toDouble();
+    if (range <= 0) return;
 
-    // 底部基线
     final baselinePaint = Paint()
       ..color = AppTheme.primary30
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(0, height), Offset(width, height), baselinePaint);
+    canvas.drawLine(
+        Offset(0, size.height), Offset(size.width, size.height), baselinePaint);
 
-    // 柱子渐变画笔：共享一个覆盖整个画布高度的 shader，避免逐柱重建
-    // 竖向渐变从 Y=0（primary）到 Y=height（primary30），所有普通柱子共用
-    final sharedShader = const LinearGradient(
+    final shader = const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [AppTheme.primary, AppTheme.primary30],
-    ).createShader(Rect.fromLTWH(0, 0, 1, height));
-
-    final barPaint = Paint()..shader = sharedShader;
-    final lastBarPaint = Paint()..color = AppTheme.primary;
-
-    for (int i = 0; i < count; i++) {
-      final left = i * (barW + _gap);
-      final normalized = (data[i] - minPressure) / range;
-      final barH = normalized * height;
-      final top = height - barH;
-      final rect = Rect.fromLTWH(left, top, barW, barH);
-
-      // 最新一根柱子（最右侧）高亮：纯色亮柱 + 顶部亮边，不做模糊发光
-      if (i == count - 1) {
-        canvas.drawRect(rect, lastBarPaint);
-        canvas.drawRect(
-          Rect.fromLTWH(rect.left, rect.top, rect.width, 1.5),
-          Paint()..color = Colors.white.withValues(alpha: 0.7),
-        );
-      } else {
-        canvas.drawRect(rect, barPaint);
+    ).createShader(Rect.fromLTWH(0, 0, 1, size.height));
+    final barPaint = Paint()..shader = shader;
+    final lastBarPaint = Paint()..color = AppTheme.gaugeNormal;
+    for (var i = 0; i < data.length; i++) {
+      final normalized = ((data[i] - minPressure) / range).clamp(0.0, 1.0);
+      final barH = normalized * size.height;
+      final rect =
+          Rect.fromLTWH(i * (barW + _gap), size.height - barH, barW, barH);
+      canvas.drawRect(rect, i == data.length - 1 ? lastBarPaint : barPaint);
+      if (i == data.length - 1 && barH > 1.5) {
+        canvas.drawRect(Rect.fromLTWH(rect.left, rect.top, rect.width, 1.5),
+            Paint()..color = AppTheme.dashboardValue);
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant PressureChartPainter oldDelegate) {
-    // pressureHistory 是原地修改的同一 List 实例，last 比较无效，直接返回 true
-    return true;
-  }
-}
-
-/// 电压显示
-class _VoltageDisplay extends StatelessWidget {
-  final double voltage;
-
-  const _VoltageDisplay({required this.voltage});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: const BoxDecoration(
-        color: AppTheme.backgroundDark30,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.battery_charging_full,
-                  color: AppTheme.accentGreen, size: 14),
-              SizedBox(width: 4),
-              Text('控制模块电压', style: AppTheme.labelMediumPrimary),
-            ],
-          ),
-          Text(
-            '${voltage.toStringAsFixed(1)}V',
-            style: AppTheme.valueSmall.copyWith(color: AppTheme.accentGreen),
-          ),
-        ],
-      ),
-    );
-  }
+  bool shouldRepaint(covariant PressureChartPainter oldDelegate) =>
+      oldDelegate.pressureHistory != pressureHistory ||
+      oldDelegate.minPressure != minPressure ||
+      oldDelegate.maxPressure != maxPressure;
 }

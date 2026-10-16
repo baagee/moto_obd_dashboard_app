@@ -79,18 +79,15 @@ class _TrackRadarCardState extends State<TrackRadarCard>
 
     // 从末端往回找累计距离 >= _minBearingDistM 的"头部"点
     // 跳过 gapBefore 段（GPS 失联段不参与）
-    final metersPerLng =
-        111320.0 * cos(track.last.latitude * pi / 180);
+    final metersPerLng = 111320.0 * cos(track.last.latitude * pi / 180);
     const metersPerLat = 110540.0;
 
     double accDist = 0.0;
     int headIdx = track.length - 1;
     for (int i = track.length - 1; i > 0; i--) {
       if (track[i].gapBefore) break; // 遇到失联断点停止往前追溯
-      final dx =
-          (track[i].longitude - track[i - 1].longitude) * metersPerLng;
-      final dy =
-          (track[i].latitude - track[i - 1].latitude) * metersPerLat;
+      final dx = (track[i].longitude - track[i - 1].longitude) * metersPerLng;
+      final dy = (track[i].latitude - track[i - 1].latitude) * metersPerLat;
       accDist += sqrt(dx * dx + dy * dy);
       headIdx = i - 1;
       if (accDist >= _minBearingDistM) break;
@@ -122,8 +119,7 @@ class _TrackRadarCardState extends State<TrackRadarCard>
     // setState / 重建，在 build() 内调用是安全的
     _syncAnimation(isRiding);
     // 速度着色阈值与仪表盘共用，用户在设置页调整后轨迹雷达同步生效
-    final warnSpeed =
-        context.select<SettingsProvider, int>((s) => s.warnSpeed);
+    final warnSpeed = context.select<SettingsProvider, int>((s) => s.warnSpeed);
     final dangerSpeed =
         context.select<SettingsProvider, int>((s) => s.dangerSpeed);
 
@@ -137,7 +133,7 @@ class _TrackRadarCardState extends State<TrackRadarCard>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('轨迹雷达', style: AppTheme.labelMediumPrimary),
+              const Text('轨迹雷达', style: AppTheme.dashboardCardTitle),
               Row(
                 children: [
                   Container(
@@ -152,13 +148,13 @@ class _TrackRadarCardState extends State<TrackRadarCard>
                   const SizedBox(width: 4),
                   Text(
                     isRiding ? 'LIVE' : 'STANDBY',
-                    style: AppTheme.labelTiny.copyWith(
+                    style: AppTheme.dashboardStatus.copyWith(
                       color:
                           isRiding ? AppTheme.accentGreen : AppTheme.textMuted,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text('15MIN', style: AppTheme.labelTiny),
+                  const Text('15MIN', style: AppTheme.dashboardStatus),
                 ],
               ),
             ],
@@ -227,8 +223,7 @@ class _StandbyHint extends StatelessWidget {
             height: 8,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color:
-                  AppTheme.gaugeNormal.withValues(alpha: 0.3 + 0.7 * pulse),
+              color: AppTheme.gaugeNormal.withValues(alpha: 0.3 + 0.7 * pulse),
               boxShadow: AppTheme.glowShadow(
                 AppTheme.gaugeNormal,
                 blur: 10,
@@ -519,7 +514,9 @@ class _TrackRadarDynamicPainter extends CustomPainter {
       if (m.timestamp.isBefore(cutoff)) continue;
       final o = toScreen(m.latitude, m.longitude);
       // 超出当前轨迹视野的徽章不画
-      if (o.dx < -8 || o.dx > size.width + 8 || o.dy < -8 ||
+      if (o.dx < -8 ||
+          o.dx > size.width + 8 ||
+          o.dy < -8 ||
           o.dy > size.height + 8) {
         continue;
       }

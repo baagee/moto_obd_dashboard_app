@@ -90,6 +90,8 @@ lib/
 ├── constants/
 │   └── bluetooth_constants.dart     # 蓝牙相关常量
 └── widgets/                         # 所有 UI 组件（仪表、图表、弹窗、按钮等）
+    ├── vehicle_health_card.dart      # 右上横向车辆健康卡：冷却水温 / 进气温度 / 电压（负温、低频 PID 有效性）
+    ├── telemetry_chart_card.dart     # 实时趋势组件保留，但不再挂载在驾驶仪表盘（骑行记录未存 RPM 序列）
     ├── track_radar_panel.dart       # 右下角面板：档位 + 轨迹雷达/导航卡切换
     ├── navi_card.dart               # 导航卡 v2：真实路线底图（航向朝上）+ 独立动作条 + 四列指标条
     ├── navi_hud_banner.dart         # 临近路口通栏（多动作序列 + 呼吸 + 侧光）
@@ -649,6 +651,19 @@ ETA 为 1.5 / 2.9 / 5.2 秒——三个动作同时落在 8 秒通栏窗口内�
 > `smoothTickPeriod: const Duration(hours: 1)` 冻结平滑 —— 平滑推进让"剩余 100 米"
 > 在 `pump(350ms)` 后变成 96 米，且依赖真实墙钟，会让断言飘。平滑行为本身由
 > `navi_provider_test.dart` 的「里程平滑」组用 20ms 心跳覆盖。
+
+## 仪表盘车辆健康卡（实时信息布局）
+
+赛博朋克仪表盘右上角由 `VehicleHealthCard` 代替转速/速度趋势图；右栏仍维持上方 1/3、下方 2/3（轨迹雷达 / 导航卡）。卡片为横向一主两辅：冷却水温、进气温度、控制模块电压。左栏移除重复电压，中央 `CombinedGaugeCard` 和启动自检移除重复的双温度梯形，保留 RPM/速度主仪表。
+
+- OBD PID `0105`、`010F` 按 `A - 40` 解码，合法值包含 `-20°C` 与 `0°C`。**不能按 `≤0` 判无数据。**冷却水温及进气温度明确显示 `°C`，电压显示 `V`；低温状态显示 `COLD`，非 `NO DATA`。`coolantTemperatureRatio()` 仍提供 `-40～120°C` 位置换算，但当前页面不画温区带。
+- `OBDDataProvider` 分别跟踪 `hasCoolantTemp` / `hasIntakeTemp` / `hasVoltage`，仅收到本次连接相应 PID 后才显示其读数；断开重置有效性，避免初连时默认零值被误认为真实 `0°C`。电压 `≤0V` 显示缺数。冷却水温仅在本次连接内保留最近 16 次 `0105` 样本用于微趋势（不持久化，断开即清空）。
+- 右上卡通过 `context.select` 只监听两项温度、电压、连接状态、PID 有效性及水温样本。横向三块采用与左侧车辆状态相同的暗底块 / 蓝青指标标签 / 实色强调条；水温在高度允许时画真实样本微趋势（`CoolantTrendPainter`，固定最小 8°C 纵轴跨度），狭窄视口自动隐藏图表、优先保留读数。绘图不使用模糊、阴影或持续动画，也不会被高频 RPM/速度通知带着重绘。温度、电压分级是仪表显示提示，不替代骑行事件中可配置的故障阈值。
+- `TelemetryChartCard` 源文件保留但不在驾驶仪表盘挂载。现有骑行记录只持久化摘要/轨迹/事件，**没有 RPM 时序数据**；在扩展采样与存储前不能把实时内存历史当作已保存的骑行趋势。
+- 蓝牙 OBD 会话初始化成功时 `BluetoothProvider._updateDeviceConnectedStatus()` 同步 `OBDDataProvider.setDeviceConnected(true)`；断开由 `_cleanupConnection()` 的 `resetData()` 同步清零。仅 BLE 连接而 ELM327 初始化未成功时仍为 `NO DATA`。
+- 左侧 `SideStatsPanel` 改为三块纵向实色边线数据仪表：油门开度 / 发动机负载用冷青等宽大数字与有色 `%` 单位、细进度条；进气歧管压力以 `kPa` 明确单位并保留最近 30 次 PID 的紧凑柱图。块面沿用右上卡的 `backgroundDark30`、蓝青指标标签和无模糊边线；负载默认正常青，仅 ≥70% 切换警告琥珀色，避免常态误报。矮屏优先保留读数，隐藏细条/压力图；子组件各自订阅 Provider，`pressureHistoryVersion` 仅在 010B 到达或断开时变化，高频 RPM/油门通知不重绘压力图。回归 `flutter test test/widgets/side_stats_panel_test.dart`。
+- 仪表盘 P0/P1 字阶由 `AppTheme.dashboardCardTitle`（14px 框架蓝粗体）、`dashboardMetricLabel`（12px 低饱和蓝青）、`dashboardMetricLabelCompact`（11px）、`dashboardStatus`（10px）、`dashboardNaviTitle`（12px 框架蓝）专用样式统一；普通读数使用 `dashboardValue` 冷青色，警告/危险仍使用 `gaugeWarn`/`gaugeDanger`。不改全局 `textPrimary` 与通用 `labelMediumPrimary`，避免波及设置页；不新增模糊/持续动画。左栏、右上与轨迹雷达标题同级；档位栏与导航卡标题因窄栏／状态空间用紧凑样式。导航卡标题行从 14px 加至 18px，地图仍是主块；底部四列保持独立渲染（flex 11:11:8:11），标签 11px、数值 14px 不随卡高等比例缩小，`FittedBox(scaleDown)` 仅作为极窄宽度兜底。改导航字阶必须继续通过 `navi_hud_widgets_test.dart` 的 244px / 196px 地图高度与无溢出断言。
+- 回归：`flutter test test/widgets/vehicle_health_card_test.dart`（负温、已连接但 PID 未到、重连清零、横向压缩、无模糊）及 `flutter test`。
 
 ## 重要说明
 

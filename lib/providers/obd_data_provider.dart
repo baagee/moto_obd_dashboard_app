@@ -33,13 +33,31 @@ class OBDDataProvider extends ChangeNotifier {
     intakeTemp: defaultIntakeTemp,
   );
 
+  // 水温微趋势仅保留本次连接最近 16 帧 PID 0105 响应，避免主仪表存储长期序列。
+  static const int maxCoolantHistoryPoints = 16;
+  List<int> _coolantTempHistory = const [];
+  List<int> get coolantTempHistory => _coolantTempHistory;
+
   // 历史数据
   List<int> _rpmHistory = List.generate(maxDataPoints, (_) => 0);
   List<int> _velocityHistory = List.generate(maxDataPoints, (_) => 0);
   List<int> _pressureHistory = List.generate(maxDataPoints, (_) => 0);
+  int _pressureHistoryVersion = 0;
+
+  /// 压力历史仅在 010B 到达时递增，避免速度/RPM 通知重绘压力图。
+  int get pressureHistoryVersion => _pressureHistoryVersion;
 
   // 连接状态
   bool _isDeviceConnected = false;
+
+  // 每项低频 PID 是否在本次连接后收到过；0°C 是合法温度，不能作为缺数哨兵。
+  bool _hasCoolantTemp = false;
+  bool _hasIntakeTemp = false;
+  bool _hasVoltage = false;
+
+  bool get hasCoolantTemp => _hasCoolantTemp;
+  bool get hasIntakeTemp => _hasIntakeTemp;
+  bool get hasVoltage => _hasVoltage;
 
   // 峰值保持（Peak-Hold）：本次骑行的最高 RPM / 最高速度
   // 骑行开始（startRide）或设备断开（resetData）时清零
@@ -79,6 +97,18 @@ class OBDDataProvider extends ChangeNotifier {
     double? voltage,
     int? timestamp,
   }) {
+    if (coolantTemp != null) {
+      _hasCoolantTemp = true;
+      _coolantTempHistory = [
+        ..._coolantTempHistory.length >= maxCoolantHistoryPoints
+            ? _coolantTempHistory.skip(1)
+            : _coolantTempHistory,
+        coolantTemp,
+      ];
+    }
+    if (intakeTemp != null) _hasIntakeTemp = true;
+    if (voltage != null) _hasVoltage = true;
+
     // 更新历史数据
     if (rpm != null) {
       _rpmHistory.add(rpm);
@@ -91,6 +121,7 @@ class OBDDataProvider extends ChangeNotifier {
     if (pressure != null) {
       _pressureHistory.add(pressure);
       if (_pressureHistory.length > maxDataPoints) _pressureHistory.removeAt(0);
+      _pressureHistoryVersion++;
     }
 
     // 更新峰值（Peak-Hold）
@@ -137,9 +168,14 @@ class OBDDataProvider extends ChangeNotifier {
   /// 重置数据为默认值（设备断开时调用）
   void resetData() {
     _isDeviceConnected = false;
+    _hasCoolantTemp = false;
+    _hasIntakeTemp = false;
+    _hasVoltage = false;
+    _coolantTempHistory = const [];
     _rpmHistory = List.generate(maxDataPoints, (_) => 0);
     _velocityHistory = List.generate(maxDataPoints, (_) => 0);
     _pressureHistory = List.generate(maxDataPoints, (_) => 0);
+    _pressureHistoryVersion++;
     resetPeaks();
 
     _data = OBDData(

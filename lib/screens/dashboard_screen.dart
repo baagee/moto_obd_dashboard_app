@@ -5,7 +5,7 @@ import '../providers/obd_data_provider.dart';
 import '../widgets/combined_gauge_card.dart';
 import '../widgets/navi_hud_banner.dart';
 import '../widgets/side_stats_panel.dart';
-import '../widgets/telemetry_chart_card.dart';
+import '../widgets/vehicle_health_card.dart';
 import '../widgets/track_radar_panel.dart';
 import '../widgets/self_check_overlay.dart';
 import '../widgets/danger_pulse_overlay.dart';
@@ -109,8 +109,8 @@ class _CyberpunkLayout extends StatelessWidget {
     final dangerRpm = context.select<SettingsProvider, int>((s) => s.dangerRpm);
     final dangerSpeed =
         context.select<SettingsProvider, int>((s) => s.dangerSpeed);
-    final rpmDanger = context
-        .select<OBDDataProvider, bool>((p) => p.data.rpm > dangerRpm);
+    final rpmDanger =
+        context.select<OBDDataProvider, bool>((p) => p.data.rpm > dangerRpm);
     final speedDanger = context
         .select<OBDDataProvider, bool>((p) => p.data.speed > dangerSpeed);
 
@@ -148,10 +148,10 @@ class _CyberpunkLayout extends StatelessWidget {
             flex: 3,
             child: Column(
               children: [
-                // 上半部分：实时遥测折线图（1/3）
+                // 上半部分：车辆健康状态（横向长方形）
                 Expanded(
                   flex: 1,
-                  child: TelemetryChartCard(),
+                  child: VehicleHealthCard(),
                 ),
 
                 SizedBox(height: 8),

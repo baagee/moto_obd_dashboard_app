@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:obd_dashboard/data/amap/models.dart';
@@ -10,12 +11,25 @@ import 'package:obd_dashboard/providers/navi_provider.dart';
 import 'package:obd_dashboard/providers/obd_data_provider.dart';
 import 'package:obd_dashboard/services/geocoding_service.dart';
 import 'package:obd_dashboard/services/location_service.dart';
+import 'package:obd_dashboard/theme/app_fonts.dart';
 import 'package:obd_dashboard/widgets/navi_card.dart';
-import 'package:obd_dashboard/widgets/navi_turn_arrow.dart';
 import 'package:provider/provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    // 测试引擎不加载系统字体；显式加载项目中使用的数字与界面字体。
+    for (final font in [
+      (AppFonts.display, 'assets/fonts/Orbitron-Bold.ttf'),
+      (AppFonts.mono, 'assets/fonts/RobotoMono-Bold.ttf'),
+      (AppFonts.ui, 'assets/fonts/SpaceGrotesk-Regular.ttf'),
+    ]) {
+      final data = await rootBundle.load(font.$2);
+      final loader = FontLoader(font.$1)..addFont(Future.value(data));
+      await loader.load();
+    }
+  });
 
   testWidgets('NaviCard 真实渲染（导航中）', (tester) async {
     final obd = OBDDataProvider()..updateRealTimeData(speed: 80);
@@ -26,11 +40,8 @@ void main() {
       logProvider: LogProvider(),
       client: client,
       positionStreamFactory: () => positions.stream,
-      // 测试环境没有平台插件：显式给出"权限已授、即时定位为空"，
-      // 否则卡片会渲染成"系统定位未开启"，金样本就不是正常导航态了
       locationGate: () async => LocationPermissionStatus.granted,
       firstFixProvider: () async => null,
-      // 金样本要求位置固定：冻结里程平滑心跳（否则每次 pump 都会挪动底图）
       smoothTickPeriod: const Duration(hours: 1),
     );
 
@@ -56,37 +67,23 @@ void main() {
         ),
       );
 
-      Future<void> feed(double d) async {
-        final gcj = navi.debugAnalyzer!.coordAt(d);
-        final wgs = _gcjToWgs(gcj.lat, gcj.lon);
-        positions.add(Position(
-          latitude: wgs.$1,
-          longitude: wgs.$2,
-          timestamp: DateTime.now(),
-          accuracy: 5,
-          altitude: 0,
-          altitudeAccuracy: 0,
-          heading: 90,
-          headingAccuracy: 0,
-          speed: 80 / 3.6,
-          speedAccuracy: 0,
-        ));
-        await tester.pump();
-        await tester.pump();
-      }
-
-      await feed(500);
+      final gcj = navi.debugAnalyzer!.coordAt(500);
+      final wgs = _gcjToWgs(gcj.lat, gcj.lon);
+      positions.add(Position(
+        latitude: wgs.$1,
+        longitude: wgs.$2,
+        timestamp: DateTime.now(),
+        accuracy: 5,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 90,
+        headingAccuracy: 0,
+        speed: 80 / 3.6,
+        speedAccuracy: 0,
+      ));
+      await tester.pump();
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
-
-      // ignore: avoid_print
-      print('displayActionCode = ${navi.displayActionCode}');
-      final arrowFinder = find.byWidgetPredicate((w) => w is NaviTurnArrow);
-      for (final e in arrowFinder.evaluate()) {
-        final w = e.widget as NaviTurnArrow;
-        // ignore: avoid_print
-        print('NaviTurnArrow type=${w.type} size=${w.size} '
-            'rect=${tester.getRect(find.byWidget(w))}');
-      }
 
       await expectLater(
         find.byType(Container).first,
@@ -115,7 +112,6 @@ class _FakeShareClient extends AmapShareClient {
   @override
   Future<String> resolveParam(String shareUrl) async => 'param-test';
 
-  // 显式实现两个状态端点：即便某个用例把时间推过心跳周期，也绝不会打到真实网络
   @override
   Future<ShareInfoEnvelope> probeNaviStatus(String param) async =>
       ShareInfoEnvelope(
