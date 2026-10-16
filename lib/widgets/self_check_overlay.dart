@@ -101,45 +101,44 @@ class _SelfCheckOverlayState extends State<SelfCheckOverlay>
               const SizedBox(width: 8),
               Expanded(
                 flex: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final size = Size(
-                        constraints.maxWidth,
-                        constraints.maxHeight,
-                      );
-                      return Stack(
-                        children: [
-                          CustomPaint(
-                            size: size,
-                            painter: GaugeStaticPainter(
-                              maxRpm: widget.maxRpm,
-                              warnRpm: widget.warnRpm,
-                              dangerRpm: widget.dangerRpm,
-                              maxSpeed: widget.maxSpeed,
-                              warnSpeed: widget.warnSpeed,
-                              dangerSpeed: widget.dangerSpeed,
-                            ),
+                // 与 CombinedGaugeCard 保持一致：不再套 8px 内边距，画布＝卡盒，
+                // 自检那圈指针/刻度与驾驶时逐像素同尺寸。
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final size = Size(
+                      constraints.maxWidth,
+                      constraints.maxHeight,
+                    );
+                    return Stack(
+                      children: [
+                        CustomPaint(
+                          size: size,
+                          painter: GaugeStaticPainter(
+                            maxRpm: widget.maxRpm,
+                            warnRpm: widget.warnRpm,
+                            dangerRpm: widget.dangerRpm,
+                            maxSpeed: widget.maxSpeed,
+                            warnSpeed: widget.warnSpeed,
+                            dangerSpeed: widget.dangerSpeed,
                           ),
-                          CustomPaint(
-                            size: size,
-                            painter: CombinedGaugePainter(
-                              rpm: _currentRpm,
-                              speed: _currentSpeed,
-                              gear: 0,
-                              maxRpm: widget.maxRpm,
-                              warnRpm: widget.warnRpm,
-                              dangerRpm: widget.dangerRpm,
-                              maxSpeed: widget.maxSpeed,
-                              warnSpeed: widget.warnSpeed,
-                              dangerSpeed: widget.dangerSpeed,
-                            ),
+                        ),
+                        CustomPaint(
+                          size: size,
+                          painter: CombinedGaugePainter(
+                            rpm: _currentRpm,
+                            speed: _currentSpeed,
+                            gear: 0,
+                            maxRpm: widget.maxRpm,
+                            warnRpm: widget.warnRpm,
+                            dangerRpm: widget.dangerRpm,
+                            maxSpeed: widget.maxSpeed,
+                            warnSpeed: widget.warnSpeed,
+                            dangerSpeed: widget.dangerSpeed,
                           ),
-                        ],
-                      );
-                    },
-                  ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 8),

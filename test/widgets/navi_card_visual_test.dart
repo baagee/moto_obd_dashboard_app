@@ -9,17 +9,19 @@ import 'package:obd_dashboard/data/amap/share_client.dart';
 import 'package:obd_dashboard/providers/log_provider.dart';
 import 'package:obd_dashboard/providers/navi_provider.dart';
 import 'package:obd_dashboard/providers/obd_data_provider.dart';
+import 'package:obd_dashboard/providers/settings_provider.dart';
 import 'package:obd_dashboard/services/geocoding_service.dart';
 import 'package:obd_dashboard/services/location_service.dart';
 import 'package:obd_dashboard/theme/app_fonts.dart';
 import 'package:obd_dashboard/widgets/navi_card.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
-    // 测试引擎不加载系统字体；显式加载项目中使用的数字与界面字体。
+    // 保持当前金图的项目拉丁字体；不调整字体或中文回退。
     for (final font in [
       (AppFonts.display, 'assets/fonts/Orbitron-Bold.ttf'),
       (AppFonts.mono, 'assets/fonts/RobotoMono-Bold.ttf'),
@@ -35,6 +37,10 @@ void main() {
     final obd = OBDDataProvider()..updateRealTimeData(speed: 80);
     final positions = StreamController<Position>.broadcast();
     final client = _FakeShareClient();
+    SharedPreferences.setMockInitialValues(
+        {'settings_navi_etaMode': 'duration'});
+    final settings = SettingsProvider();
+    await settings.init();
     final navi = NaviProvider(
       obdDataProvider: obd,
       logProvider: LogProvider(),
@@ -43,7 +49,7 @@ void main() {
       locationGate: () async => LocationPermissionStatus.granted,
       firstFixProvider: () async => null,
       smoothTickPeriod: const Duration(hours: 1),
-    );
+    )..updateSettings(settings);
 
     try {
       await navi.start('https://surl.amap.com/a');
@@ -92,6 +98,7 @@ void main() {
     } finally {
       await navi.stop();
       navi.dispose();
+      settings.dispose();
       await positions.close();
     }
   });
