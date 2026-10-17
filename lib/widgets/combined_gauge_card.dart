@@ -8,7 +8,10 @@ import '../theme/app_theme.dart';
 
 /// 组合仪表盘的分层几何：**半径的唯一真源**。
 ///
-/// 分层顺序（由圆心向外）：中心数值 → 指针 → **进度环** → 刻度线 → 刻度数字。
+/// 分层顺序（由圆心向外）：中心数值 → **进度环** → 刻度线 → 刻度数字。
+/// 中央另有一条由静态层绘制的**上下分栏短横线**（[dividerHalfWidth]），
+/// 把"上转速 / 下时速"两块读数分开。
+///
 /// 静态层（`GaugeStaticPainter`）与动态层（`CombinedGaugePainter`）都从这里取
 /// 半径，避免"两层各算一遍"漂移；测试也直接断言这里的几何关系。
 ///
@@ -61,27 +64,21 @@ class GaugeGeometry {
     required this.backgroundRadius,
   });
 
-  /// 环带内缘（指针可用的外边界）
+  /// 环带内缘（中心读数区的可用外边界）
   double get ringInner => ringRadius - ringWidth / 2;
 
   /// 环带外缘
   double get ringOuter => ringRadius + ringWidth / 2;
 
-  /// 指针尖端半径：环内缘再往里 16px，不碰进度环
-  double get pointerTipRadius => ringInner - 16;
+  /// 中心分栏线半宽：把上下两块读数分开的短横线（全长 = 0.44 × [ringInner]）
+  double get dividerHalfWidth => ringInner * 0.22;
 
-  /// 指针根部越过圆心的距离（保持改动前 0.10R 的相对比例）
-  double get pointerRootDist => ringRadius * 0.10;
-
-  /// 指针刀片最宽处半径（保持改动前 0.30R 的相对比例）
-  double get pointerMidDist => ringRadius * 0.30;
-
-  /// 中心轮毂半径（保持改动前 0.065R 的相对比例）
-  double get hubRadius => ringRadius * 0.065;
-
-  /// 中心大数字字号：按**环内缘**定标而不是 [ringRadius]。
+  /// 转速（上行）字号：按**环内缘**定标而不是 [ringRadius]。
   /// 缩径后若仍按 `0.24R` 会掉到 ~29px（主读数变小），故改由可用圆心区决定。
   double get centerValueFontSize => ringInner * 0.34;
+
+  /// 时速（下行）字号：比转速大一档，保证扫视时先落到时速上。
+  double get centerSpeedFontSize => centerValueFontSize * 1.2;
 
   /// 由画布尺寸推导整套半径。
   ///
@@ -205,7 +202,7 @@ class CombinedGaugeCard extends StatelessWidget {
                   dangerSpeed: dangerSpeed,
                 ),
               ),
-              // 动态层：进度/指针/数值，独立图层避免波及静态层
+              // 动态层：进度/数值，独立图层避免波及静态层
               RepaintBoundary(
                 child: CustomPaint(
                   size: size,
@@ -310,15 +307,10 @@ class CombinedGaugePainter extends CustomPainter {
     // 绘制下半圆 Speed 进度
     _drawSpeedProgress(canvas, g);
 
-    // 绘制指针
-    _drawRPMPointer(canvas, g);
-    _drawSpeedPointer(canvas, g);
-    _drawCenterHub(canvas, g);
-
-    // 绘制峰值保持标记（在指针之上，中心值之下）
+    // 峰值保持标记（中心值之下）：没有指针后，它是环上唯一的"到过哪里"标记
     _drawPeakMarkers(canvas, g);
 
-    // 绘制中心数值
+    // 绘制中心数值（上转速 / 下时速，中间由静态层的分栏线隔开）
     _drawCenterValues(canvas, g);
 
     // 温度与电压由右上方 VehicleHealthCard 统一展示。
@@ -418,164 +410,6 @@ class CombinedGaugePainter extends CustomPainter {
     );
   }
 
-  void _drawRPMPointer(Canvas canvas, GaugeGeometry g) {
-    if (rpm <= 0) return;
-
-    final center = g.center;
-
-    // 动态颜色：跟随 RPM 区间变化
-    Color color;
-    if (rpm <= warnRpm) {
-      color = AppTheme.gaugeNormal;
-    } else if (rpm <= dangerRpm) {
-      color = AppTheme.gaugeWarn;
-    } else {
-      color = AppTheme.gaugeDanger;
-    }
-
-    final sweepAngle = CombinedGaugePainter.rpmToAngle(rpm.toDouble(), maxRpm);
-    final angle = pi + sweepAngle;
-    final pointerLength = g.pointerTipRadius;
-    const halfWidth = 3.5;
-
-    // 指针尖端（贴近环带内缘）
-    final tipX = center.dx + pointerLength * cos(angle);
-    final tipY = center.dy + pointerLength * sin(angle);
-
-    // 指针根部（从圆心略微后退）
-    final rootDist = g.pointerRootDist;
-    final rootX = center.dx - rootDist * cos(angle);
-    final rootY = center.dy - rootDist * sin(angle);
-
-    // 刀片最宽处（距圆心约 30%）
-    final perpAngle = angle + pi / 2;
-    final midDist = g.pointerMidDist;
-    final midX = center.dx + midDist * cos(angle);
-    final midY = center.dy + midDist * sin(angle);
-    final leftX = midX + halfWidth * cos(perpAngle);
-    final leftY = midY + halfWidth * sin(perpAngle);
-    final rightX = midX - halfWidth * cos(perpAngle);
-    final rightY = midY - halfWidth * sin(perpAngle);
-
-    // 刀片路径：菱形（尖端→左宽→根部→右宽）
-    final bladePath = Path()
-      ..moveTo(tipX, tipY)
-      ..lineTo(leftX, leftY)
-      ..lineTo(rootX, rootY)
-      ..lineTo(rightX, rightY)
-      ..close();
-
-    // 实体刀片（渐变：根部→尖端高亮）
-    // 已精简：删除双层光晕与尖端发光点（与进度弧末端发光位置重复，降低视觉噪音与 blur 开销）
-    final bladeRect = Rect.fromPoints(Offset(rootX, rootY), Offset(tipX, tipY));
-    canvas.drawPath(
-      bladePath,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            color.withValues(alpha: 0.55),
-            Colors.white.withValues(alpha: 0.92),
-          ],
-        ).createShader(bladeRect)
-        ..style = PaintingStyle.fill,
-    );
-  }
-
-  void _drawSpeedPointer(Canvas canvas, GaugeGeometry g) {
-    if (speed <= 0) return;
-
-    final center = g.center;
-
-    // 动态颜色：跟随速度区间变化
-    Color color;
-    if (speed <= warnSpeed) {
-      color = AppTheme.gaugeNormal;
-    } else if (speed <= dangerSpeed) {
-      color = AppTheme.gaugeWarn;
-    } else {
-      color = AppTheme.gaugeDanger;
-    }
-
-    final sweepAngle =
-        CombinedGaugePainter.speedToAngle(speed.toDouble(), maxSpeed);
-    final angle = pi - sweepAngle;
-    final pointerLength = g.pointerTipRadius;
-    const halfWidth = 3.5;
-
-    // 指针尖端
-    final tipX = center.dx + pointerLength * cos(angle);
-    final tipY = center.dy + pointerLength * sin(angle);
-
-    // 指针根部
-    final rootDist = g.pointerRootDist;
-    final rootX = center.dx - rootDist * cos(angle);
-    final rootY = center.dy - rootDist * sin(angle);
-
-    // 刀片最宽处
-    final perpAngle = angle + pi / 2;
-    final midDist = g.pointerMidDist;
-    final midX = center.dx + midDist * cos(angle);
-    final midY = center.dy + midDist * sin(angle);
-    final leftX = midX + halfWidth * cos(perpAngle);
-    final leftY = midY + halfWidth * sin(perpAngle);
-    final rightX = midX - halfWidth * cos(perpAngle);
-    final rightY = midY - halfWidth * sin(perpAngle);
-
-    final bladePath = Path()
-      ..moveTo(tipX, tipY)
-      ..lineTo(leftX, leftY)
-      ..lineTo(rootX, rootY)
-      ..lineTo(rightX, rightY)
-      ..close();
-
-    // 实体刀片（渐变）
-    // 已精简：删除双层光晕与尖端发光点（与进度弧末端发光位置重复，降低视觉噪音与 blur 开销）
-    final bladeRect = Rect.fromPoints(Offset(rootX, rootY), Offset(tipX, tipY));
-    canvas.drawPath(
-      bladePath,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            color.withValues(alpha: 0.55),
-            Colors.white.withValues(alpha: 0.92),
-          ],
-        ).createShader(bladeRect)
-        ..style = PaintingStyle.fill,
-    );
-  }
-
-  /// 金属轮毂（统一替代两个指针末尾的中心白点）
-  void _drawCenterHub(Canvas canvas, GaugeGeometry g) {
-    final center = g.center;
-    final hubR = g.hubRadius;
-
-    // 金属质感径向渐变圆盘
-    canvas.drawCircle(
-      center,
-      hubR,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.95),
-            AppTheme.primary.withValues(alpha: 0.7),
-            AppTheme.backgroundDark,
-          ],
-          stops: const [0.0, 0.45, 1.0],
-        ).createShader(Rect.fromCircle(center: center, radius: hubR)),
-    );
-
-    // 顶层高光小点（偏左上，营造金属反光感）
-    canvas.drawCircle(
-      center.translate(-hubR * 0.22, -hubR * 0.22),
-      hubR * 0.22,
-      Paint()..color = Colors.white.withValues(alpha: 0.75),
-    );
-  }
-
   /// 峰值保持标记（Peak-Hold）：弧上覆盖一条短亮线，无发光层
   /// 无数字标签；峰值 > 0 才绘制
   void _drawPeakMarkers(Canvas canvas, GaugeGeometry g) {
@@ -629,15 +463,21 @@ class CombinedGaugePainter extends CustomPainter {
     return AppTheme.gaugeDanger;
   }
 
-  /// 中心数值块：RPM 在上、速度在下，均跟随区间变色。
+  /// 中心数值块：转速（上行）在上、时速（下行）在下，均跟随区间变色，
+  /// 两者之间由静态层画的分栏短横线隔开（见 `GaugeStaticPainter._drawCenterDivider`）。
   ///
   /// 缩径后改用**环内缘**（`g.ringInner`）定标而不是环半径：主读数不跟着环径
   /// 一起变小；数值与单位采用**顺序布局**（单位永远贴着数值放），避免调字号时重叠。
+  ///
+  /// 两行**不等号**：时速比转速大一档（[GaugeGeometry.centerSpeedFontSize]），
+  /// 扫视时先落到时速上。
   void _drawCenterValues(Canvas canvas, GaugeGeometry g) {
     final center = g.center;
     final innerR = g.ringInner;
-    final valueFontSize = g.centerValueFontSize;
+    final valueFontSize = g.centerValueFontSize; // 转速（上行）
+    final speedFontSize = g.centerSpeedFontSize; // 时速（下行）
     final unitFontSize = valueFontSize * 0.34;
+    final speedUnitFontSize = speedFontSize * 0.34;
     final gap = innerR * 0.02;
 
     // RPM 在上半圆视觉中心：数值在 center 上方， 单位在数值更上方
@@ -683,15 +523,15 @@ class CombinedGaugePainter extends CustomPainter {
     );
 
     // Speed 在下半圆视觉中心：数值在 center 下方， 单位在数值更下方
-    // Speed 值 — 跟随区间变色
+    // Speed 值 — 跟随区间变色（字号比转速大一档）
     final speedColor = zoneColor(speed, warnSpeed, dangerSpeed);
     final speedValueTop = center.dy + innerR * 0.30;
-    final speedUnitTop = speedValueTop + valueFontSize * 1.2 + gap;
+    final speedUnitTop = speedValueTop + speedFontSize * 1.2 + gap;
 
     final speedTextSpan = TextSpan(
       text: '$speed',
       style: AppFonts.displayStyle(
-        fontSize: valueFontSize,
+        fontSize: speedFontSize,
         color: speedColor,
         letterSpacing: -1,
       ),
@@ -709,7 +549,7 @@ class CombinedGaugePainter extends CustomPainter {
     final speedUnitSpan = TextSpan(
       text: 'km/h',
       style: AppFonts.monoStyle(
-        fontSize: unitFontSize,
+        fontSize: speedUnitFontSize,
         color: speedColor.withValues(alpha: 0.7),
       ).copyWith(fontWeight: FontWeight.w500),
     );
@@ -766,6 +606,39 @@ class GaugeStaticPainter extends CustomPainter {
     _drawBackground(canvas, g);
     _drawTickBackground(canvas, g);
     _drawTicks(canvas, g);
+    _drawCenterDivider(canvas, g);
+  }
+
+  /// 中心上下分栏线：把"上转速 / 下时速"两块读数分开。
+  ///
+  /// 纯静态几何（只依赖画布尺寸），画在静态层，不跟着 RPM/速度的每帧通知重绘。
+  /// 只用实色描边，不使用 MaskFilter（见 combined_gauge_card_blur_test.dart）。
+  /// 注意它不是刻度线：两边共用的 0 刻度在**正左方**（角度 π），和这条线无关。
+  void _drawCenterDivider(Canvas canvas, GaugeGeometry g) {
+    final center = g.center;
+    final half = g.dividerHalfWidth;
+    const capW = 3.0;
+    const capH = 7.0;
+
+    // 主体横线
+    canvas.drawLine(
+      Offset(center.dx - half, center.dy),
+      Offset(center.dx + half, center.dy),
+      Paint()
+        ..color = AppTheme.primary.withValues(alpha: 0.55)
+        ..strokeWidth = 2,
+    );
+
+    // 两端端帽
+    final capPaint = Paint()..color = AppTheme.primary70;
+    canvas.drawRect(
+      Rect.fromLTWH(center.dx - half - capW, center.dy - capH / 2, capW, capH),
+      capPaint,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(center.dx + half, center.dy - capH / 2, capW, capH),
+      capPaint,
+    );
   }
 
   void _drawBackground(Canvas canvas, GaugeGeometry g) {
@@ -971,7 +844,7 @@ class GaugeStaticPainter extends CustomPainter {
     );
   }
 
-  /// 刻度线/数字的分区色：临界值本身算入**下一档**（与数值/指针所用的
+  /// 刻度线/数字的分区色：临界值本身算入**下一档**（与数值所用的
   /// [CombinedGaugePainter.zoneColor] 的 `<=` 语义不同），保持改动前观感
   static Color _tickZoneColor(int value, int warn, int danger) {
     if (value < warn) return AppTheme.gaugeNormal;

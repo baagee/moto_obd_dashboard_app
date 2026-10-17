@@ -15,8 +15,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// 中央组合仪表**分层顺序**回归。
 ///
 /// 背景：进度环原来在最外层、刻度线与刻度数字被挤在环**内侧**；本方案把顺序反转成
-/// 「中心数值 → 指针 → **进度环** → 刻度线 → 刻度数字（最外）」，代价是整体缩径
+/// 「中心数值 → **进度环** → 刻度线 → 刻度数字（最外）」，代价是整体缩径
 /// 约 28%（环外预算 ≈ 54px，见 `GaugeGeometry.of`）。
+///
+/// 跟进：**两根指针与中心轮毂已移除**，中心改成"上行转速 / 下行时速"两块读数，
+/// 中间用静态层画的短横线分栏（`dividerHalfWidth`），时速字号比转速大一档。
+/// 原先锁"指针尖端落在环带内侧"的用例相应改成锁分栏线与两行字号的几何关系。
 ///
 /// 跟进：**环半径与刻度数字字号已彻底解耦**——环位置只由画布尺寸算（冻结定义），
 /// 数字字号由"环外剩余带宽 + 最外 3 字符标签不出画布"反解。这条由「环位置只由画布
@@ -103,9 +107,9 @@ void main() {
           g.labelRadius,
           g.labelFontSize,
           g.backgroundRadius,
-          g.pointerTipRadius,
-          g.hubRadius,
+          g.dividerHalfWidth,
           g.centerValueFontSize,
+          g.centerSpeedFontSize,
         ]) {
           expect(v.isFinite, isTrue, reason: '$size 出现非有限半径');
         }
@@ -118,12 +122,24 @@ void main() {
       }
     });
 
-    test('指针尖端落在环带内侧，不与进度环重叠', () {
+    test('中心分栏线落在环内：不碰进度环，也不退化成一个小点', () {
       for (final size in sizes) {
         final g = GaugeGeometry.of(size);
-        expect(g.pointerTipRadius, lessThan(g.ringInner), reason: '$size');
-        expect(g.pointerTipRadius, greaterThan(g.hubRadius * 2),
-            reason: '$size: 指针不能退化成一个点');
+        expect(g.dividerHalfWidth * 2, lessThan(g.ringInner),
+            reason: '$size: 分栏线比环内缘还宽');
+        expect(g.dividerHalfWidth, greaterThan(8.0),
+            reason: '$size: 分栏线太短，读不出"上下两栏"');
+      }
+    });
+
+    test('中心两行不等号：时速字号大于转速', () {
+      for (final size in sizes) {
+        final g = GaugeGeometry.of(size);
+        expect(g.centerSpeedFontSize, greaterThan(g.centerValueFontSize * 1.1),
+            reason: '$size: 时速没有比转速更突出');
+        // 两行墨迹加中间的分栏线必须留得下：上行的底 + 下行的顶之间要有空隙
+        expect(g.centerSpeedFontSize, lessThan(g.centerValueFontSize * 1.5),
+            reason: '$size: 时速字号过大，下行会顶到分栏线');
       }
     });
 
@@ -246,15 +262,19 @@ void main() {
       }
     });
 
-    testWidgets('静态层：刻度线与数字全在环带内缘之外', (tester) async {
+    testWidgets('静态层：刻度线与数字全在环带内缘之外（环内只剩中心分栏线）',
+        (tester) async {
       for (final size in [const Size(341, 344), const Size(800, 300)]) {
         final g = GaugeGeometry.of(size);
         final tag = '${size.width.toInt()}x${size.height.toInt()}';
         final (w, h, bytes) = await rasterize(tester, staticPainter(), size);
 
         var count = 0;
-        var minR = double.infinity;
         var maxR = 0.0;
+        // 环带内缘以内：**只允许**中心分栏线的墨迹
+        var insideCount = 0;
+        var insideMaxX = 0.0;
+        var insideMaxY = 0.0;
         for (var y = 0; y < h; y++) {
           for (var x = 0; x < w; x++) {
             if (!ink(bytes, w, x, y)) continue;
@@ -262,16 +282,27 @@ void main() {
             final dy = y - g.center.dy;
             final r = math.sqrt(dx * dx + dy * dy);
             count++;
-            if (r < minR) minR = r;
             if (r > maxR) maxR = r;
+            if (r < g.ringInner - 1) {
+              insideCount++;
+              if (dx.abs() > insideMaxX) insideMaxX = dx.abs();
+              if (dy.abs() > insideMaxY) insideMaxY = dy.abs();
+            }
           }
         }
 
         expect(count, greaterThan(200), reason: '$tag: 刻度/数字应当画出来了');
-        // 核心不变量：环带内缘以内不得再有任何刻度墨水
-        expect(minR, greaterThanOrEqualTo(g.ringInner - 1),
-            reason: '$tag: 仍有刻度墨水落在环带内'
-                '（最小半径 $minR < 环内缘 ${g.ringInner}）');
+
+        // 核心不变量：环带内缘以内不得再有**刻度**墨水。
+        // 唯一例外是静态层画的那条中心分栏线：横向 = 半宽 + 3px 端帽（留 1px 抗锯齿余量），
+        // 纵向 = 2px 线 + 7px 端帽的一半再留余量。
+        expect(insideMaxX, lessThanOrEqualTo(g.dividerHalfWidth + 4),
+            reason: '$tag: 环内出现了分栏线以外的墨水'
+                '（横向伸到 ${insideMaxX}，分栏线半宽 ${g.dividerHalfWidth}）');
+        expect(insideMaxY, lessThanOrEqualTo(4.0),
+            reason: '$tag: 环内出现了分栏线以外的墨水（纵向伸到 $insideMaxY）');
+        expect(insideCount, greaterThan(0), reason: '$tag: 中心分栏线没有画出来');
+
         // 刻度线确实伸到了环带外
         expect(maxR, greaterThan(g.ringOuter + 6),
             reason: '$tag: 刻度线没伸到环外（最大半径 $maxR）');
